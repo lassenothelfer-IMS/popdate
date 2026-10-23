@@ -4,7 +4,7 @@ Oct 23, 2026 · @Lasse
 
 ## What Popdate is
 
-Popdate is a native iOS dating game: one popper and 5 contestants in a chat room, and the popper pops balloons until one contestant is left, who becomes the match. The popper can be a woman with 5 men or a man with 5 women. There are no hosts: the app fills every room from the queue.
+Popdate is a mobile dating game, iOS first and built with React Native: one popper and 5 contestants in a chat room, and the popper pops balloons until one contestant is left, who becomes the match. The popper can be a woman with 5 men or a man with 5 women. There are no hosts: the app fills every room from the queue.
 
 It is built on the format of the viral YouTube and Netflix show "Pop the Balloon or Find Love", but as a live app anyone can join. The working title is Popdate. The MVP is the smallest version that proves the loop works with real people on real phones.
 
@@ -47,7 +47,7 @@ With 5 contestants there are 4 rounds. After the 4th pop, one balloon is left, a
 
 ## What the app does
 
-The iOS app has seven screens, all in SwiftUI.
+The app has seven screens, all in React Native with Expo.
 
 | Screen | Who sees it | What happens there |
 | --- | --- | --- |
@@ -67,9 +67,9 @@ Report and block stay available on every person in the room (long-press).
 
 ## How it is built
 
-The app is a thin SwiftUI client. Matchmaking, roles, timers, photo reveals and pops all run on the Supabase server, so the phone can never cheat.
+The app is a thin React Native client. Matchmaking, roles, timers, photo reveals and pops all run on the Supabase server, so the phone can never cheat.
 
-- **Client:** SwiftUI, iOS 17+, supabase-swift.
+- **Client:** React Native with Expo and TypeScript, Expo Router for navigation, supabase-js for auth, data and realtime. iOS first; the same code can ship to Android later.
 - **Backend:** Supabase with Postgres, row level security, realtime updates, and Storage for the photos.
 - **Rule of the repo:** the app never decides roles, who is popped or which photo is shown. It only calls server functions.
 - **Photo privacy:** a contestant's photo N is only readable by people in the room once round N has started.
@@ -113,21 +113,21 @@ Four people, four folders, one shared repo. Each person works with their own Cla
 - Send the project URL and keys to Lasse
 - Later: admin view for reports and push notifications
 
-### Lasse: iOS app (`ios/Popdate/`, except Safety)
+### Lasse: mobile app (`mobile/`, except Safety)
 
-- Create the Xcode project (SwiftUI, iOS 17+) and connect it to Jonas's Supabase
-- Build onboarding and profile setup with 6 photo uploads
+- Create the Expo app (React Native, TypeScript) and connect it to Jonas's Supabase
+- Build onboarding and profile setup with 6 photo uploads (expo-image-picker)
 - Build the home screen and the queue screen
 - Build the game room: question picker, answers, photo reveals, timers, pop, watch or leave
 - Build the match screen
-- Test the full flow on real phones
+- Test the full flow on real phones with an Expo development build
 
-### Elias: App Store and safety (`docs/`, `ios/Popdate/Features/Safety/`)
+### Elias: App Store and safety (`docs/`, `mobile/src/features/safety/`)
 
-- Set team and bundle ID in `ios/project.yml`
-- Create the app in App Store Connect and upload the first TestFlight build
+- Set team and bundle ID in `mobile/app.json` and set up EAS Build
+- Create the app in App Store Connect and upload the first TestFlight build with EAS Submit
 - Write the privacy policy and terms, link them in onboarding
-- Replace anonymous login with Sign in with Apple
+- Replace anonymous login with Sign in with Apple (expo-apple-authentication)
 - Own the report and block UI and the App Store review answers
 
 ### Kian: marketing (`marketing/`)
@@ -170,7 +170,7 @@ The game is a text chat room with photos, not a livestream. The MVP skips everyt
 - Push notifications when a room goes live
 - Payments, premium features, profile photos
 - Selfie verification and an admin view for reports
-- Android and web versions
+- Android and web releases (the React Native code can target Android later, but the MVP only ships and tests on iOS)
 
 ### Main risks
 
