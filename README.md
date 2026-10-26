@@ -67,55 +67,84 @@ Report and block stay available on every person in the room (long-press).
 
 ## How it is built
 
-The app is a thin React Native client. Matchmaking, roles, timers, photo reveals and pops all run on the Supabase server, so the phone can never cheat.
+The app is a thin React Native client. Matchmaking, roles, timers, photo reveals and pops all run on the Convex server, so the phone can never cheat.
 
-- **Client:** React Native with Expo and TypeScript, Expo Router for navigation, supabase-js for auth, data and realtime. iOS first; the same code can ship to Android later.
-- **Backend:** Supabase with Postgres, row level security, realtime updates, and Storage for the photos.
+- **Client:** React Native with Expo and TypeScript, Expo Router for navigation, the `convex` client for data and live updates, Convex Auth for sign-in. iOS first; the same code can ship to Android later.
+- **Backend:** [Convex](https://convex.dev), in `mobile/convex/`. Its database, server functions, live queries, scheduled functions for the timers, and file storage for the photos.
 - **Rule of the repo:** the app never decides roles, who is popped or which photo is shown. It only calls server functions.
-- **Photo privacy:** a contestant's photo N is only readable by people in the room once round N has started.
+- **Live by default:** a Convex query re-runs by itself whenever its data changes, so the room, the queue and the chat update on every phone without polling.
+- **Photo privacy:** a contestant's photo N is only sent to people in the room once round N's answers are in.
+- **Who checks what:** every server function checks who is calling; nothing trusts an id or a role sent by the phone.
 
 ### Tables
 
+All tables are in `mobile/convex/schema.ts`.
+
 | Table | Holds |
 | --- | --- |
-| `profiles` | Name, birth date, gender, wants to meet, city, height, job, bio, profile complete flag |
-| `photos` | 6 photos per user, with position 1 to 6 (files in Supabase Storage) |
-| `queue` | Who is waiting, since when, and with which gender and preference |
-| `rooms` | Popper, status (answering, popping, finished), round 1 to 4, current question, timers, winner |
-| `room_players` | The 5 contestants per room, popped or not, watching or left |
+| `users` and the `auth…` tables | Accounts and sign-in sessions (Convex Auth) |
+| `profiles` | Name, birth date, gender, wants to meet, city, height, job, bio, and the 6 photos in order (files in Convex storage) |
+| `queue` | Who is waiting, since when, with which gender and preference, and the room they were matched into |
+| `rooms` | Popper, status (picking, answering, popping, finished), round, current question and options, timer, winner, match |
+| `roomPlayers` | The contestants per room, popped or not, left or not |
 | `questions` | The personality question list the popper picks from |
 | `answers` | One answer per contestant per round |
-| `matches` | The final popper and winner pair |
+| `matches`, `messages` | The final popper and winner pair, and their chat |
+| `settings`, `pushTokens` | Each player's settings and their phones' push tokens |
+| `verifications` | Selfie reviews (pending, verified, rejected) |
 | `reports`, `blocks` | Safety data |
+| `uploads`, `rateLimits` | Who uploaded which file, and the counters that stop flooding |
 
 ### Server functions the app calls
 
+`mobile/src/api/convex-server.ts` maps each method of `PopdateApi` (`mobile/src/api/types.ts`) to one of these.
+
 | Function | What it does |
 | --- | --- |
-| `join_queue`, `leave_queue` | Enter or leave the queue. Only works with a complete profile. |
-| `matchmake` | Runs on the server every few seconds. Builds full lobbies of 1 popper + 5 fitting contestants and creates the room. |
-| `pick_question` | Popper only. Sets this round's question and starts the answer timer. |
-| `post_answer` | Contestants still in the game, before the timer ends. |
-| `pop_balloon` | Popper only, once per round. Pops one, reveals the next photos, starts the next round or creates the match after round 4. |
-| `leave_room` | A popped contestant leaves. A non-popped one leaving counts as popped. |
-| `report_user`, `block_user` | Safety actions. Blocked people are never put in the same lobby. |
+| `queue.joinQueue`, `queue.leaveQueue`, `queue.status` | Enter or leave the queue (only with a profile), and watch it live. Joining builds a lobby in the same step: 1 popper and 5 contestants who all want to meet each other's side, never two people who blocked each other. |
+| `rooms.get` | The room as you may see it, live. Photo N only from round N, other answers hidden while people are still answering. |
+| `rooms.pickQuestion` | Popper only. Sets this round's question and starts the 60-second answer timer. |
+| `rooms.postAnswer` | Contestants still in the game, before the timer ends. |
+| `rooms.popBalloon` | Popper only, once per round. Pops one, reveals the next photos, starts the next round or creates the match. |
+| `rooms.leaveRoom` | The popper leaving ends the room. A contestant leaving counts as popped. |
+| `matches.*`, `chat.*` | Your matches, and the chat between the popper and the winner. |
+| `profiles.*`, `settings.*`, `verification.*` | Profile with 18+ check, settings, push token, selfie review. |
+| `safety.*`, `account.*` | Block, unblock, report, sign out, delete account (everything, as Apple requires). |
+
+The timers are scheduled functions (`rooms.answerTimeUp`, `rooms.popTimeUp`), set by the step that starts them. The pop timer only reminds the popper; there is no auto-pop. Answers and messages go through the server's profanity filter.
+
+### Running the backend
+
+The app talks to the in-memory mock unless you switch it to Convex.
+
+1. `cd mobile`, then `npm run backend` (`npx convex dev`). The first time, it asks you to log in to Convex with GitHub and creates the project. Without a login, it runs a local backend on your computer.
+2. Once: `npx @convex-dev/auth --web-server-url http://localhost:8081` sets the sign-in keys on the deployment.
+3. Add `EXPO_PUBLIC_API=convex` to `mobile/.env.local` (next to the `EXPO_PUBLIC_CONVEX_URL` that step 1 wrote), then restart `npm start`.
+
+For testing with fewer phones:
+
+- `npx convex env set LOBBY_SIZE 3` makes rooms of 1 popper + 2 contestants. Back to 6 for real games.
+- `npx convex env set ALLOW_TEST_PLAYERS true` and then `npx convex run testPlayers:add '{"count": 2, "gender": "man", "wantsToMeet": "woman"}'` add test players. Only on a dev deployment: test players look exactly like real people.
+- `npm run test:backend` runs the backend tests.
+
+A phone can't reach a local backend on your computer; use the cloud dev deployment for that.
 
 ## What each person does
 
 Four people, four folders, one shared repo. Each person works with their own Claude Code and stays inside their folder.
 
-### Jonas: backend (`backend/`)
+### Jonas: backend (`mobile/convex/`)
 
-- Create the Supabase project and turn on auth
-- Write the database: profiles, photos, queue, rooms, players, questions, answers, matches, reports, blocks
-- Write the server functions: queue, matchmaking, rounds, timers, pops, match
+- Create the Convex project and turn on auth
+- Write the database: profiles, queue, rooms, players, questions, answers, matches, messages, settings, reports, blocks
+- Write the server functions: queue, matchmaking, rounds, timers, pops, match, chat, safety, account deletion
 - Set up photo storage so each photo unlocks only in its round
-- Send the project URL and keys to Lasse
-- Later: admin view for reports and push notifications
+- Share the Convex project with the team (the app only needs its URL, which `npx convex dev` writes to `.env.local`)
+- Later: admin view for reports and selfie reviews, and sending push notifications
 
 ### Lasse: mobile app (`mobile/`, except Safety)
 
-- Create the Expo app (React Native, TypeScript) and connect it to Jonas's Supabase
+- Create the Expo app (React Native, TypeScript) and connect it to Jonas's Convex backend
 - Build onboarding and profile setup with 6 photo uploads (expo-image-picker)
 - Build the home screen and the queue screen
 - Build the game room: question picker, answers, photo reveals, timers, pop, watch or leave
