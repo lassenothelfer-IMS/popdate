@@ -3,12 +3,36 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
-import { Colors } from '@/constants/theme';
+import { Colors, SeatColors, type Seat } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'dark' ? 'dark' : 'light';
+export function useScheme(): 'light' | 'dark' {
+  return useColorScheme() === 'dark' ? 'dark' : 'light';
+}
 
-  return Colors[theme];
+export function useTheme() {
+  return Colors[useScheme()];
+}
+
+/** The five seat hues for the current mode, in seat order. */
+export function useSeats(): readonly Seat[] {
+  return SeatColors[useScheme()];
+}
+
+/** The hue for a seat index, wrapping past five. */
+export function seatAt(seats: readonly Seat[], index: number): Seat {
+  return seats[((index % seats.length) + seats.length) % seats.length];
+}
+
+/** Your own hue outside a room (your profile, Home): plum, as the canvas draws you. */
+export function youSeat(seats: readonly Seat[]): Seat {
+  return seats[seats.length - 1];
+}
+
+/** A stable hue for someone outside a room (Home, your profile, a match), from their id. */
+export function seatFor(seats: readonly Seat[], id: string | null | undefined): Seat {
+  if (!id) return seats[seats.length - 1];
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  return seatAt(seats, Math.abs(hash));
 }

@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
+    "@expo-google-fonts/gloock": "^0.4.2",
+    "@expo-google-fonts/hanken-grotesk": "^0.4.3",
     "@expo/ui": "~58.0.22",
     "expo": "~58.0.17",
     "expo-constants": "~58.0.13",
@@ -10,7 +12,9 @@
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.9",
     "expo-glass-effect": "~58.0.4",
+    "expo-haptics": "~58.0.7",
     "expo-image": "~58.0.16",
+    "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.14",
     "expo-router": "~58.0.25",
     "expo-splash-screen": "~58.0.11",
@@ -25,11 +29,15 @@
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
+    "react-native-svg": "15.16.0",
     "react-native-web": "~0.21.4",
     "react-native-worklets": "0.13.0"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
+    "designlang": "^13.3.2",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
