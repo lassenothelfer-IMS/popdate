@@ -18,6 +18,10 @@ type Session = {
   onboarding: OnboardingAnswers | null;
   setOnboarding: (answers: OnboardingAnswers) => void;
   saveProfile: (details: ProfileDetails, answers?: OnboardingAnswers) => Promise<Profile>;
+  /** Ends the session; the app goes back to the welcome screen. */
+  signOut: () => Promise<void>;
+  /** Deletes the account for good; the app goes back to the welcome screen. */
+  deleteAccount: () => Promise<void>;
 };
 
 const SessionContext = createContext<Session | null>(null);
@@ -48,8 +52,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return saved;
   }
 
+  async function endSession(action: () => Promise<void>) {
+    await action();
+    setProfile(null);
+    setOnboarding(null);
+    // Start a fresh session, so the welcome screen works as on a first launch.
+    await api.signIn();
+  }
+
+  const signOut = () => endSession(() => api.signOut());
+  const deleteAccount = () => endSession(() => api.deleteAccount());
+
   return (
-    <SessionContext value={{ ready, profile, onboarding, setOnboarding, saveProfile }}>
+    <SessionContext
+      value={{ ready, profile, onboarding, setOnboarding, saveProfile, signOut, deleteAccount }}>
       {children}
     </SessionContext>
   );

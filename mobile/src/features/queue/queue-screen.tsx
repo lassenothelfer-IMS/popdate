@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { CssEase, Ease, Fonts, Gutter, Motion, Space } from '@/constants/theme';
 import { PopperSeat } from '@/features/queue/popper-seat';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
+import { useT, type Translate } from '@/i18n';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
 import { nativeOnly, webSafeKeyframe } from '@/utils/web-motion';
 import { haptics } from '@/utils/haptics';
@@ -75,10 +76,9 @@ const idleIn = FadeIn.duration(Motion.state)
   .easing(Ease.out)
   .reduceMotion(ReduceMotion.Never);
 
-const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-
-function numberWord(value: number) {
-  return NUMBER_WORDS[value] ?? String(value);
+/** "five" for 5, in the app's language; digits past ten. */
+function numberWord(t: Translate, value: number) {
+  return value >= 0 && value <= 10 ? t(`queue.number${value}`) : String(value);
 }
 
 function capitalized(text: string) {
@@ -115,21 +115,26 @@ type RoleBeat = {
   popper: { name: string; photo: string | null };
 };
 
-function roleBeat(room: Room): RoleBeat {
+function roleBeat(room: Room, t: Translate): RoleBeat {
   const popper = { name: room.popper.name, photo: room.popper.photos[0] ?? null };
-  const rounds = numberWord(room.totalRounds);
+  const count = room.totalRounds;
+  const rounds = numberWord(t, count);
   if (room.me.role === 'popper') {
     return {
-      title: "You're choosing tonight",
-      line: `${capitalized(numberWord(room.contestants.length))} people, ${rounds} questions. You pop one balloon each round.`,
+      title: t('queue.popperTitle'),
+      line: t('queue.popperLine', {
+        count,
+        rounds,
+        people: capitalized(numberWord(t, room.contestants.length)),
+      }),
       mySeat: null,
       popper,
     };
   }
   const mySeat = room.contestants.findIndex((contestant) => contestant.id === room.me.id);
   return {
-    title: "You're holding a balloon",
-    line: `${room.popper.name} is choosing. Be the last balloon after ${rounds} rounds.`,
+    title: t('queue.contestantTitle'),
+    line: t('queue.contestantLine', { count, rounds, name: room.popper.name }),
     mySeat: mySeat >= 0 ? mySeat : null,
     popper,
   };
@@ -151,6 +156,7 @@ export function QueueScreen() {
 }
 
 function NotInQueue() {
+  const t = useT();
   return (
     <Screen
       scroll
@@ -158,12 +164,12 @@ function NotInQueue() {
       contentStyle={styles.content}
       footer={
         <Animated.View entering={idleIn}>
-          <Button title="Back to home" onPress={goHome} />
+          <Button title={t('queue.backHome')} onPress={goHome} />
         </Animated.View>
       }>
       <Animated.View entering={idleIn} style={styles.stage}>
         <ThemedText themeColor="textSecondary" style={styles.centered}>
-          You&apos;re not in the queue.
+          {t('queue.notInQueue')}
         </ThemedText>
       </Animated.View>
     </Screen>
@@ -179,6 +185,7 @@ type FillingRoomProps = {
 
 function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   const theme = useTheme();
+  const t = useT();
   const [room, setRoom] = useState<Room | null | undefined>(undefined);
   const entered = useRef(false);
   const celebrated = useRef(false);
@@ -186,7 +193,8 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   const holdMs = screenReader ? ROLE_BEAT_SCREEN_READER_MS : ROLE_BEAT_MS;
 
   const matched = roomId !== null;
-  const beat = matched && room ? roleBeat(room) : null;
+  const beat = matched && room ? roleBeat(room, t) : null;
+  const seatsFilled = t('queue.seatsFilled', { found, needed });
   const beatText = beat ? `${beat.title}. ${beat.line}` : null;
   const ready = matched && room !== undefined;
   const missing = room === null;
@@ -220,9 +228,9 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   // The live region below only speaks on Android, so VoiceOver gets each new player announced.
   useEffect(() => {
     if (Platform.OS === 'ios' && !matched && found > 1) {
-      AccessibilityInfo.announceForAccessibility(`${found} of ${needed} seats filled`);
+      AccessibilityInfo.announceForAccessibility(seatsFilled);
     }
-  }, [matched, found, needed]);
+  }, [matched, found, seatsFilled]);
 
   // The role lines mount fresh, with no live region, so both platforms get them announced.
   useEffect(() => {
@@ -259,7 +267,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             transitionDuration: Motion.exit,
             transitionTimingFunction: CssEase.out,
           }}>
-          <Button title="Cancel" variant="secondary" onPress={handleCancel} />
+          <Button title={t('common.cancel')} variant="secondary" onPress={handleCancel} />
         </Animated.View>
       }>
       {roomId ? <RoomWatcher roomId={roomId} onChange={setRoom} /> : null}
@@ -271,7 +279,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           entering={beat ? beatIn : undefined}
           layout={reflow}>
           <ThemedText type="question" accessibilityRole="header" style={styles.centered}>
-            {beat ? beat.title : 'Filling your room'}
+            {beat ? beat.title : t('queue.filling')}
           </ThemedText>
         </Animated.View>
 
@@ -279,12 +287,14 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           <ThemedText
             type="count"
             accessible
-            accessibilityLabel={`${found} of ${needed} seats filled`}
+            accessibilityLabel={seatsFilled}
             accessibilityLiveRegion="polite"
             maxFontSizeMultiplier={1.3}
             style={styles.centered}>
             {found}
-            <Text style={[styles.countRest, { color: theme.textSecondary }]}> of {needed}</Text>
+            <Text style={[styles.countRest, { color: theme.textSecondary }]}>
+              {t('queue.countRest', { needed })}
+            </Text>
           </ThemedText>
         </Animated.View>
 
@@ -300,7 +310,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           <ThemedText type="callout" themeColor="textSecondary" style={styles.centered}>
             {beat
               ? beat.line
-              : `${capitalized(numberWord(needed))} people per room. It starts the moment the last seat fills.`}
+              : t('queue.perRoom', { people: capitalized(numberWord(t, needed)) })}
           </ThemedText>
         </Animated.View>
       </Pressable>

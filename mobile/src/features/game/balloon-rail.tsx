@@ -9,6 +9,7 @@ import { SeatMark, type SeatState } from '@/features/game/seat-mark';
 import { YouTag } from '@/features/game/you-tag';
 import { useTextScale } from '@/hooks/use-text-scale';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
+import { useT, type Translate } from '@/i18n';
 
 /**
  * Above this text size the names and the You pill don't fit under five
@@ -69,13 +70,22 @@ export function BalloonRail({
   );
 }
 
-function seatLabel(contestant: Contestant, isMe: boolean, state: SeatState, risen: boolean) {
-  const owner = isMe ? 'You' : contestant.name;
-  if (risen) return `${owner}, the last balloon`;
-  if (state === 'mark') return `${owner}, marked to pop`;
+function seatLabel(
+  t: Translate,
+  contestant: Contestant,
+  isMe: boolean,
+  state: SeatState,
+  risen: boolean,
+) {
+  const owner = isMe ? t('common.you') : contestant.name;
+  if (risen) return t('game.seatLast', { owner });
+  if (state === 'mark') return t('game.seatMarked', { owner });
   if (state === 'up') return owner;
-  const round = contestant.poppedInRound ? ` in round ${contestant.poppedInRound}` : '';
-  return `${owner}, ${contestant.left ? 'left' : 'popped'}${round}`;
+  const round = contestant.poppedInRound;
+  if (contestant.left) {
+    return round ? t('game.seatLeftInRound', { owner, round }) : t('game.seatLeft', { owner });
+  }
+  return round ? t('game.seatPoppedInRound', { owner, round }) : t('game.seatPopped', { owner });
 }
 
 type SeatProps = {
@@ -91,6 +101,7 @@ type SeatProps = {
 
 function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelect }: SeatProps) {
   const theme = useTheme();
+  const t = useT();
   const selectable = !!onSelect;
 
   // Always the same element, tappable or not, so VoiceOver keeps its place when
@@ -101,8 +112,8 @@ function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelec
     <PressableScale
       accessible
       accessibilityRole={selectable ? 'button' : undefined}
-      accessibilityLabel={seatLabel(contestant, isMe, state, risen)}
-      accessibilityHint={selectable ? `Marks ${contestant.name}'s balloon to pop` : undefined}
+      accessibilityLabel={seatLabel(t, contestant, isMe, state, risen)}
+      accessibilityHint={selectable ? t('game.markHint', { name: contestant.name }) : undefined}
       accessibilityState={selectable ? { selected: state === 'mark' } : undefined}
       onPress={onSelect}
       containerStyle={[styles.pressable, !selectable && styles.inert]}

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 type PillProps = {
   label: string;
@@ -34,7 +35,8 @@ export function Pill({ label, tone = 'ink' }: PillProps) {
 
 /** Marks your own balloon and row. */
 export function YouTag() {
-  return <Pill label="You" />;
+  const t = useT();
+  return <Pill label={t('common.you')} />;
 }
 
 const styles = StyleSheet.create({

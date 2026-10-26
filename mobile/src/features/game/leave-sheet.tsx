@@ -8,9 +8,7 @@ import { ErrorLine } from '@/components/error-line';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-
-const TITLE = 'Leave this room?';
-const DEFAULT_MESSAGE = "Your balloon pops and you can't rejoin.";
+import { useT } from '@/i18n';
 
 /** Scrim and sheet fade in together. Opacity only, so it stays under Reduce Motion. */
 const fadeIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
@@ -23,7 +21,7 @@ const sheetIn = SlideInDown.duration(Motion.enter)
   .reduceMotion(ReduceMotion.System);
 
 type LeaveSheetProps = {
-  /** Under the title: what leaving costs you. */
+  /** Under the title: what leaving costs you. Defaults to a contestant's: their balloon pops. */
   message?: string;
   onLeave: () => void;
   /** Stay, the scrim and Escape all keep you in the room. */
@@ -39,15 +37,17 @@ type LeaveSheetProps = {
  * the native alert). It fills its parent, so render it over the whole screen.
  */
 export function LeaveSheet({
-  message = DEFAULT_MESSAGE,
+  message,
   onLeave,
   onStay,
   leaving = false,
   error = null,
 }: LeaveSheetProps) {
   const theme = useTheme();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<ViewInstance>(null);
+  const title = t('game.leaveTitle');
 
   function stay() {
     if (!leaving) onStay();
@@ -80,7 +80,7 @@ export function LeaveSheet({
           ref={sheetRef}
           role="dialog"
           aria-modal
-          aria-label={TITLE}
+          aria-label={title}
           tabIndex={-1}
           style={[
             styles.sheet,
@@ -92,13 +92,13 @@ export function LeaveSheet({
           ]}>
           <View style={[styles.grabber, { backgroundColor: theme.surfacePressed }]} />
           <ThemedText type="task" accessibilityRole="header" style={[styles.center, styles.title]}>
-            {TITLE}
+            {title}
           </ThemedText>
           <ThemedText
             type="callout"
             themeColor="textSecondary"
             style={[styles.center, styles.message]}>
-            {message}
+            {message ?? t('game.leaveActive')}
           </ThemedText>
           {error ? (
             <View style={styles.error}>
@@ -107,10 +107,10 @@ export function LeaveSheet({
           ) : null}
           <View style={styles.actions}>
             <View style={styles.action}>
-              <Button title="Leave" variant="ghost" loading={leaving} onPress={onLeave} />
+              <Button title={t('game.leave')} variant="ghost" loading={leaving} onPress={onLeave} />
             </View>
             <View style={styles.action}>
-              <Button title="Stay" disabled={leaving} onPress={stay} />
+              <Button title={t('game.stay')} disabled={leaving} onPress={stay} />
             </View>
           </View>
         </View>

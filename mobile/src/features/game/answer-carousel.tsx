@@ -30,6 +30,8 @@ import { sentence } from '@/features/game/announce';
 import { Quote } from '@/features/game/room-blocks';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useT } from '@/i18n';
+import { useFilterText } from '@/state/settings';
 
 /** The canvas's card. On shorter screens it narrows, so a whole card stays above the footer. */
 const MAX_CARD_WIDTH = 288;
@@ -226,9 +228,13 @@ type AnswerCardProps = {
 function AnswerCard({ contestant, seat, width, marked, developed, onPress }: AnswerCardProps) {
   const theme = useTheme();
   const reduced = useReduceMotion();
+  const t = useT();
+  const filterText = useFilterText();
   const latest = contestant.photos.at(-1);
   const position = contestant.photos.length;
-  const answer = contestant.answer;
+  // Someone else's words: masked when the comment filter is on.
+  const answer = contestant.answer ? filterText(contestant.answer) : contestant.answer;
+  const name = contestant.name;
   const selectable = !!onPress;
   const photoWidth = width - CHROME;
 
@@ -242,10 +248,10 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
       accessible
       accessibilityRole={selectable ? 'button' : undefined}
       accessibilityState={selectable ? { selected: marked } : undefined}
-      accessibilityLabel={`${contestant.name}, ${contestant.age}. ${sentence(
-        answer ? `Answer: ${answer}` : 'No answer',
-      )} ${contestant.name}'s balloon`}
-      accessibilityHint={selectable ? `Marks ${contestant.name}'s balloon to pop` : undefined}
+      accessibilityLabel={`${t('common.nameAge', { name, age: contestant.age })}. ${sentence(
+        answer ? t('game.answerLabel', { answer }) : t('game.noAnswer'),
+      )} ${t('game.balloonOf', { name })}`}
+      accessibilityHint={selectable ? t('game.markHint', { name }) : undefined}
       background={theme.field}
       style={[styles.card, { width, borderColor: theme.outline }]}>
       {latest ? (
@@ -266,7 +272,7 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
             tone={seat}
             style={[styles.photo, { width: photoWidth, height: photoWidth / PhotoAspect }]}
           />
-          <PhotoBadge label={`Photo ${position}`} />
+          <PhotoBadge label={t('game.photoN', { n: position })} />
         </Animated.View>
       ) : null}
 
@@ -287,7 +293,7 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
             <Quote text={answer} />
           ) : (
             <ThemedText type="footnote" themeColor="textSecondary">
-              No answer
+              {t('game.noAnswer')}
             </ThemedText>
           )}
         </View>

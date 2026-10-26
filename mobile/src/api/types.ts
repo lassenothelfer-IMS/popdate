@@ -86,6 +86,54 @@ export type Match = {
 
 export type Unsubscribe = () => void;
 
+/** `system` follows the phone. */
+export type LanguageSetting = 'system' | 'en' | 'de' | 'fr' | 'it';
+export type AppearanceSetting = 'system' | 'light' | 'dark';
+export type Units = 'metric' | 'imperial';
+
+/** Your settings, kept on the server so they follow your account to a new phone. */
+export type Settings = {
+  language: LanguageSetting;
+  /** An ISO 3166 country code like 'CH', or null to follow the phone. */
+  region: string | null;
+  units: Units;
+  appearance: AppearanceSetting;
+  /** Hide offensive words in other people's answers and messages, on your phone only. */
+  commentFilter: boolean;
+  notifications: {
+    /** A room you queued for is about to start. */
+    roomLive: boolean;
+    newMatch: boolean;
+    messages: boolean;
+  };
+};
+
+/**
+ * Selfie verification. `pending` while a person (or service) reviews it;
+ * only `verified` accounts will be allowed to queue once the backend enforces it.
+ */
+export type VerificationStatus = 'none' | 'pending' | 'verified' | 'rejected';
+
+export type BlockedPerson = {
+  id: string;
+  name: string;
+  age: number;
+  photo: string;
+  blockedAt: string;
+};
+
+export type ReportReason = 'harassment' | 'fake' | 'underage' | 'inappropriate' | 'spam' | 'other';
+
+/** A chat message between you and a match. */
+export type Message = {
+  id: string;
+  matchId: string;
+  senderId: string;
+  /** Already filtered by the server's own profanity filter. */
+  text: string;
+  sentAt: string;
+};
+
 /** One method per server function in the root README. */
 export interface PopdateApi {
   signIn(): Promise<string>;
@@ -104,4 +152,28 @@ export interface PopdateApi {
 
   listMatches(): Promise<Match[]>;
   getMatch(matchId: string): Promise<Match | null>;
+
+  /** Ends the session on this phone. */
+  signOut(): Promise<void>;
+  /** Deletes the account, profile, photos, matches and messages. Apple requires this in the app. */
+  deleteAccount(): Promise<void>;
+
+  getSettings(): Promise<Settings>;
+  saveSettings(settings: Settings): Promise<Settings>;
+  /** The Expo push token for this phone, so the server can send room, match and message pushes. */
+  registerPushToken(token: string): Promise<void>;
+
+  getVerification(): Promise<VerificationStatus>;
+  /** Uploads a selfie for review. Resolves with the new status. */
+  submitSelfie(photoUri: string): Promise<VerificationStatus>;
+
+  listBlocked(): Promise<BlockedPerson[]>;
+  /** Blocked people are never put in your rooms again and can't message you. */
+  block(userId: string): Promise<void>;
+  unblock(userId: string): Promise<void>;
+  report(userId: string, reason: ReportReason, details?: string): Promise<void>;
+
+  listMessages(matchId: string): Promise<Message[]>;
+  watchMessages(matchId: string, onChange: (messages: Message[]) => void): Unsubscribe;
+  sendMessage(matchId: string, text: string): Promise<Message>;
 }

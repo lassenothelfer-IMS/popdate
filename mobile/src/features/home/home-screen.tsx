@@ -1,6 +1,6 @@
 import { Redirect, router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import {
@@ -20,16 +20,20 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { Ease, Motion, Radius, Space } from '@/constants/theme';
+import { Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { PushPrompt } from '@/features/home/push-prompt';
+import { SettingsButton } from '@/features/home/settings-button';
 import { seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
 
+/** The test server's role chips, labeled by their `home.*` keys. */
 const MOCK_ROLES: { role: MockRole; label: string }[] = [
-  { role: 'random', label: 'Random' },
-  { role: 'popper', label: 'Popper' },
-  { role: 'contestant', label: 'Balloon' },
+  { role: 'random', label: 'home.roleRandom' },
+  { role: 'popper', label: 'home.rolePopper' },
+  { role: 'contestant', label: 'home.roleBalloon' },
 ];
 
 /** The matches arrive once the list has loaded, instead of flashing the empty state first. */
@@ -38,6 +42,8 @@ const listIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(Reduc
 export function HomeScreen() {
   const { profile } = useSession();
   const seats = useSeats();
+  const theme = useTheme();
+  const t = useT();
   /** Null until the first load, so the empty state never flashes before the rows. */
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [joining, setJoining] = useState(false);
@@ -71,8 +77,8 @@ export function HomeScreen() {
     try {
       await api.joinQueue();
       router.push('/queue');
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "Couldn't join the queue. Try again.";
+    } catch {
+      const message = t('home.joinError');
       setError(message);
       haptics.error();
       AccessibilityInfo.announceForAccessibility(message);
@@ -89,45 +95,63 @@ export function HomeScreen() {
 
   return (
     <Screen scroll contentStyle={styles.content}>
-      <Wordmark />
+      <View style={styles.top}>
+        <Wordmark />
+        <SettingsButton />
+      </View>
 
-      <View style={styles.you}>
-        <Avatar
-          name={profile.name}
-          uri={profile.photos[0]}
-          tone={youSeat(seats)}
-          size={64}
-          accessibilityLabel="Your photo 1"
-        />
+      {/* The whole row opens your profile; the highlight reaches a little past the avatar. */}
+      <PressableHighlight
+        accessibilityRole="button"
+        accessibilityLabel={t('home.editProfile')}
+        onPress={() => router.push('/profile')}
+        background="transparent"
+        style={styles.you}>
+        <Avatar name={profile.name} uri={profile.photos[0]} tone={youSeat(seats)} size={64} />
         <View style={styles.youText}>
           <ThemedText type="heading">{profile.name}</ThemedText>
           <ThemedText type="footnote" themeColor="textSecondary">
             {ageFromBirthDate(profile.birthDate)} · {profile.city}
           </ThemedText>
         </View>
-      </View>
+        <View style={styles.chevron}>
+          <Icon name="chevronRight" size={14} color={theme.textTertiary} />
+        </View>
+      </PressableHighlight>
 
       <View style={styles.play}>
         <Button
-          title="Play"
+          title={t('home.play')}
           loading={joining}
           onPress={handlePlay}
-          accessibilityHint="Finds you a room of six people"
+          accessibilityHint={t('home.playHint')}
         />
         {error ? <ErrorLine message={error} /> : null}
         <ThemedText type="footnote" themeColor="textSecondary" style={styles.centered}>
-          Most rooms, you&apos;ll hold a balloon. Now and then, you&apos;re the one choosing.
+          {t('home.roleNote')}
         </ThemedText>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={t('home.howToPlay')}
+          onPress={() => router.push('/how-to-play')}
+          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          style={({ pressed }) => [styles.howTo, pressed && styles.pressed]}>
+          <ThemedText type="label" style={styles.link}>
+            {t('home.howToPlay')}
+          </ThemedText>
+        </Pressable>
       </View>
+
+      <PushPrompt style={styles.push} />
 
       {matches ? (
         <Animated.View entering={listIn} style={styles.matches}>
           <ThemedText type="headline" accessibilityRole="header">
-            Your matches
+            {t('home.matches')}
           </ThemedText>
           {matches.length === 0 ? (
             <ThemedText type="callout" themeColor="textSecondary" style={styles.empty}>
-              No matches yet. Be the last balloon in a room, or be the one choosing.
+              {t('home.noMatches')}
             </ThemedText>
           ) : (
             <View style={styles.list}>
@@ -143,24 +167,24 @@ export function HomeScreen() {
       {isMockServer ? (
         <View style={hasMatches ? styles.mockAfterRows : styles.mock}>
           <ThemedText type="headline" accessibilityRole="header">
-            Test server
+            {t('home.testServer')}
           </ThemedText>
           {/* Sized to their labels; larger text wraps them onto a second line. */}
           <View
             style={styles.chips}
             accessibilityRole="radiogroup"
-            accessibilityLabel="Your role in the next room">
+            accessibilityLabel={t('home.roleGroup')}>
             {MOCK_ROLES.map(({ role, label }) => (
               <Chip
                 key={role}
-                label={label}
+                label={t(label)}
                 selected={mockRole === role}
                 onPress={() => chooseMockRole(role)}
               />
             ))}
           </View>
           <ThemedText type="footnote" themeColor="textSecondary" style={styles.mockNote}>
-            The other players are bots. Your role in the next room.
+            {t('home.testNote')}
           </ThemedText>
         </View>
       ) : null}
@@ -168,16 +192,17 @@ export function HomeScreen() {
   );
 }
 
-/** One match: a card with their avatar in their hue, their name and age, and a chevron. */
+/** One match: a card with their avatar in their hue, their name and age, and a chevron. Opens your chat. */
 function MatchRow({ match }: { match: Match }) {
   const theme = useTheme();
   const seats = useSeats();
+  const t = useT();
   return (
     <PressableHighlight
       accessibilityRole="button"
-      accessibilityLabel={`${match.other.name}, ${match.other.age}`}
-      accessibilityHint="Opens your match"
-      onPress={() => router.push({ pathname: '/match/[id]', params: { id: match.id } })}
+      accessibilityLabel={t('common.nameAge', { name: match.other.name, age: match.other.age })}
+      accessibilityHint={t('home.openChatHint')}
+      onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
       background={theme.field}
       style={[styles.row, { borderColor: theme.outline }]}>
       <Avatar
@@ -199,6 +224,9 @@ function MatchRow({ match }: { match: Match }) {
   );
 }
 
+/** How far the profile row's pressed fill reaches past its content. */
+const YOU_INSET = Space.sm;
+
 const styles = StyleSheet.create({
   // Home starts 8pt lower than the other screens: the wordmark has the top to itself.
   content: {
@@ -210,11 +238,21 @@ const styles = StyleSheet.create({
   centered: {
     textAlign: 'center',
   },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  // The row sits where it did before it became a button: its padding is taken back by the margins.
   you: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.md,
-    marginTop: 28,
+    marginTop: 28 - YOU_INSET,
+    marginHorizontal: -YOU_INSET,
+    padding: YOU_INSET,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
   },
   youText: {
     flex: 1,
@@ -222,7 +260,25 @@ const styles = StyleSheet.create({
   },
   play: {
     gap: 10,
-    marginTop: 28,
+    marginTop: 28 - YOU_INSET,
+  },
+  // A 44pt target around one line of text, pulled in so it reads as part of the note above.
+  howTo: {
+    alignSelf: 'center',
+    minHeight: MinTouch,
+    justifyContent: 'center',
+    paddingHorizontal: Space.sm,
+    marginTop: -Space.xs,
+    marginBottom: -Space.xs,
+  },
+  link: {
+    textDecorationLine: 'underline',
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  push: {
+    marginTop: Space.lg,
   },
   // More room above the list than between the groups above it.
   matches: {

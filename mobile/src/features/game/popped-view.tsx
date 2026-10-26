@@ -8,11 +8,11 @@ import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, Motion, Space } from '@/constants/theme';
+import { useT } from '@/i18n';
 
 const MARK_SIZE = 56;
 /** The plain footer's buttons sit 6 apart, as on the canvas. */
 const FOOTER_GAP = 6;
-const NEXT = 'Stay to see how it ends, or try another room.';
 
 // A kind fade instead of a one-frame swap. Opacity only, so it stays under Reduce Motion.
 const contentIn = FadeIn.duration(Motion.enter).easing(Ease.out).reduceMotion(ReduceMotion.Never);
@@ -43,9 +43,14 @@ export function PoppedView({
   onPlayAgain,
   onWatch,
 }: PoppedViewProps) {
+  const t = useT();
   const [burst] = useState(fresh);
   const headerRef = useRef<ViewInstance>(null);
-  const line = `${popperName} popped your balloon${round ? ` in round ${round}` : ''}.`;
+  const line = round
+    ? t('game.poppedYouInRound', { name: popperName, round })
+    : t('game.poppedYou', { name: popperName });
+  const next = t('game.poppedNext');
+  const title = t('game.notThisTime');
 
   // The room turns into this view inside one route, so the system posts no screen
   // change, and whatever VoiceOver was on is gone. Move it to the news once it has
@@ -67,8 +72,13 @@ export function PoppedView({
       footer={
         <Animated.View entering={contentIn} style={styles.footer}>
           {error ? <ErrorLine message={error} /> : null}
-          <Button title="Play another room" loading={replaying} onPress={onPlayAgain} />
-          <Button title="Stay and watch" variant="ghost" disabled={replaying} onPress={onWatch} />
+          <Button title={t('game.playAnother')} loading={replaying} onPress={onPlayAgain} />
+          <Button
+            title={t('game.stayWatch')}
+            variant="ghost"
+            disabled={replaying}
+            onPress={onWatch}
+          />
         </Animated.View>
       }>
       {/* The mark keeps its own box; the burst plays around it, centered on the body. */}
@@ -88,13 +98,13 @@ export function PoppedView({
           ref={headerRef}
           accessible
           accessibilityRole="header"
-          accessibilityLabel={`Not this time. ${line} ${NEXT}`}
+          accessibilityLabel={`${title}. ${line} ${next}`}
           style={styles.group}>
           <ThemedText type="display" style={styles.text}>
-            Not this time
+            {title}
           </ThemedText>
           <ThemedText type="callout" themeColor="textSecondary" style={styles.text}>
-            {line} {NEXT}
+            {line} {next}
           </ThemedText>
         </View>
       </Animated.View>

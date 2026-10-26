@@ -127,23 +127,30 @@ const RAYS = [0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
   };
 });
 
-/** The body swells about 12% and vanishes in 90 ms, quicker than any token on purpose. */
+/**
+ * The body swells about 12% and vanishes in the first 90 ms, quicker than any
+ * token on purpose, then stays gone for as long as the burst is on screen. The
+ * keyframes hold every piece's hidden end state themselves: a static opacity in
+ * the style would fight the animation (Reanimated warns about it on device).
+ */
+const BURST_MS = Motion.burst + 60;
 const swell = new Keyframe({
   0: { opacity: 1, transform: [{ scale: 1 }] },
-  100: { opacity: 0, transform: [{ scale: 1.12 }], easing: Ease.out },
-}).duration(90);
+  [Math.round((90 / BURST_MS) * 100)]: { opacity: 0, transform: [{ scale: 1.12 }], easing: Ease.out },
+  100: { opacity: 0, transform: [{ scale: 1.12 }] },
+}).duration(BURST_MS);
 
 const ringOut = new Keyframe({
   0: { opacity: 0.45, transform: [{ scale: 0.7 }] },
   100: { opacity: 0, transform: [{ scale: 1.15 }], easing: Ease.out },
-}).duration(Motion.burst + 60);
+}).duration(BURST_MS);
 
 function rayOut(distance: number) {
   return new Keyframe({
     0: { opacity: 0, transform: [{ translateX: distance * 0.6 }] },
     30: { opacity: 1, transform: [{ translateX: distance * 0.82 }] },
     100: { opacity: 0, transform: [{ translateX: distance }], easing: Ease.out },
-  }).duration(Motion.burst + 60);
+  }).duration(BURST_MS);
 }
 
 /** The mark settles in after the rays. Opacity only, so it is all that is left under Reduce Motion. */
@@ -166,7 +173,8 @@ export function PopBurst({ color, size = 72 }: PopBurstProps) {
 
   useEffect(() => {
     if (reduced) return;
-    const id = setTimeout(() => setSettled(true), Motion.burst + 100);
+    // Just before the keyframes end, so no piece ever snaps back to full opacity.
+    const id = setTimeout(() => setSettled(true), BURST_MS - 20);
     return () => clearTimeout(id);
   }, [reduced]);
 
@@ -184,14 +192,13 @@ export function PopBurst({ color, size = 72 }: PopBurstProps) {
   const radius = RING_RADIUS * size;
   return (
     <View style={{ width: size, height }}>
-      <Animated.View entering={swell} style={[StyleSheet.absoluteFill, styles.gone]}>
+      <Animated.View entering={swell} style={StyleSheet.absoluteFill}>
         <Balloon color={color} size={size} string={false} />
       </Animated.View>
       <Animated.View
         entering={ringOut}
         style={[
           styles.ring,
-          styles.gone,
           {
             left: cx - radius,
             top: cy - radius,
@@ -215,7 +222,6 @@ export function PopBurst({ color, size = 72 }: PopBurstProps) {
             <Animated.View
               entering={rayOut(distance)}
               style={[
-                styles.gone,
                 {
                   position: 'absolute',
                   left: -length / 2,
@@ -235,9 +241,6 @@ export function PopBurst({ color, size = 72 }: PopBurstProps) {
 }
 
 const styles = StyleSheet.create({
-  gone: {
-    opacity: 0,
-  },
   ring: {
     position: 'absolute',
   },

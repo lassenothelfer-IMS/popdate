@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Ease, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { announce } from '@/features/game/announce';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useT, type Translate } from '@/i18n';
 
 const MAX_ANSWER_LENGTH = 280;
 /** Show how much room is left once the answer gets close to the limit. */
@@ -25,9 +26,9 @@ const SHORT_ANSWER = 90;
 const sentIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /** The count as VoiceOver says it. */
-function countLeft(left: number) {
-  if (left === 0) return 'No characters left';
-  return left === 1 ? '1 character left' : `${left} characters left`;
+function countLeft(t: Translate, left: number) {
+  if (left === 0) return t('game.noCharactersLeft');
+  return t('game.charactersLeft', { count: left });
 }
 
 type AnswerComposerProps = {
@@ -50,6 +51,7 @@ export function AnswerComposer({
 }: AnswerComposerProps) {
   const theme = useTheme();
   const scheme = useScheme();
+  const t = useT();
   const [sending, setSending] = useState(false);
   /** The last count VoiceOver heard, so each step down is said once. */
   const spokenCount = useRef<number | null>(null);
@@ -62,7 +64,7 @@ export function AnswerComposer({
     const nextLeft = MAX_ANSWER_LENGTH - next.length;
     const reached = SPOKEN_COUNTS.find((count) => nextLeft <= count) ?? null;
     if (reached !== null && (spokenCount.current === null || reached < spokenCount.current)) {
-      announce(countLeft(nextLeft));
+      announce(countLeft(t, nextLeft));
     }
     spokenCount.current = reached;
   }
@@ -85,13 +87,13 @@ export function AnswerComposer({
         <View
           style={[styles.box, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
           <TextInput
-            accessibilityLabel="Your answer"
-            placeholder={`Answer ${popperName}…`}
+            accessibilityLabel={t('game.yourAnswer')}
+            placeholder={t('game.answerPlaceholder', { name: popperName })}
             placeholderTextColor={theme.textTertiary}
             keyboardAppearance={scheme}
             selectionColor={theme.text}
             // Read when the field gets focus, once the count shows.
-            accessibilityHint={text.length >= COUNTER_FROM ? countLeft(left) : undefined}
+            accessibilityHint={text.length >= COUNTER_FROM ? countLeft(t, left) : undefined}
             value={text}
             onChangeText={changeText}
             onFocus={onFocus}
@@ -107,7 +109,7 @@ export function AnswerComposer({
         {/* Always ink, as on the canvas; it only answers once there is something to send. */}
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="Send answer"
+          accessibilityLabel={t('game.sendAnswer')}
           accessibilityState={{ disabled: !canSend, busy: sending }}
           disabled={!canSend}
           onPress={handleSend}
@@ -123,7 +125,7 @@ export function AnswerComposer({
       </View>
       {text.length >= COUNTER_FROM ? (
         <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
-          {left} characters left
+          {t('game.charactersLeft', { count: left })}
         </ThemedText>
       ) : null}
     </View>
@@ -137,16 +139,18 @@ export function AnswerComposer({
  */
 export function AnswerSent({ popperName }: { popperName: string }) {
   const theme = useTheme();
+  const t = useT();
+  const sent = t('game.sent', { name: popperName });
   return (
     <Animated.View
       entering={sentIn}
       accessible
       accessibilityLiveRegion="polite"
-      accessibilityLabel={`Sent. ${popperName} can read it now.`}
+      accessibilityLabel={sent}
       style={styles.sent}>
       <Icon name="checkCircle" size={16} color={theme.success} />
       <ThemedText type="label" themeColor="success" style={styles.sentText}>
-        Sent. {popperName} can read it now.
+        {sent}
       </ThemedText>
     </Animated.View>
   );
@@ -155,14 +159,15 @@ export function AnswerSent({ popperName }: { popperName: string }) {
 /** Your sent answer, under the question it answers. */
 export function SentAnswerCard({ text }: { text: string }) {
   const theme = useTheme();
+  const t = useT();
   return (
     <Animated.View
       entering={sentIn}
       accessible
-      accessibilityLabel={`Your answer: ${text}`}
+      accessibilityLabel={t('game.yourAnswerLabel', { text })}
       style={[styles.card, { backgroundColor: theme.field, borderColor: theme.outline }]}>
       <ThemedText type="footnote" themeColor="textSecondary">
-        Your answer
+        {t('game.yourAnswer')}
       </ThemedText>
       <ThemedText type={text.length <= SHORT_ANSWER ? 'quote' : 'quoteLong'}>
         {`“${text}”`}

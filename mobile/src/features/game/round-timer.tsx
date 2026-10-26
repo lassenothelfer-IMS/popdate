@@ -7,6 +7,7 @@ import { CssEase, Ease, Motion, Radius, Space } from '@/constants/theme';
 import { BAR_TEXT_MAX_SCALE } from '@/features/game/room-bar';
 import { formatSeconds, useSecondsLeft } from '@/hooks/use-server';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 const timerIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
@@ -27,23 +28,21 @@ type RoundTimerProps = {
  */
 export function RoundTimer({ deadline, popReminder }: RoundTimerProps) {
   const theme = useTheme();
+  const t = useT();
   const secondsLeft = useSecondsLeft(deadline);
   if (secondsLeft === null && !popReminder) return null;
 
   const urgent = popReminder || (secondsLeft !== null && secondsLeft <= URGENT_FROM);
   const seconds = secondsLeft ?? 0;
-  const text = popReminder ? "Everyone's waiting" : formatSeconds(seconds);
+  const waiting = t('game.everyoneWaiting');
+  const text = popReminder ? waiting : formatSeconds(seconds);
 
   return (
     <Animated.View
       entering={timerIn}
       accessible
       accessibilityRole="timer"
-      accessibilityLabel={
-        popReminder
-          ? "Everyone's waiting"
-          : `${seconds} ${seconds === 1 ? 'second' : 'seconds'} left`
-      }
+      accessibilityLabel={popReminder ? waiting : t('game.secondsLeft', { count: seconds })}
       style={[
         styles.pill,
         {

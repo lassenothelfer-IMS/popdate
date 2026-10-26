@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
@@ -13,6 +13,7 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
 import { useRoom } from '@/hooks/use-server';
+import { useT, type Translate } from '@/i18n';
 import { seatAt, seatFor, useScheme, useSeats, useTheme } from '@/hooks/use-theme';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
@@ -89,10 +90,9 @@ const balloonSettles = FadeIn.duration(Motion.state)
   .easing(Ease.out)
   .reduceMotion(ReduceMotion.Never);
 
-const NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-
-function numberWord(value: number) {
-  return NUMBER_WORDS[value] ?? String(value);
+/** Counts up to ten are spelled out, as in "Out of five people"; past that, digits. */
+function numberWord(t: Translate, value: number) {
+  return Number.isInteger(value) && value >= 0 && value <= 10 ? t(`match.n${value}`) : String(value);
 }
 
 export function MatchScreen({ matchId }: { matchId: string }) {
@@ -100,19 +100,25 @@ export function MatchScreen({ matchId }: { matchId: string }) {
   const params = useLocalSearchParams<{ as?: string }>();
   const as = Array.isArray(params.as) ? params.as[0] : params.as;
   const role: Role = as === 'popper' || as === 'winner' ? as : null;
+  const t = useT();
   const [match, setMatch] = useState<Match | null | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
-    api.getMatch(matchId).then((found) => {
-      if (active) setMatch(found);
-    });
+    api.getMatch(matchId).then(
+      (found) => {
+        if (active) setMatch(found);
+      },
+      () => {
+        if (active) setMatch(null);
+      },
+    );
     return () => {
       active = false;
     };
   }, [matchId]);
 
-  if (match === undefined) return <LoadingScreen label="Loading your match" />;
+  if (match === undefined) return <LoadingScreen label={t('match.loading')} />;
 
   if (match === null) {
     return (
@@ -120,9 +126,9 @@ export function MatchScreen({ matchId }: { matchId: string }) {
         scroll
         contentStyle={styles.centered}
         footerStyle="plain"
-        footer={<Button title="Back to home" onPress={goHome} />}>
+        footer={<Button title={t('match.backHome')} onPress={goHome} />}>
         <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-          This match doesn&apos;t exist.
+          {t('match.notFound')}
         </ThemedText>
       </Screen>
     );
@@ -132,6 +138,7 @@ export function MatchScreen({ matchId }: { matchId: string }) {
 }
 
 function MatchMoment({ match, role }: { match: Match; role: Role }) {
+  const t = useT();
   const theme = useTheme();
   const scheme = useScheme();
   const seats = useSeats();
@@ -157,10 +164,14 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
 
   const name = match.other.name;
   const hero =
-    role === 'popper' ? `You chose ${name}` : role === 'winner' ? `${name} chose you` : `You and ${name}`;
-  const people = numberWord(room?.contestants.length ?? DEFAULT_PEOPLE);
-  const rounds = numberWord(room?.totalRounds ?? DEFAULT_ROUNDS);
-  const sub = fresh ? `Out of ${people} people, over ${rounds} rounds.` : null;
+    role === 'popper'
+      ? t('match.youChose', { name })
+      : role === 'winner'
+        ? t('match.choseYou', { name })
+        : t('match.youAnd', { name });
+  const people = numberWord(t, room?.contestants.length ?? DEFAULT_PEOPLE);
+  const rounds = numberWord(t, room?.totalRounds ?? DEFAULT_ROUNDS);
+  const sub = fresh ? t('match.outOf', { people, rounds }) : null;
 
   // A player's seat, once the room says who sat where.
   function roomSeat(playerId: string | null | undefined) {
@@ -196,10 +207,19 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
       scroll
       footerStyle="plain"
       contentStyle={[styles.content, { paddingTop: Math.max(Space.sm, HEADER_TOP - insets.top) }]}
-      footer={<Button title="Done" onPress={goHome} />}>
+      footer={
+        <>
+          <Button
+            title={t('match.sayHi')}
+            accessibilityHint={t('match.sayHiHint', { name })}
+            onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+          />
+          <Button title={t('common.done')} variant="ghost" onPress={goHome} />
+        </>
+      }>
       <Animated.View entering={motion === 'full' ? lineIn : motion === 'fade' ? fadeOnly : undefined}>
         <ThemedText type="callout" themeColor="textSecondary">
-          Last balloon
+          {t('match.lastBalloon')}
         </ThemedText>
         <ThemedText
           type="hero"
@@ -233,7 +253,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
             ]}>
             <Photo
               uri={match.other.photo}
-              accessibilityLabel={`${name}, photo 1`}
+              accessibilityLabel={t('match.theirPhoto', { name })}
               name={name}
               tone={theirSeat}
               hairline={false}
@@ -256,7 +276,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
               ]}>
               <Photo
                 uri={profile.photos[0]}
-                accessibilityLabel="Your photo 1"
+                accessibilityLabel={t('match.yourPhoto')}
                 name={profile.name}
                 tone={yourTone}
                 hairline={false}

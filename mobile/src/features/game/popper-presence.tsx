@@ -5,6 +5,7 @@ import { Avatar } from '@/components/avatar';
 import type { PhotoTone } from '@/components/photo';
 import { ThemedText } from '@/components/themed-text';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 const AVATAR_SIZE = 64;
 /** Avatar to name, as on the canvas. */
@@ -23,14 +24,15 @@ export function useNeutralTone(): PhotoTone {
 /** The person everyone is trying to win, above the question, for contestants and watchers. */
 export function PopperPresence({ popper }: { popper: RoomPlayer }) {
   const tone = useNeutralTone();
+  const t = useT();
   return (
     <View
       style={styles.presence}
       accessible
-      accessibilityLabel={`${popper.name}, ${popper.age}, is choosing`}>
+      accessibilityLabel={t('game.isChoosingLabel', { name: popper.name, age: popper.age })}>
       <Avatar name={popper.name} uri={popper.photos[0]} tone={tone} size={AVATAR_SIZE} />
       <View style={styles.copy}>
-        <ThemedText type="task">{popper.name} is choosing</ThemedText>
+        <ThemedText type="task">{t('game.isChoosing', { name: popper.name })}</ThemedText>
         <ThemedText type="footnote" themeColor="textSecondary">
           {popper.age}
         </ThemedText>

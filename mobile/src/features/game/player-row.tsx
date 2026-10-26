@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Ease, Motion, Space } from '@/constants/theme';
 import { YouTag } from '@/features/game/you-tag';
 import { useTheme } from '@/hooks/use-theme';
+import { useT, type Translate } from '@/i18n';
 
 const ROW_HEIGHT = 56;
 /** The column every row's mark sits in: a dot, the answered check or the popped mark. */
@@ -17,6 +18,12 @@ const POPPED_MARK = 14;
 
 /** Small changes inside a row: the Answered check, a row arriving in the Popped group. */
 const quietIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+
+/** "Lena, 27", with ", you" on your own row. */
+function whoLabel(t: Translate, contestant: Contestant, isMe: boolean) {
+  const nameAge = t('common.nameAge', { name: contestant.name, age: contestant.age });
+  return isMe ? t('game.rowYou', { nameAge }) : nameAge;
+}
 
 type LiveRowProps = {
   contestant: Contestant;
@@ -29,14 +36,15 @@ type LiveRowProps = {
 /** Someone still in: their dot, name and age, and for the popper whether they answered. */
 export function LiveRow({ contestant, color, isMe, status }: LiveRowProps) {
   const theme = useTheme();
+  const t = useT();
   const answered = status === 'answered';
   const writing = status === 'writing';
   return (
     <View
       accessible
       accessibilityLabel={[
-        `${contestant.name}, ${contestant.age}${isMe ? ', you' : ''}`,
-        answered ? 'Answered' : writing ? 'Writing' : null,
+        whoLabel(t, contestant, isMe),
+        answered ? t('game.answered') : writing ? t('game.writing') : null,
       ]
         .filter(Boolean)
         .join('. ')}
@@ -71,12 +79,12 @@ export function LiveRow({ contestant, color, isMe, status }: LiveRowProps) {
       {answered ? (
         <Animated.View entering={quietIn}>
           <ThemedText type="footnote" themeColor="success">
-            Answered
+            {t('game.answered')}
           </ThemedText>
         </Animated.View>
       ) : writing ? (
         <ThemedText type="footnote" themeColor="textTertiary">
-          Writing
+          {t('game.writing')}
         </ThemedText>
       ) : null}
     </View>
@@ -96,12 +104,19 @@ type PoppedRowProps = {
 /** Popped or left: the popped mark in their hue, quiet, and nobody is singled out. */
 export function PoppedRow({ contestant, color, isMe, round, last }: PoppedRowProps) {
   const theme = useTheme();
-  const what = `${contestant.left ? 'Left' : 'Popped'}${round ? ` in round ${round}` : ''}`;
+  const t = useT();
+  const what = contestant.left
+    ? round
+      ? t('game.leftInRound', { round })
+      : t('game.left')
+    : round
+      ? t('game.poppedInRound', { round })
+      : t('game.popped');
   return (
     <Animated.View
       entering={quietIn}
       accessible
-      accessibilityLabel={`${contestant.name}, ${contestant.age}${isMe ? ', you' : ''}. ${what}`}
+      accessibilityLabel={`${whoLabel(t, contestant, isMe)}. ${what}`}
       style={[styles.row, { borderBottomColor: theme.border }, last && styles.lastRow]}>
       <View style={styles.markBox}>
         <PoppedMark color={color} size={POPPED_MARK} />

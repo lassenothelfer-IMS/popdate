@@ -92,11 +92,6 @@ export function PopNews({ text, detail, color, animate, announce = true }: PopNe
   );
 }
 
-/** "4 balloons left", the same words during the beat and after it. */
-export function balloonsLeft(count: number) {
-  return count === 1 ? '1 balloon left' : `${count} balloons left`;
-}
-
 const styles = StyleSheet.create({
   stage: {
     height: STAGE_HEIGHT,

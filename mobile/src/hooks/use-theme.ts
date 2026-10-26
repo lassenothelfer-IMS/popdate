@@ -5,9 +5,13 @@
 
 import { Colors, SeatColors, type Seat } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useOptionalSettings } from '@/state/settings';
 
+/** Light or dark: your Appearance setting, or the phone's when it follows the system. */
 export function useScheme(): 'light' | 'dark' {
-  return useColorScheme() === 'dark' ? 'dark' : 'light';
+  const system = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const appearance = useOptionalSettings()?.settings.appearance ?? 'system';
+  return appearance === 'system' ? system : appearance;
 }
 
 export function useTheme() {

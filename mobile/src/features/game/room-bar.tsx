@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Gutter, MinTouch, Space } from '@/constants/theme';
 import { Pill } from '@/features/game/you-tag';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 /**
  * The bar's words grow with the text size up to here, like the rail's names. Past
@@ -55,6 +56,7 @@ export function RoomBar({
   onLayout,
 }: RoomBarProps) {
   const theme = useTheme();
+  const t = useT();
   return (
     <View style={styles.bar} onLayout={onLayout}>
       <View style={styles.top}>
@@ -74,7 +76,7 @@ export function RoomBar({
               style={styles.shrink}>
               {subtitle}
             </ThemedText>
-            {watching ? <Pill label="Watching" tone="quiet" /> : null}
+            {watching ? <Pill label={t('game.watching')} tone="quiet" /> : null}
           </View>
         </View>
         {timer || onLeave ? (
@@ -83,7 +85,7 @@ export function RoomBar({
             {onLeave ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Leave room"
+                accessibilityLabel={t('game.leaveRoom')}
                 accessibilityState={{ busy: leaving, disabled: leaving }}
                 disabled={leaving}
                 onPress={onLeave}
@@ -93,7 +95,7 @@ export function RoomBar({
                   <ActivityIndicator color={theme.textSecondary} />
                 ) : (
                   <ThemedText type="label" maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}>
-                    Leave
+                    {t('game.leave')}
                   </ThemedText>
                 )}
               </Pressable>

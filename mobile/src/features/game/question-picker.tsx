@@ -6,6 +6,7 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { ThemedText } from '@/components/themed-text';
 import { CssEase, Motion, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 /** Rows reach this far into the gutter, so their text lines up with the heading. */
 const ROW_INSET = Space.sm;
@@ -30,15 +31,17 @@ export function QuestionPicker({
   answering,
 }: QuestionPickerProps) {
   const theme = useTheme();
+  const t = useT();
 
   return (
     <View>
       <ThemedText type="headline" accessibilityRole="header">
-        Ask them something
+        {t('game.askSomething')}
       </ThemedText>
       <ThemedText type="footnote" themeColor="textSecondary" style={styles.hint}>
-        {answering === 2 ? 'Both answer' : `All ${answering} answer`}, then you see their next
-        photo.
+        {answering === 2
+          ? t('game.pickHintBoth')
+          : t('game.pickHintAll', { count: answering })}
       </ThemedText>
 
       <View accessibilityRole="radiogroup" style={styles.list}>

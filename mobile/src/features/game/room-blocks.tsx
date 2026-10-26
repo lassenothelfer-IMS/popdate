@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { CssEase, Motion, PhotoAspect, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useT } from '@/i18n';
 
 /** Short answers are set big; longer ones in the long-quote size. */
 const SHORT_ANSWER = 90;
@@ -39,11 +40,12 @@ export function QuestionBlock({ kicker, text }: { kicker: string; text: string }
 /** Why the photos are still hidden while answers come in. */
 export function LockLine() {
   const theme = useTheme();
+  const t = useT();
   return (
     <View style={styles.lock}>
       <Icon name="lock" size={13} color={theme.textSecondary} />
       <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
-        Photos unlock when the answers are in.
+        {t('game.photosUnlock')}
       </ThemedText>
     </View>
   );
@@ -63,6 +65,7 @@ type MyPhotoProps = {
 export function MyPhoto({ uri, name, tone, position, developed }: MyPhotoProps) {
   const theme = useTheme();
   const reduced = useReduceMotion();
+  const t = useT();
   return (
     <View style={[styles.frame, { backgroundColor: theme.accentWash }]}>
       <Animated.View
@@ -79,9 +82,9 @@ export function MyPhoto({ uri, name, tone, position, developed }: MyPhotoProps) 
           name={name}
           tone={tone}
           style={styles.photo}
-          accessibilityLabel={`Your photo ${position}, showing now`}
+          accessibilityLabel={t('game.yourPhotoNow', { n: position })}
         />
-        <PhotoBadge label={`Photo ${position} · You`} />
+        <PhotoBadge label={t('game.photoNYou', { n: position })} />
       </Animated.View>
     </View>
   );

@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
 import { useNeutralTone } from '@/features/game/popper-presence';
 import { useTheme } from '@/hooks/use-theme';
+import { useT, type Translate } from '@/i18n';
 
 /**
  * The pair as drawn on the 375pt canvas, in points from the content column's left
@@ -49,30 +50,28 @@ type ResultBlockProps = {
  * no outer padding: the room sets it 32 below the room bar, inside the gutters.
  */
 export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: ResultBlockProps) {
+  const t = useT();
   if (!winner) {
     return (
       <Animated.View entering={resultIn} style={styles.copy}>
         <ThemedText type="display" accessibilityRole="header">
-          The room ended early
+          {t('game.endedEarly')}
         </ThemedText>
         <ThemedText type="footnote" themeColor="textSecondary">
-          No match this time.
+          {t('game.noMatch')}
         </ThemedText>
       </Animated.View>
     );
   }
 
-  const chooser = viewer === 'popper' ? 'You' : popper.name;
-  const chosen = viewer === 'winner' ? 'you' : winner.name;
-
   return (
     <Animated.View entering={resultIn}>
       <View style={styles.copy}>
         <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.5}>
-          {chooser} chose {chosen}
+          {resultLine(t, viewer, popper.name, winner.name)}
         </ThemedText>
         <ThemedText type="footnote" themeColor="textSecondary">
-          Last balloon standing after {rounds} {rounds === 1 ? 'round' : 'rounds'}
+          {t('game.lastStanding', { count: rounds })}
         </ThemedText>
       </View>
       <Pair popper={popper} winner={winner} winnerTone={winnerTone} viewer={viewer} />
@@ -80,10 +79,17 @@ export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: Resu
   );
 }
 
+/** "You chose Lena", "Mia chose you" or "Mia chose Lena". The room says it out loud too. */
+export function resultLine(t: Translate, viewer: Viewer, popperName: string, winnerName: string) {
+  if (viewer === 'popper') return t('game.resultYouChose', { name: winnerName });
+  if (viewer === 'winner') return t('game.resultChoseYou', { name: popperName });
+  return t('game.resultChose', { popper: popperName, name: winnerName });
+}
+
 /** "Your photo 4", "Elias, photo 4", or just who it is before any photo is out. */
-function photoLabel(name: string, isYou: boolean, photo: number) {
-  if (photo === 0) return isYou ? 'You' : name;
-  return isYou ? `Your photo ${photo}` : `${name}, photo ${photo}`;
+function photoLabel(t: Translate, name: string, isYou: boolean, photo: number) {
+  if (photo === 0) return isYou ? t('common.you') : name;
+  return isYou ? t('game.yourPhotoN', { n: photo }) : t('game.namePhotoN', { name, n: photo });
 }
 
 type PairProps = {
@@ -96,6 +102,7 @@ type PairProps = {
 /** The winner's latest photo, and the popper's portrait leaning on it. */
 function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
   const theme = useTheme();
+  const t = useT();
   const neutral = useNeutralTone();
   const { width: windowWidth } = useWindowDimensions();
   // Measured on layout. Until then, what the room's gutters leave of this window.
@@ -108,8 +115,8 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
   const shown = winner.photos.length;
   const winnerPhoto = winner.photos[shown - 1];
   const popperPhoto = popper.photos[0];
-  const winnerLabel = photoLabel(winner.name, viewer === 'winner', shown);
-  const popperLabel = photoLabel(popper.name, viewer === 'popper', popperPhoto ? 1 : 0);
+  const winnerLabel = photoLabel(t, winner.name, viewer === 'winner', shown);
+  const popperLabel = photoLabel(t, popper.name, viewer === 'popper', popperPhoto ? 1 : 0);
 
   return (
     <View
@@ -136,7 +143,13 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
             style={styles.winnerPhoto}
           />
           {winnerPhoto ? (
-            <PhotoBadge label={viewer === 'winner' ? `Photo ${shown} · You` : `Photo ${shown}`} />
+            <PhotoBadge
+              label={
+                viewer === 'winner'
+                  ? t('game.photoNYou', { n: shown })
+                  : t('game.photoN', { n: shown })
+              }
+            />
           ) : null}
           <View
             pointerEvents="none"

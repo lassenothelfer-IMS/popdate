@@ -6,10 +6,15 @@
  * Every other player in a room is a bot.
  */
 import type {
+  BlockedPerson,
   Contestant,
   Gender,
   Match,
+  Message,
   PopdateApi,
+  ReportReason,
+  Settings,
+  VerificationStatus,
   Profile,
   ProfileDraft,
   Question,
@@ -19,6 +24,7 @@ import type {
   RoomStatus,
 } from '@/api/types';
 import { ageFromBirthDate } from '@/utils/birth-date';
+import { maskProfanity } from '@/utils/profanity';
 
 const LOBBY_SIZE = 6;
 const ANSWER_MS = 60_000;
@@ -69,6 +75,27 @@ const BOT_NAMES: Record<Gender, string[]> = {
 };
 
 export type MockRole = 'random' | 'popper' | 'contestant';
+
+const MAX_MESSAGE_LENGTH = 1000;
+
+const DEFAULT_SETTINGS: Settings = {
+  language: 'system',
+  region: null,
+  units: 'metric',
+  appearance: 'system',
+  commentFilter: true,
+  notifications: { roomLive: true, newMatch: true, messages: true },
+};
+
+const BOT_REPLIES = [
+  'Haha, okay that answer of yours won me over.',
+  'So, coffee or a walk by the lake?',
+  'I was hoping it would be you in the end.',
+  'Tell me the pizza argument. I need to know.',
+  'That was the most stressful game of my life.',
+  'Hi! What made you pick me?',
+  'Okay, your turn: worst habit, go.',
+];
 
 type Player = RoomPlayer & { isBot: boolean };
 
@@ -131,6 +158,11 @@ class MockServer implements PopdateApi {
   private rooms = new Map<string, ServerRoom>();
   private matches: Match[] = [];
   private usedBotNames = new Set<string>();
+  private settings: Settings = { ...DEFAULT_SETTINGS, notifications: { ...DEFAULT_SETTINGS.notifications } };
+  private verification: VerificationStatus = 'none';
+  private blocked: BlockedPerson[] = [];
+  private messages = new Map<string, Message[]>();
+  private messageListeners = new Map<string, Set<(messages: Message[]) => void>>();
 
   nextRole: MockRole = 'random';
 
@@ -278,6 +310,160 @@ class MockServer implements PopdateApi {
 
   async getMatch(matchId: string) {
     return this.matches.find((match) => match.id === matchId) ?? null;
+  }
+
+  // Account
+
+  async signOut() {
+    // A test account is anonymous: signing out ends it. Sign in with Apple will let people come back.
+    this.reset();
+  }
+
+  async deleteAccount() {
+    this.reset();
+  }
+
+  private reset() {
+    this.clearQueueTimer();
+    this.setQueue({ state: 'idle' });
+    this.rooms.forEach((room) => this.clearTimers(room));
+    this.rooms.clear();
+    this.userId = null;
+    this.profile = null;
+    this.matches = [];
+    this.messages.clear();
+    this.blocked = [];
+    this.verification = 'none';
+    this.settings = { ...DEFAULT_SETTINGS, notifications: { ...DEFAULT_SETTINGS.notifications } };
+  }
+
+  // Settings
+
+  async getSettings() {
+    return structuredClone(this.settings);
+  }
+
+  async saveSettings(settings: Settings) {
+    this.settings = structuredClone(settings);
+    return structuredClone(this.settings);
+  }
+
+  async registerPushToken(token: string) {
+    this.pushToken = token;
+  }
+
+  pushToken: string | null = null;
+
+  // Verification
+
+  async getVerification() {
+    return this.verification;
+  }
+
+  async submitSelfie(photoUri: string) {
+    if (!photoUri) throw new Error('Take a selfie first.');
+    this.verification = 'pending';
+    // A person reviews it on the real server; the mock approves after a few seconds.
+    setTimeout(() => {
+      if (this.verification === 'pending') this.verification = 'verified';
+    }, 4000);
+    return this.verification;
+  }
+
+  // Safety
+
+  async listBlocked() {
+    return [...this.blocked];
+  }
+
+  async block(userId: string) {
+    if (this.blocked.some((person) => person.id === userId)) return;
+    const known = this.findPerson(userId);
+    this.blocked.push({
+      id: userId,
+      name: known?.name ?? 'Someone',
+      age: known?.age ?? 0,
+      photo: known?.photo ?? 'mock://blocked',
+      blockedAt: new Date().toISOString(),
+    });
+  }
+
+  async unblock(userId: string) {
+    this.blocked = this.blocked.filter((person) => person.id !== userId);
+  }
+
+  async report(userId: string, reason: ReportReason, details?: string) {
+    if (!userId || !reason) throw new Error('Choose a reason.');
+    void details;
+  }
+
+  private findPerson(userId: string) {
+    const match = this.matches.find((m) => m.other.id === userId);
+    if (match) return match.other;
+    for (const room of this.rooms.values()) {
+      const player =
+        room.popper.id === userId ? room.popper : room.seats.find((seat) => seat.player.id === userId)?.player;
+      if (player) return { name: player.name, age: player.age, photo: player.photos[0] };
+    }
+    return null;
+  }
+
+  // Chat
+
+  async listMessages(matchId: string) {
+    this.requireMatch(matchId);
+    return [...(this.messages.get(matchId) ?? [])];
+  }
+
+  watchMessages(matchId: string, onChange: (messages: Message[]) => void) {
+    const listeners = this.messageListeners.get(matchId) ?? new Set();
+    listeners.add(onChange);
+    this.messageListeners.set(matchId, listeners);
+    onChange([...(this.messages.get(matchId) ?? [])]);
+    return () => {
+      listeners.delete(onChange);
+    };
+  }
+
+  async sendMessage(matchId: string, text: string) {
+    const match = this.requireMatch(matchId);
+    const trimmed = text.trim();
+    if (!trimmed) throw new Error('Write something first.');
+    if (trimmed.length > MAX_MESSAGE_LENGTH) throw new Error('That message is too long.');
+    if (this.blocked.some((person) => person.id === match.other.id)) {
+      throw new Error("You blocked this person, so you can't message them.");
+    }
+    const message = this.addMessage(matchId, this.userId ?? 'me', trimmed);
+    // The other person is a bot: it answers now and then, after a little while.
+    if (Math.random() < 0.8) {
+      setTimeout(() => {
+        if (this.matches.some((m) => m.id === matchId)) {
+          this.addMessage(matchId, match.other.id, pickRandom(BOT_REPLIES));
+        }
+      }, randomInt(1500, 4000));
+    }
+    return message;
+  }
+
+  private addMessage(matchId: string, senderId: string, text: string) {
+    const message: Message = {
+      id: `msg-${randomId()}`,
+      matchId,
+      senderId,
+      // The server's own filter: the worst words never reach anyone.
+      text: maskProfanity(text),
+      sentAt: new Date().toISOString(),
+    };
+    const list = [...(this.messages.get(matchId) ?? []), message];
+    this.messages.set(matchId, list);
+    this.messageListeners.get(matchId)?.forEach((listener) => listener([...list]));
+    return message;
+  }
+
+  private requireMatch(matchId: string) {
+    const match = this.matches.find((m) => m.id === matchId);
+    if (!match) throw new Error("This match doesn't exist.");
+    return match;
   }
 
   // Game flow

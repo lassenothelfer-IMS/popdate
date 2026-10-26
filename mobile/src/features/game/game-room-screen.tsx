@@ -51,11 +51,11 @@ import {
 import { BalloonRail } from '@/features/game/balloon-rail';
 import { LeaveSheet } from '@/features/game/leave-sheet';
 import { LiveRow, PoppedRow } from '@/features/game/player-row';
-import { afterBeatIn, balloonsLeft, PopNews } from '@/features/game/pop-news';
+import { afterBeatIn, PopNews } from '@/features/game/pop-news';
 import { PoppedView } from '@/features/game/popped-view';
 import { PopperPresence } from '@/features/game/popper-presence';
 import { QuestionPicker } from '@/features/game/question-picker';
-import { ResultBlock } from '@/features/game/result-block';
+import { ResultBlock, resultLine } from '@/features/game/result-block';
 import { RoomBar } from '@/features/game/room-bar';
 import { LockLine, MY_PHOTO_FRAME, MyPhoto, QuestionBlock } from '@/features/game/room-blocks';
 import { RoundTimer } from '@/features/game/round-timer';
@@ -67,6 +67,7 @@ import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
 import { nativeOnly, webSafeKeyframe } from '@/utils/web-motion';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useT, type Translate } from '@/i18n';
 
 /** The Pop button's bar: its top padding, the button and the hairline, before the bottom inset. */
 const POP_BAR = Space.sm + 56 + StyleSheet.hairlineWidth;
@@ -104,14 +105,14 @@ const TIGHT_SPACING: RevealSpacing = {
 /** A failed call, and the phase it was made in. Null for leave and replay: those stay until the next call. */
 type CallError = { phase: string | null; message: string };
 
-function phaseLabel(status: Exclude<RoomStatus, 'finished'>) {
+function phaseLabel(t: Translate, status: Exclude<RoomStatus, 'finished'>) {
   switch (status) {
     case 'picking':
-      return 'Picking a question';
+      return t('game.phasePicking');
     case 'answering':
-      return 'Answering';
+      return t('game.phaseAnswering');
     case 'popping':
-      return 'Reveal and pop';
+      return t('game.phasePopping');
   }
 }
 
@@ -120,17 +121,17 @@ function phaseOf(room: Room) {
   return `${room.round}:${room.status}`;
 }
 
-function popLine(room: Room, popped: Contestant) {
-  if (room.me.role === 'popper') return `You popped ${popped.name}'s balloon`;
-  if (popped.id === room.me.id) return `${room.popper.name} popped your balloon`;
-  return `${room.popper.name} popped ${popped.name}'s balloon`;
+function popLine(t: Translate, room: Room, popped: Contestant) {
+  if (room.me.role === 'popper') return t('game.youPopped', { name: popped.name });
+  if (popped.id === room.me.id) return t('game.poppedYours', { popper: room.popper.name });
+  return t('game.poppedTheirs', { popper: room.popper.name, name: popped.name });
 }
 
-function lastBalloonLine(room: Room, keeper: Contestant | undefined) {
+function lastBalloonLine(t: Translate, room: Room, keeper: Contestant | undefined) {
   if (!keeper) return undefined;
   return keeper.id === room.me.id
-    ? 'Your balloon is the last one'
-    : `${keeper.name}'s balloon is the last one`;
+    ? t('game.yourLast')
+    : t('game.theirLast', { name: keeper.name });
 }
 
 /** One key per revealed photo, so each new photo develops once. */
@@ -181,6 +182,7 @@ const popButtonFade = FadeIn.duration(Motion.state)
 
 export function GameRoomScreen({ roomId }: { roomId: string }) {
   const theme = useTheme();
+  const t = useT();
   const seats = useSeats();
   const insets = useSafeAreaInsets();
   const windowSize = useWindowDimensions();
@@ -273,7 +275,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   }, [holdingId]);
 
   // A failed answer, pick or pop belongs to its phase: once the room moves on it
-  // would be wrong ("Answer time is over." above the next round's empty box), so
+  // would be wrong ("Couldn't send your answer." above the next round's empty box), so
   // it goes. A failed leave or replay stays until the next call.
   const shownError =
     error && room && (error.phase === null || error.phase === phaseOf(room))
@@ -285,15 +287,15 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     if (shownError && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(shownError);
   }, [shownError]);
 
-  if (room === undefined) return <LoadingScreen label="Loading the room" />;
+  if (room === undefined) return <LoadingScreen label={t('game.loadingRoom')} />;
   if (room === null) {
     return (
       <Screen
         scroll
         contentStyle={styles.center}
-        footer={<Button title="Back to home" onPress={goHome} />}>
+        footer={<Button title={t('game.backHome')} onPress={goHome} />}>
         <ThemedText themeColor="textSecondary" style={styles.centerText}>
-          This room doesn&apos;t exist anymore.
+          {t('game.roomGone')}
         </ThemedText>
       </Screen>
     );
@@ -364,16 +366,16 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   const phase = phaseOf(room);
   const popperName = room.popper.name;
 
-  /** Runs a call. Its error is tied to `phase`, or to none for leave and replay. */
-  async function call(action: () => Promise<void>, errorPhase: string | null) {
+  /**
+   * Runs a call. Its error is tied to `phase`, or to none for leave and replay.
+   * `failMessage` is said in the app's language, never the server's words.
+   */
+  async function call(action: () => Promise<void>, errorPhase: string | null, failMessage: string) {
     setError(null);
     try {
       await action();
     } catch (e) {
-      setError({
-        phase: errorPhase,
-        message: e instanceof Error ? e.message : 'Something went wrong. Try again.',
-      });
+      setError({ phase: errorPhase, message: failMessage });
       haptics.error();
       throw e;
     }
@@ -384,7 +386,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     setLeaving(true);
     setLeaveFailed(false);
     try {
-      await call(() => api.leaveRoom(roomId), null);
+      await call(() => api.leaveRoom(roomId), null, t('game.leaveFailed'));
       goHome();
     } catch {
       // The error is shown above the footer, and in the web's leave sheet.
@@ -399,10 +401,10 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   }
 
   const leaveMessage = isPopper
-    ? 'The room ends for all five players.'
+    ? t('game.leavePopper')
     : iAmActive
-      ? "Your balloon pops and you can't rejoin."
-      : "You'll stop watching this room.";
+      ? t('game.leaveActive')
+      : t('game.leaveWatching');
 
   function askLeave() {
     if (leaving) return;
@@ -412,9 +414,9 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
       setConfirmingLeave(true);
       return;
     }
-    Alert.alert('Leave this room?', leaveMessage, [
-      { text: 'Stay', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: confirmLeave },
+    Alert.alert(t('game.leaveTitle'), leaveMessage, [
+      { text: t('game.stay'), style: 'cancel' },
+      { text: t('game.leave'), style: 'destructive', onPress: confirmLeave },
     ]);
   }
 
@@ -429,7 +431,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
           setLeftForReplay(true);
         }
         await api.joinQueue();
-      }, null);
+      }, null, t('game.replayFailed'));
       router.replace('/queue');
     } catch {
       // The error is shown above the buttons.
@@ -555,7 +557,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     haptics.light();
     setAsking(true);
     try {
-      await call(() => api.pickQuestion(roomId, selectedQuestion.id), phase);
+      await call(() => api.pickQuestion(roomId, selectedQuestion.id), phase, t('game.pickFailed'));
     } catch {
       // The error is shown above the button, and the pick stays marked.
     } finally {
@@ -564,11 +566,11 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   }
 
   async function sendAnswer(text: string) {
-    await call(() => api.postAnswer(roomId, text), phase);
+    await call(() => api.postAnswer(roomId, text), phase, t('game.answerFailed'));
     haptics.success();
     // The composer, with the Send button VoiceOver was on, gives way to the Sent line.
     // Queued, so the keyboard going down doesn't cut it off.
-    announce(`Sent. ${popperName} can read it now.`);
+    announce(t('game.sent', { name: popperName }));
   }
 
   function selectBalloon(id: string) {
@@ -587,14 +589,14 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     if (!selected || sendingPop) return;
     const target = selected;
     // Only the popper pops, so this is the popper's own pop line.
-    const announcement = `You popped ${target.name}'s balloon`;
+    const announcement = t('game.youPopped', { name: target.name });
     // The pop is felt and seen on the press itself, and rolled back if the server says no.
     haptics.medium();
     setSendingPop(true);
     setPendingPopId(target.id);
     startBeat(target.id);
     try {
-      await call(() => api.popBalloon(roomId, target.id), phase);
+      await call(() => api.popBalloon(roomId, target.id), phase, t('game.popFailed'));
       setSelectedId(null);
       // Said once the server has it, so a pop that fails is never announced. Queued,
       // so the Pop bar VoiceOver was on going away doesn't cut it off.
@@ -609,11 +611,10 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     }
   }
 
-  const title = finished
-    ? 'Final'
-    : finalTwo
-      ? 'Final two'
-      : `Round ${room.round} of ${room.totalRounds}`;
+  const roundOf = t('game.roundOf', { round: room.round, total: room.totalRounds });
+  const title = finished ? t('game.final') : finalTwo ? t('game.finalTwo') : roundOf;
+  const left = (count: number) => t('game.balloonsLeft', { count });
+  const yourPhotoShowing = me ? t('game.yourPhotoShowing', { n: me.photos.length }) : '';
 
   // Your own pop in the final, seen live: the room goes straight to the result.
   const ownFinalPop =
@@ -621,6 +622,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
 
   // Your balloon is out: the popped view takes the room's place until you stay to
   // watch, or the game ends.
+  const viewer = isPopper ? 'popper' : room.winnerId === room.me.id ? 'winner' : 'other';
+
   const showPopped =
     !isPopper &&
     !!me?.popped &&
@@ -642,25 +645,27 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
         // The match opens on its own and says what happened.
         if (matchId) return null;
         const result = winner
-          ? `${isPopper ? 'You' : popperName} chose ${room.winnerId === room.me.id ? 'you' : winner.name}.`
-          : 'The room ended early. No match this time.';
-        return ownFinalPop ? `${popperName} popped your balloon. ${result}` : result;
+          ? sentence(resultLine(t, viewer, popperName, winner.name))
+          : `${sentence(t('game.endedEarly'))} ${t('game.noMatch')}`;
+        return ownFinalPop
+          ? `${sentence(t('game.poppedYours', { popper: popperName }))} ${result}`
+          : result;
       }
       case 'picking':
         return isPopper
-          ? `${title}. Ask them something.`
-          : `${title}. ${popperName} is picking a question.${room.round > 1 ? ` ${balloonsLeft(up.length)}.` : ''}`;
+          ? `${title}. ${sentence(t('game.askSomething'))}`
+          : `${title}. ${sentence(t('game.isPicking', { name: popperName }))}${room.round > 1 ? ` ${sentence(left(up.length))}` : ''}`;
       case 'answering':
         return isPopper
-          ? `You asked: ${question} Photos unlock when the answers are in.`
-          : `${popperName} asks: ${question}`;
+          ? `${t('game.youAskedSpoken', { question })} ${t('game.photosUnlock')}`
+          : t('game.asksSpoken', { name: popperName, question });
       case 'popping':
         if (isPopper) {
           return room.popReminder
-            ? "Everyone's waiting on your pick."
-            : 'Answers are in. Choose whose balloon to pop.';
+            ? t('game.waitingOnYou')
+            : `${t('game.answersIn')} ${sentence(t('game.choosePop'))}`;
         }
-        return `${popperName} is deciding who to pop.${myPhotoShowing ? ` Your photo ${me.photos.length} is showing now.` : ''}`;
+        return `${sentence(t('game.isDeciding', { name: popperName }))}${myPhotoShowing ? ` ${yourPhotoShowing}` : ''}`;
     }
   };
 
@@ -700,22 +705,22 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     news = (
       <PopNews
         key={beatPop.id}
-        text={popLine(room, beatPop)}
-        detail={lastBalloonLine(room, winner)}
+        text={popLine(t, room, beatPop)}
+        detail={lastBalloonLine(t, room, winner)}
         color={seatOf(beatPop).color}
         animate={holding}
         announce={!isPopper}
       />
     );
   } else if (holdingPop && beatPop) {
-    const left = up.length - (pending ? 1 : 0);
+    const stillUp = up.length - (pending ? 1 : 0);
     const lastOne =
-      pending && left === 1 ? up.find((p) => p.contestant.id !== pending.id) : undefined;
+      pending && stillUp === 1 ? up.find((p) => p.contestant.id !== pending.id) : undefined;
     news = (
       <PopNews
         key={beatPop.id}
-        text={popLine(room, beatPop)}
-        detail={lastOne ? lastBalloonLine(room, lastOne.contestant) : balloonsLeft(left)}
+        text={popLine(t, room, beatPop)}
+        detail={lastOne ? lastBalloonLine(t, room, lastOne.contestant) : left(stillUp)}
         color={seatOf(beatPop).color}
         animate
         announce={!isPopper}
@@ -740,15 +745,15 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     statusStyle = tight ? styles.chooseLineTight : styles.chooseLine;
     statusLine = (
       <ThemedText type="headline" accessibilityRole="header" accessibilityLiveRegion="polite">
-        {room.popReminder ? "Everyone's waiting on your pick." : 'Choose whose balloon to pop'}
+        {room.popReminder ? t('game.waitingOnYou') : t('game.choosePop')}
       </ThemedText>
     );
   } else if (showQuestionBlock) {
     statusKey = 'deciding';
     statusLine = (
       <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
-        {room.popper.name} is deciding who to pop…
-        {myPhotoShowing ? ` Your photo ${me.photos.length} is showing now.` : ''}
+        {t('game.isDeciding', { name: room.popper.name })}…
+        {myPhotoShowing ? ` ${yourPhotoShowing}` : ''}
       </ThemedText>
     );
   }
@@ -774,7 +779,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     rows.push(
       <Animated.View key="popped-header" layout={cardTransition} style={styles.poppedHeader}>
         <ThemedText type="footnote" themeColor="textSecondary" accessibilityRole="header">
-          Popped
+          {t('game.popped')}
         </ThemedText>
       </Animated.View>,
     );
@@ -807,7 +812,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   let footer: ReactNode = null;
   if (finished) {
     // While the last pop holds the room, nothing should pull you off this moment.
-    footer = climax ? null : <Button title="Back to home" onPress={goHome} />;
+    footer = climax ? null : <Button title={t('game.backHome')} onPress={goHome} />;
   } else if (iAmActive && answering) {
     footer = me.answered ? (
       <AnswerSent popperName={room.popper.name} />
@@ -824,7 +829,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     footer = (
       <Animated.View entering={pickingIn}>
         <Button
-          title="Ask this question"
+          title={t('game.askThis')}
           disabled={!selectedQuestion}
           loading={asking}
           onPress={handleAsk}
@@ -838,14 +843,18 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     footer = (
       <Animated.View entering={reduced ? popButtonFade : popButtonIn} style={styles.popFooter}>
         <Button
-          title={keeper ? `Match with ${keeper.contestant.name}` : `Pop ${selected.name}'s balloon`}
+          title={
+            keeper
+              ? t('game.matchWith', { name: keeper.contestant.name })
+              : t('game.popBalloon', { name: selected.name })
+          }
           icon={<Balloon color={shown.onInk} size={14} string={false} shine={false} />}
-          accessibilityHint={keeper ? `Pops ${selected.name}'s balloon` : undefined}
+          accessibilityHint={keeper ? t('game.popsHint', { name: selected.name }) : undefined}
           onPress={handlePop}
         />
         {keeper ? (
           <ThemedText type="footnote" themeColor="textSecondary" style={styles.centerText}>
-            {selected.name}&apos;s balloon pops.
+            {t('game.balloonPops', { name: selected.name })}
           </ThemedText>
         ) : null}
       </Animated.View>
@@ -855,9 +864,9 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
 
   const subtitle = finished
     ? winner
-      ? `${room.round} ${room.round === 1 ? 'round' : 'rounds'} played`
-      : 'Ended early'
-    : phaseLabel(room.status as Exclude<RoomStatus, 'finished'>);
+      ? t('game.roundsPlayed', { count: room.round })
+      : t('game.endedEarlyShort')
+    : phaseLabel(t, room.status as Exclude<RoomStatus, 'finished'>);
 
   return (
     <>
@@ -882,7 +891,9 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
             <RoomBar
               title={title}
               titleLabel={
-                finalTwo ? `Final two, round ${room.round} of ${room.totalRounds}` : undefined
+                finalTwo
+                  ? t('game.finalTwoLabel', { round: room.round, total: room.totalRounds })
+                  : undefined
               }
               subtitle={subtitle}
               watching={watching && !finished}
@@ -897,8 +908,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                 total: room.totalRounds,
                 filled: Math.min(room.round, room.totalRounds),
                 label: finished
-                  ? `${room.round} of ${room.totalRounds} rounds played`
-                  : `Round ${room.round} of ${room.totalRounds}`,
+                  ? t('game.roundsPlayedOf', { round: room.round, total: room.totalRounds })
+                  : roundOf,
               }}
               rail={
                 <BalloonRail
@@ -949,7 +960,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                     winner={winner}
                     winnerTone={winner ? seatOf(winner) : undefined}
                     rounds={room.round}
-                    viewer={isPopper ? 'popper' : room.winnerId === room.me.id ? 'winner' : 'other'}
+                    viewer={viewer}
                   />
                 </View>
               ) : null}
@@ -983,8 +994,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                       type="footnote"
                       themeColor="textSecondary"
                       accessibilityLiveRegion="polite">
-                      {room.popper.name} is picking a question…
-                      {room.round > 1 ? ` ${balloonsLeft(up.length)}.` : ''}
+                      {t('game.isPicking', { name: room.popper.name })}…
+                      {room.round > 1 ? ` ${sentence(left(up.length))}` : ''}
                     </ThemedText>
                   </Animated.View>
                 )
@@ -1002,7 +1013,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                   }}>
                   <Animated.View entering={questionIn}>
                     <QuestionBlock
-                      kicker={isPopper ? 'You asked' : `${room.popper.name} asks`}
+                      kicker={isPopper ? t('game.youAsked') : t('game.asks', { name: room.popper.name })}
                       text={room.question.text}
                     />
                   </Animated.View>
