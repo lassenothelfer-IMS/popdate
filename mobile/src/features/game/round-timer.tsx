@@ -1,85 +1,126 @@
-import { StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 
-import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { CssEase, Ease, Motion, Radius, Space } from '@/constants/theme';
+import { Ease, Motion, Radius, Space } from '@/constants/theme';
 import { BAR_TEXT_MAX_SCALE } from '@/features/game/room-bar';
 import { formatSeconds, useSecondsLeft } from '@/hooks/use-server';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
+import { haptics } from '@/utils/haptics';
 
 const timerIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
-/** Filled gold from 10 seconds left, and once everyone is waiting on the popper. Never red. */
-const URGENT_FROM = 10;
-const PILL_HEIGHT = 32;
-const ICON_SIZE = 14;
+/** The 40 pt ring timer in the room header. */
+const SIZE = 40;
+const STROKE = 2.5;
+const RADIUS = 18;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+/** A warning haptic once, when your answer has this many seconds left. */
+const WARN_AT = 10;
 
 type RoundTimerProps = {
   deadline: number | null;
   /** The popper is over the pop time. There is no auto-pop. */
   popReminder: boolean;
+  /** Buzz once at 10 s left: only while you still have an answer to send. */
+  warn?: boolean;
 };
 
 /**
- * The countdown pill in the room bar. It owns the per-second tick, so only this
- * pill re-renders while the clock runs, not the whole room. The digits never animate.
+ * The ring timer in the room header: a 40 pt ring that empties as the clock
+ * runs, the time in 11 pt tabular figures inside. It owns the per-second tick,
+ * so only this ring re-renders while the clock runs. Past the pop time it
+ * becomes a quiet "Everyone's waiting" pill.
  */
-export function RoundTimer({ deadline, popReminder }: RoundTimerProps) {
+export function RoundTimer({ deadline, popReminder, warn = false }: RoundTimerProps) {
   const theme = useTheme();
   const t = useT();
   const secondsLeft = useSecondsLeft(deadline);
-  if (secondsLeft === null && !popReminder) return null;
+  // The ring's full length is the time left when this deadline first showed.
+  const [total, setTotal] = useState<{ deadline: number | null; seconds: number } | null>(null);
+  if (secondsLeft !== null && total?.deadline !== deadline) {
+    setTotal({ deadline, seconds: Math.max(1, secondsLeft) });
+  }
+  const warned = useRef<number | null>(null);
+  useEffect(() => {
+    if (!warn || secondsLeft === null || deadline === null) return;
+    if (secondsLeft <= WARN_AT && secondsLeft > 0 && warned.current !== deadline) {
+      warned.current = deadline;
+      haptics.warning();
+    }
+  }, [warn, secondsLeft, deadline]);
 
-  const urgent = popReminder || (secondsLeft !== null && secondsLeft <= URGENT_FROM);
-  const seconds = secondsLeft ?? 0;
-  const waiting = t('game.everyoneWaiting');
-  const text = popReminder ? waiting : formatSeconds(seconds);
+  if (popReminder) {
+    const waiting = t('game.everyoneWaiting');
+    return (
+      <Animated.View
+        entering={timerIn}
+        accessible
+        accessibilityRole="timer"
+        accessibilityLabel={waiting}
+        style={[styles.pill, { backgroundColor: theme.surface }]}>
+        <ThemedText type="timer" maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE} style={styles.pillText}>
+          {waiting}
+        </ThemedText>
+      </Animated.View>
+    );
+  }
+  if (secondsLeft === null) return null;
 
+  const fraction = Math.min(1, secondsLeft / (total?.seconds ?? Math.max(1, secondsLeft)));
   return (
     <Animated.View
       entering={timerIn}
       accessible
       accessibilityRole="timer"
-      accessibilityLabel={popReminder ? waiting : t('game.secondsLeft', { count: seconds })}
-      style={[
-        styles.pill,
-        {
-          // A capsule with a 1pt candle-gold ring; it fills gold when time runs short.
-          backgroundColor: urgent ? theme.gold : 'transparent',
-          borderColor: urgent ? theme.gold : 'rgba(233, 190, 114, 0.45)',
-          transitionProperty: ['backgroundColor', 'borderColor'],
-          transitionDuration: Motion.state,
-          transitionTimingFunction: CssEase.out,
-        },
-      ]}>
-      <Icon name="timer" size={ICON_SIZE} color={urgent ? theme.onInverse : theme.gold} />
-      {/* Capped with the rest of the bar, so "Everyone's waiting" never pushes Leave off. */}
-      <ThemedText
-        type="timer"
-        themeColor={urgent ? 'onInverse' : 'gold'}
-        maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
-        style={styles.digits}>
-        {text}
-      </ThemedText>
+      accessibilityLabel={t('game.secondsLeft', { count: secondsLeft })}
+      style={styles.ring}>
+      <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} style={StyleSheet.absoluteFill}>
+        <Circle cx={20} cy={20} r={RADIUS} fill="none" stroke={theme.surface} strokeWidth={STROKE} />
+        <Circle
+          cx={20}
+          cy={20}
+          r={RADIUS}
+          fill="none"
+          stroke={theme.text}
+          strokeWidth={STROKE}
+          strokeLinecap="round"
+          strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+          strokeDashoffset={CIRCUMFERENCE * (1 - fraction)}
+          transform="rotate(-90 20 20)"
+        />
+      </Svg>
+      <View>
+        <ThemedText type="timer" maxFontSizeMultiplier={1} style={styles.digits}>
+          {formatSeconds(secondsLeft)}
+        </ThemedText>
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  pill: {
-    minHeight: PILL_HEIGHT,
-    flexDirection: 'row',
+  ring: {
+    width: SIZE,
+    height: SIZE,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.pill,
-    borderCurve: 'continuous',
-    borderWidth: 1,
+    justifyContent: 'center',
   },
   digits: {
-    fontSize: 14,
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: 600,
+  },
+  pill: {
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: Space.sm,
+    borderRadius: Radius.pill,
+  },
+  pillText: {
     fontWeight: 600,
   },
 });

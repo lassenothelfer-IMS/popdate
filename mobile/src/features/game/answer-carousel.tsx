@@ -10,7 +10,15 @@ import {
   type ScrollViewInstance,
   type ViewStyle,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  Keyframe,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 import type { Contestant } from '@/api';
 import { Photo, PhotoBadge } from '@/components/photo';
@@ -32,6 +40,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
 import { useFilterText } from '@/state/settings';
+import { webSafeKeyframe } from '@/utils/web-motion';
 
 /** The canvas's card. On shorter screens it narrows, so a whole card stays above the footer. */
 const MAX_CARD_WIDTH = 288;
@@ -61,8 +70,15 @@ const DEVELOP_FROM = 0.97;
 const DOT = 10;
 
 const CHROME = 2 * (CARD_EDGE + CARD_PAD);
-/** Gold at 22%: the edge of every photo card. */
-const CARD_RING = 'rgba(233, 190, 114, 0.22)';
+/** A photo that hasn't bloomed yet sits a little back, at 60%. */
+const WAITING_OPACITY = 0.6;
+/** The bloom from grey to color, once the card is in view. */
+const BLOOM_MS = 2400;
+/**
+ * Grayscale until the photo blooms. React Native draws filter functions other
+ * than brightness and opacity on Android and the web only; iOS keeps the dim.
+ */
+const GREY = Platform.OS === 'ios' ? undefined : ([{ grayscale: 1 }] as ViewStyle['filter']);
 
 /**
  * The card width that fits a whole card, answer and marked ring included, into
@@ -75,6 +91,29 @@ export function cardWidthFor(height: number, pageWidth: number, textScale = 1) {
   const fit = Math.floor(photoHeight * PhotoAspect) + CHROME;
   return Math.max(Math.min(fit, max), Math.min(MIN_CARD_WIDTH, max));
 }
+
+/** The final two lean toward each other: -4 and 4 degrees, the left one a little lower. */
+const PAIR_TILT = 4;
+const PAIR_OVERLAP = 18;
+const PAIR_DROP = 20;
+
+/** The final two slide in from 60 pt either side, turning to their tilt, 150 ms apart. */
+function pairIn(side: -1 | 1) {
+  return webSafeKeyframe(
+    new Keyframe({
+      0: { opacity: 0, transform: [{ translateX: 60 * side }, { rotate: '0deg' }] },
+      100: {
+        opacity: 1,
+        transform: [{ translateX: 0 }, { rotate: `${PAIR_TILT * side}deg` }],
+        easing: Easing.bezier(0.22, 1, 0.36, 1),
+      },
+    })
+      .duration(900)
+      .delay(side === 1 ? 150 : 0),
+  );
+}
+const leftIn = pairIn(-1);
+const rightIn = pairIn(1);
 
 /** Where a card's photo sits in the carousel, for checking it is in view before it develops. */
 export function cardPhotoBox(width: number) {
@@ -115,6 +154,8 @@ type AnswerCarouselProps = {
   onSelect?: (contestantId: string) => void;
   /** The cards at least half in view, whenever that set changes. */
   onVisibleChange: (contestantIds: string[]) => void;
+  /** The final two: both cards side by side, tilted toward each other, the favorite breathing. */
+  pair?: boolean;
   ref?: Ref<AnswerCarouselHandle>;
 };
 
@@ -125,6 +166,7 @@ export function AnswerCarousel({
   markedId,
   onSelect,
   onVisibleChange,
+  pair = false,
   ref,
 }: AnswerCarouselProps) {
   const reduced = useReduceMotion();
@@ -183,6 +225,36 @@ export function AnswerCarousel({
     report();
   }
 
+  if (pair && cards.length === 2) {
+    // Both in view at once: no track to swipe.
+    const pairWidth = Math.min(width, Math.floor((pageWidth - 2 * Gutter + PAIR_OVERLAP) / 2));
+    return (
+      <View style={styles.pair}>
+        {cards.map(({ contestant, seat, developed }, index) => (
+          <Animated.View
+            key={contestant.id}
+            entering={reduced ? undefined : index === 0 ? leftIn : rightIn}
+            style={{
+              marginLeft: index === 0 ? 0 : -PAIR_OVERLAP,
+              marginTop: index === 0 ? PAIR_DROP : 0,
+              zIndex: contestant.id === markedId ? 1 : 0,
+              transform: [{ rotate: `${index === 0 ? -PAIR_TILT : PAIR_TILT}deg` }],
+            }}>
+            <AnswerCard
+              contestant={contestant}
+              seat={seat}
+              width={pairWidth}
+              marked={contestant.id === markedId}
+              breathe={contestant.id === markedId && !reduced}
+              developed={developed}
+              onPress={onSelect ? () => onSelect(contestant.id) : undefined}
+            />
+          </Animated.View>
+        ))}
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       ref={scrollRef}
@@ -222,13 +294,25 @@ type AnswerCardProps = {
   seat: Seat;
   width: number;
   marked: boolean;
+  /** The chooser's favorite in the final two breathes, 1 to 1.04 over 3 s. */
+  breathe?: boolean;
   developed: boolean;
   onPress?: () => void;
 };
 
 /** Their newest photo, then their name and their words. Tapping marks their balloon. */
-function AnswerCard({ contestant, seat, width, marked, developed, onPress }: AnswerCardProps) {
+function AnswerCard({ contestant, seat, width, marked, breathe = false, developed, onPress }: AnswerCardProps) {
   const theme = useTheme();
+  const breath = useSharedValue(0);
+  useEffect(() => {
+    if (!breathe) {
+      cancelAnimation(breath);
+      breath.set(withTiming(0, { duration: Motion.state }));
+      return;
+    }
+    breath.set(withRepeat(withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }), -1, true));
+  }, [breathe, breath]);
+  const breathing = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.04 * breath.get() }] }));
   const reduced = useReduceMotion();
   const t = useT();
   const filterText = useFilterText();
@@ -244,6 +328,7 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
   // popper's turn to pop starts or ends. Its name ends in "<Name>'s balloon":
   // marking the card marks that balloon.
   return (
+    <Animated.View style={breathing}>
     <PressableHighlight
       onPress={onPress}
       disabled={!selectable}
@@ -255,18 +340,22 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
       )} ${t('game.balloonOf', { name })}`}
       accessibilityHint={selectable ? t('game.markHint', { name }) : undefined}
       background={theme.field}
-      // A photo card: 22pt corners and a faint candle-gold edge.
-      style={[styles.card, { width, borderColor: CARD_RING }]}>
+      // A large photo card: 22pt corners, a hairline edge, the long soft shadow on Velvet.
+      style={[
+        styles.card,
+        { width, borderColor: theme.borderStrong, boxShadow: '0 30px 60px -30px rgba(0,0,0,0.8)' },
+      ]}>
       {latest ? (
-        // The reveal: the photo develops once it is in view. No stagger, no haptic.
-        // Under Reduce Motion only the fade is left.
+        // The reveal: the photo waits in grey and blooms into color over 2.4 s once it
+        // is in view. No stagger, no haptic. Under Reduce Motion it is instant.
         <Animated.View
           key={latest}
           style={{
-            opacity: developed ? 1 : 0,
+            opacity: developed ? 1 : WAITING_OPACITY,
+            filter: developed ? undefined : GREY,
             transform: [{ scale: developed || reduced ? 1 : DEVELOP_FROM }],
-            transitionProperty: reduced ? 'opacity' : ['opacity', 'transform'],
-            transitionDuration: Motion.enter,
+            transitionProperty: reduced ? [] : ['opacity', 'transform'],
+            transitionDuration: BLOOM_MS,
             transitionTimingFunction: CssEase.out,
           }}>
           <Photo
@@ -284,11 +373,8 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
           <View style={styles.dotBox}>
             <View style={[styles.dot, { backgroundColor: seat.color }]} />
           </View>
-          <ThemedText type="row" style={styles.shrink}>
-            {contestant.name},{' '}
-            <ThemedText type="row" themeColor="textSecondary" style={styles.age}>
-              {contestant.age}
-            </ThemedText>
+          <ThemedText type="row" style={[styles.shrink, styles.name]}>
+            {contestant.name}, {contestant.age}
           </ThemedText>
         </View>
         <View style={styles.words}>
@@ -308,7 +394,8 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
         style={[
           styles.ring,
           {
-            borderColor: theme.accentText,
+            // The chooser's favorite: a 2 pt coral ring.
+            borderColor: theme.accent,
             opacity: marked ? 1 : 0,
             transitionProperty: 'opacity',
             transitionDuration: Motion.state,
@@ -317,10 +404,18 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
         ]}
       />
     </PressableHighlight>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  pair: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingHorizontal: Gutter,
+    paddingVertical: RING + 4,
+  },
   track: {
     alignItems: 'flex-start',
     gap: CARD_GAP,
@@ -362,8 +457,9 @@ const styles = StyleSheet.create({
   shrink: {
     flexShrink: 1,
   },
-  age: {
-    fontWeight: 400,
+  name: {
+    fontSize: 16,
+    fontWeight: 600,
   },
   words: {
     marginTop: 6,

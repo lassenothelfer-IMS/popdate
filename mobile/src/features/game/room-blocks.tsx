@@ -4,7 +4,7 @@ import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/icon';
 import { Photo, PhotoBadge, type PhotoTone } from '@/components/photo';
 import { ThemedText } from '@/components/themed-text';
-import { CssEase, Motion, PhotoAspect, Radius, Space } from '@/constants/theme';
+import { CssEase, Motion, PhotoAspect, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
@@ -25,12 +25,21 @@ export function Quote({ text }: { text: string }) {
   );
 }
 
-/** "You asked" or "Mia asks" in candle gold, and the round's question under it. */
-export function QuestionBlock({ kicker, text }: { kicker: string; text: string }) {
+type QuestionBlockProps = {
+  kicker: string;
+  text: string;
+  /** 32/38 while it is being answered, 26/32 while waiting, 24/30 in the final. */
+  size?: 'round' | 'waiting' | 'final';
+};
+
+/** "You asked" or "Mia asks", and the round's question under it in New York. */
+export function QuestionBlock({ kicker, text, size = 'round' }: QuestionBlockProps) {
   return (
     <View>
       <ThemedText type="kicker">{kicker}</ThemedText>
-      <ThemedText type="question" style={styles.question}>
+      <ThemedText
+        type={size === 'round' ? 'question' : 'questionSmall'}
+        style={[styles.question, size === 'final' && styles.finalQuestion]}>
         {text}
       </ThemedText>
     </View>
@@ -61,7 +70,7 @@ type MyPhotoProps = {
   developed: boolean;
 };
 
-/** Your photo while the popper sees it, in a candle-gold frame, tilted like a card on the table. */
+/** Your photo while the chooser sees it, inside the ring in your balloon color. */
 export function MyPhoto({ uri, name, tone, position, developed }: MyPhotoProps) {
   const theme = useTheme();
   const reduced = useReduceMotion();
@@ -70,7 +79,7 @@ export function MyPhoto({ uri, name, tone, position, developed }: MyPhotoProps) 
     <View
       style={[
         styles.frame,
-        { backgroundColor: theme.surface, boxShadow: `inset 0 0 0 2px ${theme.gold}` },
+        { backgroundColor: theme.field, boxShadow: `inset 0 0 0 2px ${tone.color}` },
       ]}>
       <Animated.View
         key={uri}
@@ -96,7 +105,11 @@ export function MyPhoto({ uri, name, tone, position, developed }: MyPhotoProps) 
 
 const styles = StyleSheet.create({
   question: {
-    marginTop: Space.xs,
+    marginTop: 6,
+  },
+  finalQuestion: {
+    fontSize: 24,
+    lineHeight: 30,
   },
   lock: {
     flexDirection: 'row',
@@ -110,7 +123,6 @@ const styles = StyleSheet.create({
     padding: MY_PHOTO_FRAME,
     borderRadius: Radius.card,
     borderCurve: 'continuous',
-    transform: [{ rotate: '-2deg' }],
   },
   photo: {
     width: '100%',

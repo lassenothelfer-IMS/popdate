@@ -9,7 +9,7 @@ import {
 
 import { ProgressSegments } from '@/components/progress-segments';
 import { ThemedText } from '@/components/themed-text';
-import { Gutter, MinTouch, Space } from '@/constants/theme';
+import { Gutter, MinTouch, Radius, Space } from '@/constants/theme';
 import { Pill } from '@/features/game/you-tag';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -42,7 +42,10 @@ type RoomBarProps = {
   onLayout?: (event: LayoutChangeEvent) => void;
 };
 
-/** The pinned top of the room: round and phase, timer, Leave, the rounds and the seats. */
+/**
+ * The room header: "Round 1 of 4" over the phase on the left, the ring timer
+ * and a Leave pill on the right, then the four round segments and the seats.
+ */
 export function RoomBar({
   title,
   titleLabel,
@@ -70,8 +73,8 @@ export function RoomBar({
           </ThemedText>
           <View style={styles.phase}>
             <ThemedText
-              type="footnote"
-              themeColor="textTertiary"
+              type="caption"
+              themeColor="textSecondary"
               maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
               style={styles.shrink}>
               {subtitle}
@@ -91,17 +94,19 @@ export function RoomBar({
                 onPress={onLeave}
                 hitSlop={{ right: Space.sm }}
                 style={({ pressed }) => [styles.leave, pressed && styles.pressed]}>
+                {/* A surface 2 pill, 13/600, inside a 44 pt target. */}
+                <View style={[styles.leavePill, { backgroundColor: theme.surface }]}>
                 {leaving ? (
                   <ActivityIndicator color={theme.textSecondary} />
                 ) : (
                   <ThemedText
-                    type="label"
-                    themeColor="textTertiary"
+                    type="footnote"
                     maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
                     style={styles.leaveLabel}>
                     {t('game.leave')}
                   </ThemedText>
                 )}
+                </View>
               </Pressable>
             ) : null}
           </View>
@@ -132,7 +137,7 @@ export function RoomBar({
 
 const styles = StyleSheet.create({
   bar: {
-    paddingTop: Space.sm,
+    paddingTop: Space.xs,
     paddingHorizontal: Gutter,
   },
   top: {
@@ -161,7 +166,13 @@ const styles = StyleSheet.create({
   leave: {
     minWidth: MinTouch,
     minHeight: MinTouch,
-    paddingLeft: Space.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leavePill: {
+    minHeight: 32,
+    paddingHorizontal: Space.sm,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -172,10 +183,10 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   rounds: {
-    marginTop: Space.sm,
+    marginTop: Space.md,
   },
   rail: {
-    marginTop: Space.md,
-    paddingBottom: Space.sm,
+    marginTop: Space.lg,
+    paddingBottom: Space.md,
   },
 });

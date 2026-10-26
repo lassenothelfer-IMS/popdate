@@ -58,6 +58,22 @@ type ResultBlockProps = {
 export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: ResultBlockProps) {
   const t = useT();
   if (!winner) {
+    // A room with no last balloon ended because its chooser left: nobody is penalised.
+    if (viewer !== 'popper') {
+      return (
+        <Animated.View entering={resultIn} style={styles.copy}>
+          <ThemedText type="title" accessibilityRole="header" maxFontSizeMultiplier={1.5}>
+            {t('game.chooserLeft', { name: popper.name })}
+          </ThemedText>
+          <ThemedText type="body" themeColor="textSecondary">
+            {t('game.chooserLeftBody')}
+          </ThemedText>
+          <ThemedText type="footnote" themeColor="textTertiary" style={styles.note}>
+            {t('game.holderLeavesNote')}
+          </ThemedText>
+        </Animated.View>
+      );
+    }
     return (
       <Animated.View entering={resultIn} style={styles.copy}>
         <ThemedText type="display" accessibilityRole="header">
@@ -199,6 +215,9 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
 const styles = StyleSheet.create({
   copy: {
     gap: Space.xs,
+  },
+  note: {
+    marginTop: Space.md,
   },
   // Centers the pair once it stops growing on a wide screen.
   column: {
