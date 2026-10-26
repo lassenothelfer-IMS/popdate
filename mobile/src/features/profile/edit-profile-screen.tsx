@@ -1,33 +1,36 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
-import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
-import { Icon } from '@/components/icon';
+import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Space } from '@/constants/theme';
-import { BackButton } from '@/features/onboarding/back-button';
+import { useToast } from '@/components/toast';
+import { MinTouch, Space } from '@/constants/theme';
 import { DetailsSection, PhotoSection, useProfileForm } from '@/features/profile/profile-form';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
 
-/** How long "Saved" stays on the button before the screen closes. */
-const SAVED_PAUSE = 700;
+/** How long the "Saved" toast shows before the screen closes. */
+const SAVED_PAUSE = 900;
 
 function goBack() {
   if (router.canGoBack()) router.back();
   else router.replace('/home');
 }
 
-/** Your profile after setup: the same photos and details, prefilled, saved in place. */
+/**
+ * Edit profile (P01): Cancel, the title and Save in a bar at the top, then the
+ * same photos and details as setup, prefilled and saved in place.
+ */
 export function EditProfileScreen() {
   const t = useT();
   const theme = useTheme();
   const { profile, saveProfile } = useSession();
+  const { show, toast } = useToast();
   const form = useProfileForm(
     profile
       ? {
@@ -54,7 +57,7 @@ export function EditProfileScreen() {
   if (!profile) return <Redirect href="/" />;
 
   const { details, changed } = form;
-  const canSave = details !== null && changed;
+  const canSave = details !== null && changed && !saving && !saved;
   const missing = details ? null : form.missing('save');
 
   async function handleSave() {
@@ -72,80 +75,105 @@ export function EditProfileScreen() {
       setSaving(false);
       setSaved(true);
       haptics.success();
-      AccessibilityInfo.announceForAccessibility(t('common.saved'));
+      show(t('common.saved'));
     } catch {
       const message = t('profile.saveFailed');
       setError(message);
-      haptics.error();
       AccessibilityInfo.announceForAccessibility(message);
       setSaving(false);
     }
   }
 
   return (
-    <Screen
-      scroll
-      footer={
-        <>
-          {error ? (
+    <View style={styles.flex}>
+      <Screen scroll>
+        <Rise index={0} style={styles.bar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.cancel')}
+            onPress={goBack}
+            hitSlop={8}
+            style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}>
+            <ThemedText type="label">{t('common.cancel')}</ThemedText>
+          </Pressable>
+          <ThemedText type="headline" accessibilityRole="header">
+            {t('settings.editProfile')}
+          </ThemedText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.save')}
+            accessibilityHint={canSave ? undefined : (missing ?? t('profile.noChanges'))}
+            accessibilityState={{ disabled: !canSave, busy: saving }}
+            disabled={!canSave}
+            onPress={handleSave}
+            hitSlop={8}
+            style={({ pressed }) => [styles.barButton, styles.save, pressed && styles.pressed]}>
+            {saving ? (
+              <ActivityIndicator color={theme.accentText} />
+            ) : (
+              <ThemedText type="headline" themeColor={canSave ? 'accentText' : 'textTertiary'}>
+                {t('common.save')}
+              </ThemedText>
+            )}
+          </Pressable>
+        </Rise>
+
+        {error ? (
+          <View style={styles.note}>
             <ErrorLine message={error} />
-          ) : missing && !saved ? (
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.footerNote}>
-              {missing}
-            </ThemedText>
-          ) : null}
-          {saved ? (
-            <Button
-              title={t('common.saved')}
-              icon={<Icon name="check" size={17} color={theme.onInverse} />}
-            />
-          ) : (
-            <Button
-              title={t('common.save')}
-              disabled={!canSave}
-              loading={saving}
-              onPress={handleSave}
-              accessibilityHint={
-                canSave ? undefined : (missing ?? t('profile.noChanges'))
-              }
-            />
-          )}
-        </>
-      }>
-      <View style={styles.back}>
-        <BackButton onPress={goBack} />
-      </View>
+          </View>
+        ) : missing ? (
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.note}>
+            {missing}
+          </ThemedText>
+        ) : null}
 
-      <ThemedText type="display" accessibilityRole="header" style={styles.title}>
-        {t('profile.title')}
-      </ThemedText>
-      <ThemedText themeColor="textSecondary" style={styles.intro}>
-        {t('profile.intro')}
-      </ThemedText>
-
-      <PhotoSection form={form} style={styles.photosSection} />
-      <DetailsSection form={form} style={styles.aboutSection} />
-    </Screen>
+        <Rise index={1}>
+          <PhotoSection form={form} style={styles.photosSection} />
+        </Rise>
+        <Rise index={2}>
+          <DetailsSection form={form} style={styles.aboutSection} />
+          <ThemedText type="caption" themeColor="textTertiary" style={styles.locked}>
+            {t('settings.editLocked')}
+          </ThemedText>
+        </Rise>
+      </Screen>
+      {toast}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  back: {
-    paddingTop: Space.xxs,
+  flex: {
+    flex: 1,
   },
-  title: {
-    marginTop: Space.md,
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: MinTouch,
   },
-  intro: {
-    marginTop: 10,
+  barButton: {
+    minHeight: MinTouch,
+    minWidth: MinTouch,
+    justifyContent: 'center',
+  },
+  save: {
+    alignItems: 'flex-end',
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  note: {
+    marginTop: Space.xs,
   },
   photosSection: {
-    marginTop: 24,
+    marginTop: Space.md,
   },
   aboutSection: {
-    marginTop: 24,
+    marginTop: Space.lg,
   },
-  footerNote: {
-    textAlign: 'center',
+  locked: {
+    marginTop: 14,
   },
 });

@@ -1,33 +1,26 @@
-import { Redirect, router, useFocusEffect } from 'expo-router';
+import { Redirect, router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import { StyleSheet, View } from 'react-native';
 
-import {
-  api,
-  getMockNextRole,
-  isMockServer,
-  setMockNextRole,
-  type Match,
-  type MockRole,
-} from '@/api';
+import { api, getMockNextRole, isMockServer, setMockNextRole, type Match, type MockRole } from '@/api';
 import { Avatar } from '@/components/avatar';
+import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { Chip } from '@/components/chip';
 import { ErrorLine } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
+import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
+import { TAB_BAR_CLEARANCE, TabBar } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { PushPrompt } from '@/features/home/push-prompt';
-import { SettingsButton } from '@/features/home/settings-button';
+import { useJoinQueue } from '@/features/home/use-join-queue';
 import { seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useLocale, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
-import { ageFromBirthDate } from '@/utils/birth-date';
-import { haptics } from '@/utils/haptics';
 
 /** The test server's role chips, labeled by their `home.*` keys. */
 const MOCK_ROLES: { role: MockRole; label: string }[] = [
@@ -36,30 +29,57 @@ const MOCK_ROLES: { role: MockRole; label: string }[] = [
   { role: 'contestant', label: 'home.roleBalloon' },
 ];
 
-/** The matches arrive once the list has loaded, instead of flashing the empty state first. */
-const listIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+/** Home shows your newest matches; the Matches tab has them all. */
+const HOME_MATCHES = 2;
+/** Your own profile, shown big. */
+const PROFILE_VIEW = '/profile-view' as Href;
+
+type DayPart = 'Morning' | 'Afternoon' | 'Evening' | 'Night';
+
+function dayPart(hour: number): DayPart {
+  if (hour >= 5 && hour < 12) return 'Morning';
+  if (hour >= 12 && hour < 18) return 'Afternoon';
+  if (hour >= 18 && hour < 22) return 'Evening';
+  return 'Night';
+}
+
+/** "Good evening, Lasse." and "Zürich, Monday night", for right now. */
+function greeting(t: Translate, locale: string, name: string, city: string) {
+  const now = new Date();
+  const part = dayPart(now.getHours());
+  let weekday = '';
+  try {
+    weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(now);
+  } catch {
+    weekday = '';
+  }
+  // Night still says good evening, as people do.
+  const hello = part === 'Night' ? 'Evening' : part;
+  return {
+    hero: t(`home.greet${hello}`, { name }),
+    live: t('home.liveLine', { city, day: t(`home.part${part}`, { weekday }) }),
+  };
+}
 
 export function HomeScreen() {
   const { profile } = useSession();
   const seats = useSeats();
   const theme = useTheme();
   const t = useT();
-  /** Null until the first load, so the empty state never flashes before the rows. */
+  const locale = useLocale();
+  /** Null until the first load, so nothing flashes before the rows. */
   const [matches, setMatches] = useState<Match[] | null>(null);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [mockRole, setMockRole] = useState(getMockNextRole);
+  const { join, joining, error } = useJoinQueue();
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      setJoining(false);
       api
         .listMatches()
         .then((list) => {
           if (active) setMatches(list);
         })
-        // A failed load still shows the section: the last list, or the empty state.
         .catch(() => {
           if (active) setMatches((previous) => previous ?? []);
         });
@@ -71,259 +91,264 @@ export function HomeScreen() {
 
   if (!profile) return <Redirect href="/" />;
 
-  async function handlePlay() {
-    setJoining(true);
-    setError(null);
-    try {
-      await api.joinQueue();
-      router.push('/queue');
-    } catch {
-      const message = t('home.joinError');
-      setError(message);
-      haptics.error();
-      AccessibilityInfo.announceForAccessibility(message);
-      setJoining(false);
-    }
-  }
-
   function chooseMockRole(role: MockRole) {
     setMockNextRole(role);
     setMockRole(role);
   }
 
-  const hasMatches = (matches?.length ?? 0) > 0;
+  const words = greeting(t, locale, profile.name, profile.city);
+  const newest = [...(matches ?? [])]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, HOME_MATCHES);
+  const you = youSeat(seats);
 
   return (
-    <Screen scroll contentStyle={styles.content}>
-      <View style={styles.top}>
-        <Wordmark />
-        <SettingsButton />
-      </View>
+    <View style={styles.flex}>
+      <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+        <Rise index={0} style={styles.top}>
+          <Wordmark />
+          <PressableHighlight
+            accessibilityRole="button"
+            accessibilityLabel={t('home.yourProfile')}
+            onPress={() => router.push(PROFILE_VIEW)}
+            background="transparent"
+            style={styles.avatarButton}>
+            <Avatar name={profile.name} uri={profile.photos[0]} tone={you} size={40} />
+          </PressableHighlight>
+        </Rise>
 
-      {/* The whole row opens your profile; the highlight reaches a little past the avatar. */}
-      <PressableHighlight
-        accessibilityRole="button"
-        accessibilityLabel={t('home.editProfile')}
-        onPress={() => router.push('/profile')}
-        background="transparent"
-        style={styles.you}>
-        <Avatar name={profile.name} uri={profile.photos[0]} tone={youSeat(seats)} size={64} />
-        <View style={styles.youText}>
-          <ThemedText type="heading">{profile.name}</ThemedText>
-          <ThemedText type="footnote" themeColor="textTertiary">
-            {ageFromBirthDate(profile.birthDate)} · {profile.city}
+        <Rise index={1} style={styles.hello}>
+          <View style={styles.liveRow}>
+            <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
+            <ThemedText type="kicker">{words.live}</ThemedText>
+          </View>
+          <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
+            {words.hero}
           </ThemedText>
-        </View>
-        <View style={styles.chevron}>
-          <Icon name="chevronRight" size={14} color={theme.textTertiary} />
-        </View>
-      </PressableHighlight>
+        </Rise>
 
-      <View style={styles.play}>
-        <Button
-          title={t('home.play')}
-          loading={joining}
-          onPress={handlePlay}
-          accessibilityHint={t('home.playHint')}
-        />
-        {error ? <ErrorLine message={error} /> : null}
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.centered}>
-          {t('home.roleNote')}
-        </ThemedText>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={t('home.howToPlay')}
-          onPress={() => router.push('/how-to-play')}
-          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={({ pressed }) => [styles.howTo, pressed && styles.pressed]}>
-          <ThemedText type="label" themeColor="accentText" style={styles.link}>
-            {t('home.howToPlay')}
-          </ThemedText>
-        </Pressable>
-      </View>
+        <Rise index={2}>
+          <View style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <View
+              style={styles.cardBalloon}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              <Balloon color={BrandBalloon.color} size={260} string={false} />
+            </View>
+            <View style={styles.cardText}>
+              <ThemedText type="kicker">{t('home.cardLabel', { city: profile.city })}</ThemedText>
+              <ThemedText type="display" style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
+                {t('home.cardTitle')}
+              </ThemedText>
+              <ThemedText type="callout" themeColor="textSecondary" style={styles.cardNote}>
+                {t('home.roleNote')}
+              </ThemedText>
+            </View>
+            <Button
+              title={t('home.play')}
+              loading={joining}
+              onPress={join}
+              accessibilityHint={t('home.playHint')}
+            />
+          </View>
+          {error ? <ErrorLine message={error} /> : null}
+        </Rise>
 
-      <PushPrompt style={styles.push} />
+        <Rise index={3} style={styles.rows}>
+          <LinkRow
+            title={t('home.howToPlay')}
+            subtitle={t('home.howToPlayNote')}
+            onPress={() => router.push('/how-to-play')}
+            icon={
+              <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                <Balloon color={BrandBalloon.color} size={14} string={false} />
+              </View>
+            }
+          />
+          {newest.map((match) => (
+            <LinkRow
+              key={match.id}
+              title={t('common.nameAge', { name: match.other.name, age: match.other.age })}
+              subtitle={t('home.matchNote')}
+              accessibilityHint={t('home.openChatHint')}
+              onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+              icon={
+                <Avatar
+                  name={match.other.name}
+                  uri={match.other.photo}
+                  tone={seatFor(seats, match.other.id)}
+                  size={36}
+                />
+              }
+            />
+          ))}
+        </Rise>
 
-      {matches ? (
-        <Animated.View entering={listIn} style={styles.matches}>
-          <ThemedText type="headline" accessibilityRole="header">
-            {t('home.matches')}
-          </ThemedText>
-          {matches.length === 0 ? (
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.empty}>
-              {t('home.noMatches')}
+        <PushPrompt style={styles.push} />
+
+        {/* On the page, not in a card, so the chips keep their filled shape at rest. */}
+        {isMockServer ? (
+          <View style={styles.mock}>
+            <ThemedText type="kicker" accessibilityRole="header">
+              {t('home.testServer')}
             </ThemedText>
-          ) : (
-            <View style={styles.list}>
-              {matches.map((match) => (
-                <MatchRow key={match.id} match={match} />
+            <View
+              style={styles.chips}
+              accessibilityRole="radiogroup"
+              accessibilityLabel={t('home.roleGroup')}>
+              {MOCK_ROLES.map(({ role, label }) => (
+                <Chip
+                  key={role}
+                  label={t(label)}
+                  selected={mockRole === role}
+                  onPress={() => chooseMockRole(role)}
+                />
               ))}
             </View>
-          )}
-        </Animated.View>
-      ) : null}
-
-      {/* On the page, not in a card, so the chips keep their filled shape at rest. */}
-      {isMockServer ? (
-        <View style={hasMatches ? styles.mockAfterRows : styles.mock}>
-          <ThemedText type="headline" accessibilityRole="header">
-            {t('home.testServer')}
-          </ThemedText>
-          {/* Sized to their labels; larger text wraps them onto a second line. */}
-          <View
-            style={styles.chips}
-            accessibilityRole="radiogroup"
-            accessibilityLabel={t('home.roleGroup')}>
-            {MOCK_ROLES.map(({ role, label }) => (
-              <Chip
-                key={role}
-                label={t(label)}
-                selected={mockRole === role}
-                onPress={() => chooseMockRole(role)}
-              />
-            ))}
+            <ThemedText type="footnote" themeColor="textTertiary">
+              {t('home.testNote')}
+            </ThemedText>
           </View>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.mockNote}>
-            {t('home.testNote')}
-          </ThemedText>
-        </View>
-      ) : null}
-    </Screen>
+        ) : null}
+      </Screen>
+      <TabBar
+        active="home"
+        labels={{ home: t('home.tabHome'), matches: t('home.tabMatches'), settings: t('home.settings') }}
+      />
+    </View>
   );
 }
 
-/** One match: a card with their avatar in their hue, their name and age, and a chevron. Opens your chat. */
-function MatchRow({ match }: { match: Match }) {
+type LinkRowProps = {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+  accessibilityHint?: string;
+};
+
+/** A row card: a 36 pt icon or avatar, a title over a quiet line, a chevron. */
+function LinkRow({ title, subtitle, icon, onPress, accessibilityHint }: LinkRowProps) {
   const theme = useTheme();
-  const seats = useSeats();
-  const t = useT();
   return (
     <PressableHighlight
       accessibilityRole="button"
-      accessibilityLabel={t('common.nameAge', { name: match.other.name, age: match.other.age })}
-      accessibilityHint={t('home.openChatHint')}
-      onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+      accessibilityLabel={title}
+      accessibilityHint={accessibilityHint}
+      onPress={onPress}
       background={theme.field}
-      style={[styles.row, { borderColor: theme.outline }]}>
-      <Avatar
-        name={match.other.name}
-        uri={match.other.photo}
-        tone={seatFor(seats, match.other.id)}
-        size={40}
-      />
-      <ThemedText type="row" style={styles.flex}>
-        {match.other.name},{' '}
-        <ThemedText type="row" themeColor="textSecondary" style={styles.age}>
-          {match.other.age}
+      style={[styles.row, { borderColor: theme.border }]}>
+      {icon}
+      <View style={styles.rowText}>
+        <ThemedText type="headline">{title}</ThemedText>
+        <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+          {subtitle}
         </ThemedText>
-      </ThemedText>
-      <View style={styles.chevron}>
-        <Icon name="chevronRight" size={14} color={theme.gold} />
       </View>
+      <Icon name="chevronRight" size={13} color={theme.textTertiary} />
     </PressableHighlight>
   );
 }
 
-/** How far the profile row's pressed fill reaches past its content. */
-const YOU_INSET = Space.sm;
-
 const styles = StyleSheet.create({
-  // Home starts at the safe area plus 10, with the wordmark alone at the top.
-  content: {
-    paddingTop: 10,
-  },
   flex: {
     flex: 1,
   },
-  centered: {
-    textAlign: 'center',
+  content: {
+    paddingTop: Space.xs,
   },
   top: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  // The row sits where it did before it became a button: its padding is taken back by the margins.
-  you: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    marginTop: 32 - YOU_INSET,
-    marginHorizontal: -YOU_INSET,
-    padding: YOU_INSET,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
+  avatarButton: {
+    borderRadius: 22,
+    padding: 2,
   },
-  youText: {
-    flex: 1,
-    gap: 2,
-  },
-  play: {
-    gap: Space.sm,
-    marginTop: 32 - YOU_INSET,
-  },
-  // A 44pt target around one line of text, pulled in so it reads as part of the note above.
-  howTo: {
-    alignSelf: 'center',
-    minHeight: MinTouch,
-    justifyContent: 'center',
-    paddingHorizontal: Space.sm,
-    marginTop: -Space.xs,
-    marginBottom: -Space.xs,
-  },
-  link: {
-    textDecorationLine: 'underline',
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  push: {
-    marginTop: Space.lg,
-  },
-  // More room above the list than between the groups above it.
-  matches: {
+  hello: {
+    gap: Space.xs,
     marginTop: 40,
   },
-  empty: {
-    marginTop: 6,
-  },
-  list: {
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Space.xs,
-    marginTop: 10,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  // The play card: 300 tall, the brand balloon leaning in from the top right.
+  card: {
+    minHeight: 300,
+    marginTop: Space.lg,
+    padding: Space.md,
+    paddingTop: 22,
+    justifyContent: 'space-between',
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  cardBalloon: {
+    position: 'absolute',
+    right: -60,
+    top: -40,
+    opacity: 0.9,
+  },
+  cardText: {
+    gap: 6,
+    paddingHorizontal: 6,
+    marginBottom: Space.lg,
+    maxWidth: 230,
+  },
+  cardTitle: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  cardNote: {
+    marginTop: Space.xxs,
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  rows: {
+    gap: 10,
+    marginTop: Space.lg,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
-    minHeight: 64,
+    paddingVertical: 14,
     paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
-    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  age: {
-    fontWeight: 400,
-  },
-  // The chevron's 18pt slot, so the name ends where the canvas's does.
-  chevron: {
-    width: 18,
+  rowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowText: {
+    flex: 1,
+    gap: 1,
+  },
+  push: {
+    marginTop: Space.lg,
   },
   mock: {
-    marginTop: 36,
-  },
-  // A card ends flush, so the group sits a little closer to it than to a line of text.
-  mockAfterRows: {
+    gap: Space.sm,
     marginTop: Space.xl,
   },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Space.xs,
-    marginTop: Space.sm,
-  },
-  mockNote: {
-    marginTop: 10,
   },
 });

@@ -1,16 +1,17 @@
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Chip } from '@/components/chip';
 import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { ThemedText } from '@/components/themed-text';
+import { Toggle } from '@/components/toggle';
 import { MinTouch, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/utils/haptics';
 
-const ROW_HEIGHT = 56;
+const ROW_HEIGHT = 52;
 
 /**
  * Settings itself. The generated route types list it only as `/settings/index`,
@@ -79,10 +80,10 @@ export function SettingsSection({
 }) {
   return (
     <View style={styles.section}>
-      <ThemedText type="headline" accessibilityRole="header">
+      <ThemedText type="kicker" accessibilityRole="header" style={styles.sectionTitle}>
         {title}
       </ThemedText>
-      <View style={styles.rows}>{children}</View>
+      <View>{children}</View>
       {footer ? <View style={styles.sectionFooter}>{footer}</View> : null}
     </View>
   );
@@ -118,7 +119,7 @@ export function NavRow({
       background="transparent"
       onPress={onPress}
       style={[styles.row, { borderBottomColor: theme.border }]}>
-      <ThemedText type="row" style={styles.label}>
+      <ThemedText type="body" style={styles.label}>
         {label}
       </ThemedText>
       {value ? (
@@ -143,7 +144,7 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
       accessible
       accessibilityLabel={`${label}, ${value}`}
       style={[styles.row, { borderBottomColor: theme.border }]}>
-      <ThemedText type="row" style={styles.label}>
+      <ThemedText type="body" style={styles.label}>
         {label}
       </ThemedText>
       <ThemedText type="callout" themeColor="textSecondary" style={styles.value}>
@@ -180,7 +181,7 @@ export function SwitchRow({ label, description, value, onValueChange, disabled }
         style={styles.label}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
-        <ThemedText type="row" themeColor={disabled ? 'textTertiary' : 'text'}>
+        <ThemedText type="body" themeColor={disabled ? 'textTertiary' : 'text'}>
           {label}
         </ThemedText>
         {description ? (
@@ -189,16 +190,12 @@ export function SwitchRow({ label, description, value, onValueChange, disabled }
           </ThemedText>
         ) : null}
       </View>
-      <Switch
-        accessibilityLabel={label}
-        accessibilityHint={description}
+      {/* The Toggle plays its own selection haptic. */}
+      <Toggle
+        accessibilityLabel={description ? `${label}. ${description}` : label}
         value={value}
         disabled={disabled}
-        onValueChange={change}
-        trackColor={{ false: theme.surfacePressed, true: theme.gold }}
-        ios_backgroundColor={theme.surfacePressed}
-        // Gold when on, plush when off: the cream thumb reads on both.
-        thumbColor={value ? theme.text : theme.textSecondary}
+        onValueChange={onValueChange}
       />
     </Pressable>
   );
@@ -216,7 +213,7 @@ export function ChoiceRow<T extends string>({ label, options, value, onChange }:
   const theme = useTheme();
   return (
     <View style={[styles.choice, { borderBottomColor: theme.border }]}>
-      <ThemedText type="row">{label}</ThemedText>
+      <ThemedText type="body">{label}</ThemedText>
       <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={label}>
         {options.map((option) => (
           <Chip
@@ -235,10 +232,10 @@ export function ChoiceRow<T extends string>({ label, options, value, onChange }:
 
 const styles = StyleSheet.create({
   section: {
-    marginTop: Space.xl,
+    marginTop: 22,
   },
-  rows: {
-    marginTop: Space.xxs,
+  sectionTitle: {
+    paddingBottom: Space.xs,
   },
   sectionFooter: {
     marginTop: Space.sm,
@@ -269,7 +266,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   choice: {
-    paddingVertical: Space.sm,
+    paddingVertical: 14,
     gap: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
