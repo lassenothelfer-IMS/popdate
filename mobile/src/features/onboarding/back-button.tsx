@@ -2,15 +2,17 @@ import { Pressable, StyleSheet } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
+import { useTheme } from '@/hooks/use-theme';
 import { MinTouch, Space } from '@/constants/theme';
 import { useT } from '@/i18n';
 
 /**
- * A chevron and "Back", like the system back button. It's a text action, so it
+ * A chevron and "Back", a quiet button in the tertiary tone, like the system back button. It's a text action, so it
  * dims while pressed instead of scaling.
  */
 export function BackButton({ onPress }: { onPress: () => void }) {
   const t = useT();
+  const theme = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -19,8 +21,10 @@ export function BackButton({ onPress }: { onPress: () => void }) {
       hitSlop={{ left: Space.sm, right: Space.sm }}
       pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-      <Icon name="back" size={17} />
-      <ThemedText type="label">{t('common.back')}</ThemedText>
+      <Icon name="back" size={17} color={theme.textTertiary} />
+      <ThemedText type="headline" themeColor="textTertiary">
+        {t('common.back')}
+      </ThemedText>
     </Pressable>
   );
 }

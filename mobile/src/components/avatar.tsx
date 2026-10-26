@@ -35,6 +35,7 @@ export function Avatar({ name, uri, tone, size = 64, accessibilityLabel }: Avata
         styles.avatar,
         circle,
         // A hairline ring just outside the circle.
+        // Their tint tile, a hairline ring, the initial in New York.
         { backgroundColor: fill.tint, boxShadow: `0 0 0 1px ${theme.borderStrong}` },
       ]}>
       {uri && !uri.startsWith('mock://') ? (
@@ -44,7 +45,7 @@ export function Avatar({ name, uri, tone, size = 64, accessibilityLabel }: Avata
           style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
         />
       ) : (
-        <Text style={[styles.initial, { color: fill.color, fontSize: letter }]} maxFontSizeMultiplier={1}>
+        <Text style={[styles.initial, { color: theme.text, fontSize: letter }]} maxFontSizeMultiplier={1}>
           {name.charAt(0).toUpperCase()}
         </Text>
       )}

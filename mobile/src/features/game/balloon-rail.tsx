@@ -138,7 +138,7 @@ function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelec
         ) : showName ? (
           <ThemedText
             type="railName"
-            themeColor={state === 'pop' ? 'textTertiary' : 'textSecondary'}
+            themeColor="textTertiary"
             numberOfLines={1}
             style={styles.name}>
             {contestant.name}

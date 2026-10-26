@@ -44,7 +44,7 @@ export function SameQuestionArt() {
   const t = useT();
   return (
     <View style={styles.column}>
-      <ThemedText type="quote" style={styles.question} maxFontSizeMultiplier={1.3}>
+      <ThemedText type="question" style={styles.question} maxFontSizeMultiplier={1.3}>
         {t('howToPlay.sampleQuestion')}
       </ThemedText>
       <View style={styles.smallBalloons}>

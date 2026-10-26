@@ -7,7 +7,7 @@ import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouch, Space } from '@/constants/theme';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/utils/haptics';
 
 const ROW_HEIGHT = 56;
@@ -165,7 +165,6 @@ type SwitchRowProps = {
 /** Label (and a line under it) on the left, a switch on the right. Tapping the label flips it too. */
 export function SwitchRow({ label, description, value, onValueChange, disabled }: SwitchRowProps) {
   const theme = useTheme();
-  const scheme = useScheme();
   function change(next: boolean) {
     haptics.selection();
     onValueChange(next);
@@ -196,10 +195,10 @@ export function SwitchRow({ label, description, value, onValueChange, disabled }
         value={value}
         disabled={disabled}
         onValueChange={change}
-        trackColor={{ false: theme.surfacePressed, true: theme.inverse }}
+        trackColor={{ false: theme.surfacePressed, true: theme.gold }}
         ios_backgroundColor={theme.surfacePressed}
-        // The thumb keeps its contrast on both tracks in both modes.
-        thumbColor={value ? theme.onInverse : scheme === 'dark' ? theme.textSecondary : theme.field}
+        // Gold when on, plush when off: the cream thumb reads on both.
+        thumbColor={value ? theme.text : theme.textSecondary}
       />
     </Pressable>
   );

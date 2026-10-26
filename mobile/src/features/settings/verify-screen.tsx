@@ -150,7 +150,7 @@ export function VerifyScreen() {
           onPress={takePhoto}
           style={({ pressed }) => [
             styles.shutter,
-            { borderColor: theme.inverse },
+            { borderColor: theme.gold },
             pressed && styles.shutterPressed,
           ]}>
           <View
@@ -249,7 +249,7 @@ export function VerifyScreen() {
           <ThemedText type="headline" accessibilityRole="header" style={styles.frameTitle}>
             {mode === 'camera' ? t('settings.cameraTitle') : t('settings.previewTitle')}
           </ThemedText>
-          <View style={[styles.frame, { backgroundColor: theme.surface }]}>
+          <View style={[styles.frame, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             {mode === 'camera' ? (
               <CameraView
                 ref={camera}
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     marginTop: Space.lg,
     padding: Space.md,
     gap: Space.xs,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
   },
@@ -348,8 +348,9 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: '100%',
     aspectRatio: PhotoAspect,
-    borderRadius: Radius.xl,
+    borderRadius: Radius.card,
     borderCurve: 'continuous',
+    borderWidth: 1,
     overflow: 'hidden',
   },
   shutterRow: {
@@ -359,7 +360,7 @@ const styles = StyleSheet.create({
     width: SHUTTER,
     height: SHUTTER,
     borderRadius: SHUTTER / 2,
-    borderWidth: 3,
+    borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
   },

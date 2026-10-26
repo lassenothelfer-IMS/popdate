@@ -1,19 +1,28 @@
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
+  Easing,
   FadeIn,
   Keyframe,
   LinearTransition,
   ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { api, type Room } from '@/api';
 import { Balloon, balloonHeight } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { CssEase, Ease, Fonts, Gutter, Motion, Space } from '@/constants/theme';
+import { Wordmark } from '@/components/wordmark';
+import { CssEase, Ease, Motion, Space } from '@/constants/theme';
 import { PopperSeat } from '@/features/queue/popper-seat';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
@@ -26,6 +35,8 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 /** One popper and five balloons. While searching, the server sends the real number. */
 const ROOM_SIZE = 6;
+/** Velvet hour's float-in curve: a slow rise that settles softly. */
+const FloatIn = Easing.bezier(0.16, 0.84, 0.24, 1);
 /** How long the role beat holds before the room appears. A tap skips it. */
 const ROLE_BEAT_MS = 1500;
 /** With a screen reader on, the beat holds long enough for the role line to be read out. */
@@ -35,17 +46,31 @@ const ROLE_BEAT_SCREEN_READER_MS = 4000;
  * The room screen has its own loading and missing states.
  */
 const ROOM_WAIT_MS = ROLE_BEAT_MS * 2;
-/** A balloon seat, string off: 20 x 28. */
-const SEAT_SIZE = 20;
-/** Your own balloon during the role beat, drawn larger instead of dimming the others. */
-const MY_SEAT_SIZE = 26;
+/**
+ * The balloon cluster, in seat order: each balloon's width and how high it floats
+ * above the lowest one. Different sizes and heights, so the room reads as people,
+ * not a progress bar. Past five seats the pattern repeats.
+ */
+const CLUSTER = [
+  { size: 64, lift: 36 },
+  { size: 78, lift: 92 },
+  { size: 70, lift: 18 },
+  { size: 74, lift: 104 },
+  { size: 66, lift: 54 },
+] as const;
+/** Your own balloon during the role beat grows by this much instead of dimming the others. */
+const GROWN = 1.3;
+/** The gold string under each balloon, long enough to run toward the count. */
+const STRING_LENGTH = 120;
+/** Each balloon sways on its own loop, so the room breathes out of phase. */
+const SWAY_MS = [5600, 4800, 6600, 5200, 6100] as const;
 
-/** A seat lands when someone takes it. Never from scale 0. */
+/** A balloon floats up into its place when someone takes the seat. Never from scale 0. */
 const seatLands = webSafeKeyframe(
   new Keyframe({
-    0: { opacity: 0, transform: [{ translateY: 8 }, { scale: 0.92 }] },
-    100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: Ease.out },
-  }).duration(Motion.enter),
+    0: { opacity: 0, transform: [{ translateY: 160 }, { scale: 0.96 }] },
+    100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: FloatIn },
+  }).duration(1400),
 );
 
 /** Reduce Motion: the seat only fades in. */
@@ -272,10 +297,29 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             transitionDuration: Motion.exit,
             transitionTimingFunction: CssEase.out,
           }}>
-          <Button title={t('common.cancel')} variant="secondary" onPress={handleCancel} />
+          {/* The seats filled so far, as one gold line on the empty track. */}
+          <View style={[styles.track, { backgroundColor: theme.track }]}>
+            <Animated.View
+              style={[
+                styles.trackFill,
+                {
+                  backgroundColor: theme.gold,
+                  width: `${needed > 0 ? Math.min(found / needed, 1) * 100 : 0}%`,
+                  transitionProperty: 'width',
+                  transitionDuration: Motion.enter,
+                  transitionTimingFunction: CssEase.out,
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.footerRow}>
+            <Button title={t('common.cancel')} variant="ghost" onPress={handleCancel} />
+          </View>
         </Animated.View>
       }>
       {roomId ? <RoomWatcher roomId={roomId} onChange={setRoom} /> : null}
+
+      <Wordmark />
 
       {/* Once the room is full a tap anywhere opens it right away, even before it answers. */}
       <Pressable accessible={false} disabled={!roomId} onPress={skipBeat} style={styles.stage}>
@@ -283,23 +327,8 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           key={beat ? 'role-title' : 'queue-title'}
           entering={beat ? beatIn : undefined}
           layout={reflow}>
-          <ThemedText type="question" accessibilityRole="header" style={styles.centered}>
+          <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
             {beat ? beat.title : t('queue.filling')}
-          </ThemedText>
-        </Animated.View>
-
-        <Animated.View layout={reflow} style={styles.countGroup}>
-          <ThemedText
-            type="count"
-            accessible
-            accessibilityLabel={seatsFilled}
-            accessibilityLiveRegion="polite"
-            maxFontSizeMultiplier={1.3}
-            style={styles.centered}>
-            {found}
-            <Text style={[styles.countRest, { color: theme.textSecondary }]}>
-              {t('queue.countRest', { needed })}
-            </Text>
           </ThemedText>
         </Animated.View>
 
@@ -307,16 +336,33 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           <Seats found={found} needed={needed} mySeat={beat?.mySeat ?? null} popper={beat?.popper ?? null} />
         </Animated.View>
 
-        <Animated.View
-          key={beat ? 'role-line' : 'queue-line'}
-          entering={beat ? beatIn : undefined}
-          layout={reflow}
-          style={styles.copy}>
-          <ThemedText type="callout" themeColor="textSecondary" style={styles.centered}>
-            {beat
-              ? beat.line
-              : t('queue.perRoom', { people: capitalized(numberWord(t, needed)) })}
-          </ThemedText>
+        <Animated.View layout={reflow} style={styles.countGroup}>
+          <View
+            style={styles.countRow}
+            accessible
+            accessibilityLabel={seatsFilled}
+            accessibilityLiveRegion="polite">
+            <ThemedText type="count" maxFontSizeMultiplier={1} allowFontScaling={false}>
+              {found}
+            </ThemedText>
+            <View style={styles.countSide}>
+              <ThemedText type="body" style={styles.countRest} maxFontSizeMultiplier={1.4}>
+                {t('queue.countRest', { needed }).trim()}
+              </ThemedText>
+              <Animated.View
+                key={beat ? 'role-line' : 'queue-line'}
+                entering={beat ? beatIn : undefined}>
+                <ThemedText
+                  type="footnote"
+                  themeColor={beat ? 'gold' : 'textTertiary'}
+                  maxFontSizeMultiplier={1.4}>
+                  {beat
+                    ? beat.line
+                    : t('queue.perRoom', { people: capitalized(numberWord(t, needed)) })}
+                </ThemedText>
+              </Animated.View>
+            </View>
+          </View>
         </Animated.View>
       </Pressable>
     </Screen>
@@ -365,101 +411,176 @@ function Seats({ found, needed, mySeat, popper }: SeatsProps) {
       importantForAccessibility="no-hide-descendants">
       {Array.from({ length: balloonSeats }, (_, index) => {
         const filled = index < found;
+        const spot = CLUSTER[index % CLUSTER.length];
         return (
           <Animated.View
             key={`${index}-${filled ? 'filled' : 'empty'}`}
-            entering={filled ? entering : undefined}>
-            <SeatBalloon
-              color={seatAt(seats, index).color}
-              filled={filled}
-              grown={mySeat === index}
-              reduced={reduced}
-            />
+            entering={filled ? entering : undefined}
+            style={{ marginBottom: spot.lift, marginHorizontal: -Space.xxs }}>
+            <Sway duration={SWAY_MS[index % SWAY_MS.length]} delay={index * 380} still={!filled}>
+              <SeatBalloon
+                color={seatAt(seats, index).color}
+                size={spot.size}
+                filled={filled}
+                grown={mySeat === index}
+                reduced={reduced}
+              />
+            </Sway>
           </Animated.View>
         );
       })}
       <Animated.View
         key={popperFilled ? 'popper-filled' : 'popper-empty'}
-        entering={popperFilled ? entering : undefined}>
+        entering={popperFilled ? entering : undefined}
+        style={styles.popperSpot}>
         <PopperSeat filled={popperFilled} name={popper?.name ?? null} photoUri={popper?.photo ?? null} />
       </Animated.View>
     </View>
   );
 }
 
+/**
+ * Sways its balloon forever around the foot of the string: a slow tilt and a
+ * small bob, each balloon on its own loop. Still under Reduce Motion, and for
+ * an empty seat.
+ */
+function Sway({
+  duration,
+  delay,
+  still,
+  children,
+}: {
+  duration: number;
+  delay: number;
+  still: boolean;
+  children: ReactNode;
+}) {
+  const reduced = useReduceMotion();
+  const swing = useSharedValue(0.5);
+  useEffect(() => {
+    if (reduced || still) {
+      cancelAnimation(swing);
+      swing.set(0.5);
+      return;
+    }
+    swing.set(
+      withDelay(
+        delay,
+        withRepeat(withTiming(1, { duration, easing: Easing.inOut(Easing.ease) }), -1, true),
+      ),
+    );
+  }, [reduced, still, duration, delay, swing]);
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: -8 * swing.get() },
+      { rotate: `${-1.4 + 2.8 * swing.get()}deg` },
+    ],
+  }));
+  return <Animated.View style={[styles.sway, style]}>{children}</Animated.View>;
+}
+
 type SeatBalloonProps = {
   color: string;
+  /** The balloon's width in the cluster. */
+  size: number;
   filled: boolean;
-  /** Your seat during the role beat: 26 x 36 instead of 20 x 28. */
+  /** Your seat during the role beat: it grows instead of the others dimming. */
   grown: boolean;
   reduced: boolean;
 };
 
 /**
- * One balloon seat. A filled one is drawn at your seat's size and scaled down,
- * so growing into your seat is one transition on the box and the scale together,
- * anchored at the bottom like the row. Reduce Motion: it just changes size.
+ * One balloon seat with its long gold string. A filled one is drawn at its grown
+ * size and scaled down, so growing into your seat is one transition on the box
+ * and the scale together, anchored at the foot. Reduce Motion: it just changes size.
  */
-function SeatBalloon({ color, filled, grown, reduced }: SeatBalloonProps) {
+function SeatBalloon({ color, size: base, filled, grown, reduced }: SeatBalloonProps) {
+  const theme = useTheme();
   // Never grown: every seat has filled before the role beat. Drawn at its own size, so the outline stays 1.5pt.
-  if (!filled) return <Balloon color={color} size={SEAT_SIZE} ghost />;
+  if (!filled) {
+    return (
+      <View style={styles.seatBox}>
+        <Balloon color={color} size={base} ghost />
+        <View style={{ height: STRING_LENGTH }} />
+      </View>
+    );
+  }
 
-  const size = grown ? MY_SEAT_SIZE : SEAT_SIZE;
+  const largest = base * GROWN;
+  const size = grown ? largest : base;
   const timing = {
     transitionDuration: reduced ? 0 : Motion.enter,
     transitionTimingFunction: CssEase.out,
   };
   return (
-    <Animated.View
-      style={[
-        styles.seatBox,
-        { width: size, height: balloonHeight(size), transitionProperty: ['width', 'height'], ...timing },
-      ]}>
+    <View style={styles.seatBox}>
       <Animated.View
         style={[
-          styles.seatArt,
-          { transform: [{ scale: size / MY_SEAT_SIZE }], transitionProperty: 'transform', ...timing },
+          styles.seatBox,
+          { width: size, height: balloonHeight(size), transitionProperty: ['width', 'height'], ...timing },
         ]}>
-        <Balloon color={color} size={MY_SEAT_SIZE} string={false} />
+        <Animated.View
+          style={[
+            styles.seatArt,
+            { transform: [{ scale: size / largest }], transitionProperty: 'transform', ...timing },
+          ]}>
+          <Balloon color={color} size={largest} string={false} />
+        </Animated.View>
       </Animated.View>
-    </Animated.View>
+      <LongString color={theme.gold} />
+    </View>
+  );
+}
+
+/** A gold string hanging from the knot, fading out toward the bottom. */
+function LongString({ color }: { color: string }) {
+  const id = `string${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  return (
+    <Svg width={12} height={STRING_LENGTH} style={styles.string}>
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={color} stopOpacity={0.75} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Path
+        d={`M6 0c-4 ${STRING_LENGTH * 0.25} 4 ${STRING_LENGTH * 0.5} 0 ${STRING_LENGTH * 0.75}s-2 ${STRING_LENGTH * 0.2} 0 ${STRING_LENGTH * 0.25}`}
+        stroke={`url(#${id})`}
+        strokeWidth={1.2}
+        fill="none"
+      />
+    </Svg>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
-  },
-  // With the screen's gutter, the column sits 40 in from each edge.
-  stage: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Gutter,
-    paddingVertical: Space.lg,
   },
   centered: {
     textAlign: 'center',
   },
-  // 14 on the canvas, less the 2pt the count's 68pt line adds above a 64pt line.
-  countGroup: {
-    marginTop: 12,
+  // The headline up top, the balloons in the middle, the count at the foot.
+  stage: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingTop: Space.xl,
   },
-  countRest: {
-    fontFamily: Fonts.serif,
-  },
-  // 32 on the canvas, less the 2pt the count's line adds below.
   seatsGroup: {
-    marginTop: 30,
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    marginTop: Space.lg,
+    // The strings run on behind the count.
+    marginBottom: -Space.xxl,
   },
+  // A loose cluster: balloons overlap a little, each at its own height.
   seats: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'flex-end',
-    justifyContent: 'center',
-    rowGap: Space.sm,
-    columnGap: Space.md,
+    justifyContent: 'center',
+  },
+  sway: {
+    transformOrigin: 'bottom',
   },
   seatBox: {
     alignItems: 'center',
@@ -468,8 +589,40 @@ const styles = StyleSheet.create({
   seatArt: {
     transformOrigin: 'bottom',
   },
-  copy: {
-    marginTop: 28,
-    maxWidth: 260,
+  string: {
+    marginTop: -2,
+  },
+  popperSpot: {
+    marginBottom: STRING_LENGTH * 0.6,
+    marginLeft: Space.xs,
+  },
+  countGroup: {
+    marginTop: Space.lg,
+  },
+  // The big number with "of 6" and the line beside it, sitting on its baseline.
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  countSide: {
+    flex: 1,
+    gap: Space.xxs,
+  },
+  countRest: {
+    fontWeight: 500,
+  },
+  track: {
+    height: 2,
+    borderRadius: 1,
+    overflow: 'hidden',
+    marginBottom: Space.xs,
+  },
+  trackFill: {
+    height: 2,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
 });

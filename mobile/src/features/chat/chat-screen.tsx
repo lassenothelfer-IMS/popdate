@@ -316,7 +316,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         {messages === null ? null : messages.length === 0 ? (
           <Animated.View entering={contentIn} style={styles.empty}>
             <Avatar name={name} uri={match.other.photo} tone={tone} size={64} />
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.centeredText}>
+            <ThemedText type="body" themeColor="textSecondary" style={styles.centeredText}>
               {emptyLine}
             </ThemedText>
           </Animated.View>

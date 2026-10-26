@@ -1,34 +1,105 @@
-import type { ReactNode } from 'react';
+import { useEffect, useId, type ReactNode } from 'react';
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { Gutter, MaxContentWidth, Space } from '@/constants/theme';
+import { CanvasGlow, Gutter, Lamp, MaxContentWidth, Space } from '@/constants/theme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
-const GRAIN = require('@/assets/images/grain.png');
-
-/** Film grain over the paper, light mode only. Decorative, behind everything. */
+/**
+ * Behind every full screen. Velvet draws the canvas glow (the only background
+ * gradient in the app) and the lamp over it, which breathes. Cream is a flat
+ * canvas: no gradient, no lamp. Decorative, behind everything.
+ */
 export function Grain() {
   const scheme = useScheme();
-  if (scheme === 'dark') return null;
+  const { width, height } = useWindowDimensions();
+  const id = useId().replace(/[^a-zA-Z0-9]/g, '');
+  if (scheme !== 'dark') return null;
   return (
-    <Image
-      source={GRAIN}
-      resizeMode="repeat"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+    <View
+      style={StyleSheet.absoluteFill}
       pointerEvents="none"
-      style={styles.grain}
-    />
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <Svg width={width} height={height}>
+        <Defs>
+          <RadialGradient
+            id={`canvas${id}`}
+            cx="50%"
+            cy={`${CanvasGlow.cy * 100}%`}
+            rx={`${CanvasGlow.rx * 100}%`}
+            ry={`${CanvasGlow.ry * 100}%`}>
+            {CanvasGlow.stops.map((color, i) => (
+              <Stop key={color} offset={CanvasGlow.offsets[i]} stopColor={color} />
+            ))}
+          </RadialGradient>
+        </Defs>
+        <Rect width={width} height={height} fill={`url(#canvas${id})`} />
+      </Svg>
+      <BreathingLamp width={width} height={height} gradient={`lamp${id}`} />
+    </View>
+  );
+}
+
+/**
+ * The lamp: a warm ellipse over the canvas that breathes, opacity .55 to 1 and
+ * scale 1 to 1.06 over 7 s, forever. Holds still under Reduce Motion.
+ */
+function BreathingLamp({ width, height, gradient }: { width: number; height: number; gradient: string }) {
+  const reduced = useReduceMotion();
+  const breath = useSharedValue(1);
+  useEffect(() => {
+    if (reduced) {
+      cancelAnimation(breath);
+      breath.set(1);
+      return;
+    }
+    breath.set(0);
+    breath.set(withRepeat(withTiming(1, { duration: 3500, easing: Easing.inOut(Easing.ease) }), -1, true));
+  }, [reduced, breath]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.55 + 0.45 * breath.get(),
+    transform: [{ scale: 1 + 0.06 * breath.get() }],
+  }));
+  // The overlay reaches 20% past every edge, as in the mockups, so scaling never shows its rim.
+  const w = width * 1.4;
+  const h = height * 1.4;
+  return (
+    <Animated.View style={[styles.lamp, { left: -width * 0.2, top: -height * 0.2, width: w, height: h }, style]}>
+      <Svg width={w} height={h}>
+        <Defs>
+          <RadialGradient
+            id={gradient}
+            cx="50%"
+            cy={`${((Lamp.cy * height + height * 0.2) / h) * 100}%`}
+            rx={`${((Lamp.rx * width) / w) * 100}%`}
+            ry={`${((Lamp.ry * height) / h) * 100}%`}>
+            <Stop offset="0" stopColor={Lamp.color} stopOpacity={Lamp.opacity} />
+            <Stop offset={Lamp.fadeAt} stopColor={Lamp.color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={w} height={h} fill={`url(#${gradient})`} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -123,15 +194,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  grain: {
+  lamp: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0.03,
   },
   safeArea: {
     flex: 1,

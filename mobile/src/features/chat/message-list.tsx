@@ -44,7 +44,7 @@ type MessageListProps = {
   formatTime: (iso: string) => string;
 };
 
-/** Your bubbles on the right in ink, theirs on the left in surface, a time under each group. */
+/** Your bubbles on the right in cream, theirs on the left in plush, a time under each group. */
 export function MessageList({ messages, myId, name, filter, formatTime }: MessageListProps) {
   const t = useT();
   const theme = useTheme();
@@ -82,7 +82,9 @@ export function MessageList({ messages, myId, name, filter, formatTime }: Messag
                   style={[
                     styles.bubble,
                     corners,
-                    { backgroundColor: group.mine ? theme.inverse : theme.surface },
+                    group.mine
+                      ? { backgroundColor: theme.inverse }
+                      : { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 },
                   ]}>
                   <ThemedText type="body" themeColor={group.mine ? 'onInverse' : 'text'} selectable>
                     {text}
@@ -93,7 +95,7 @@ export function MessageList({ messages, myId, name, filter, formatTime }: Messag
             {/* Each bubble already says its time to screen readers. */}
             <ThemedText
               type="footnote"
-              themeColor="textSecondary"
+              themeColor="textTertiary"
               accessibilityElementsHidden
               importantForAccessibility="no"
               style={styles.time}>

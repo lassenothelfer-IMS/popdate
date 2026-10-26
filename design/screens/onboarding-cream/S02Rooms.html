@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>How it works: the room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+
+.pd-root{isolation:isolate}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(1){animation-delay:40ms}
+.pd-root > *:nth-child(2){animation-delay:110ms}
+.pd-root > *:nth-child(3){animation-delay:180ms}
+.pd-root > *:nth-child(4){animation-delay:250ms}
+.pd-root > *:nth-child(5){animation-delay:320ms}
+.pd-root > *:nth-child(6){animation-delay:390ms}
+.pd-root > *:nth-child(7){animation-delay:460ms}
+.pd-root > *:nth-child(8){animation-delay:530ms}
+.pd-root > .pd-fx{animation:none}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pd-root a[href],.pd-root button{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms,box-shadow 180ms;-webkit-tap-highlight-color:transparent}
+.pd-root a[href]:active,.pd-root button:active{transform:scale(.97)}
+.pd-root a[href]:hover,.pd-root button:hover{opacity:.92}
+.pd-root svg[style*="top: 130px"],.pd-root svg[style*="top: 52px"]{animation:pd-float 5.2s ease-in-out infinite;transform-origin:50% 100%}
+.pd-root [style*="transform-origin: top"]{animation:pd-sway 5.2s ease-in-out infinite}
+@keyframes pd-float{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-9px) rotate(-1.5deg)}}
+@keyframes pd-sway{0%,100%{transform:rotate(6deg)}50%{transform:rotate(3deg)}}
+.pd-root [style*="height: 3px"]{transform-origin:left center;animation:pd-fill 600ms cubic-bezier(.22,1,.36,1) both}
+.pd-root [style*="height: 3px"]:nth-child(n){animation-delay:calc(200ms + var(--i,0)*40ms)}
+@keyframes pd-fill{from{transform:scaleX(.2);opacity:.4}to{transform:none;opacity:1}}
+.pd-root [style*="filter: blur"]{animation:pd-drift 9s ease-in-out infinite alternate}
+@keyframes pd-drift{to{transform:translate(8px,-10px) scale(1.04)}}
+.pd-root input,.pd-root textarea{transition:box-shadow 200ms}
+.pd-root input:focus,.pd-root textarea:focus{box-shadow:inset 0 0 0 2px currentColor !important}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+
+.pd-root a[href][style*="background: #1C1917"],.pd-root button[style*="background: #1C1917"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(28,25,23,.18),0 10px 24px -10px rgba(28,25,23,.45)}
+.pd-root a[href][style*="background: #CF3A2F"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 12px 28px -10px rgba(207,58,47,.55)}
+.pd-root [style*="background: #FFFDFA"][style*="border-radius: 20px"],.pd-root [style*="background: #FFFDFA"][style*="border-radius: 16px"]{box-shadow:inset 0 0 0 1px rgba(28,25,23,0.08),0 1px 0 rgba(255,255,255,.8),0 18px 40px -24px rgba(28,25,23,.35) !important}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box">
+  <svg class="pd-fx pd-grain" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.05;mix-blend-mode:multiply;z-index:5"><filter id="pdg"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#pdg)"></rect></svg>
+  <div style="position: absolute; left: 20px; right: 20px; top: 64px; display: flex; align-items: center; justify-content: space-between">
+    <div style="display: flex; gap: 6px">
+      <span style="width: 20px; height: 6px; border-radius: 3px; background: #1C1917"></span>
+      <span style="width: 6px; height: 6px; border-radius: 3px; background: #CFC6B9"></span>
+      <span style="width: 6px; height: 6px; border-radius: 3px; background: #CFC6B9"></span>
+    </div>
+    <a href="S05SignIn.html" style="font-size: 15px; font-weight: 500; color: #5F574F; text-decoration: none; padding: 8px 0">Skip</a>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 120px; height: 380px; border-radius: 20px; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08); overflow: hidden">
+    <div style="position: absolute; left: 24px; top: 28px; font-size: 13px; font-weight: 600; color: #5F574F">Tonight's room</div>
+    <div style="position: absolute; left: 24px; top: 70px; width: 64px; height: 64px; border-radius: 50%; background: #F5E1DC; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-size: 30px; color: #B5332A">M</div>
+    <div style="position: absolute; left: 100px; top: 78px; font-size: 17px; font-weight: 600">Mia, 27</div>
+    <div style="position: absolute; left: 100px; top: 100px; font-size: 14px; color: #5F574F">is choosing tonight</div>
+    <div style="position: absolute; left: 24px; right: 24px; top: 164px; height: 1px; background: rgba(28,25,23,0.08)"></div>
+    <div style="position: absolute; left: 24px; right: 24px; top: 190px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px"><svg width="26" height="32" viewBox="0 0 120 132" aria-hidden="true" style="display: inline-block; overflow: visible; "><defs><radialGradient id="vb8E1430" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#E57A8E"/><stop offset=".42" stop-color="#8E1430"/><stop offset="1" stop-color="#2E020B"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#vb8E1430)"/><path d="M52 118h16l-8 12z" fill="#2E020B"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg><span style="font-size: 12px; font-weight: 500">Elias</span></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px"><svg width="26" height="32" viewBox="0 0 120 132" aria-hidden="true" style="display: inline-block; overflow: visible; "><defs><radialGradient id="vbE2B566" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFF3D6"/><stop offset=".42" stop-color="#E2B566"/><stop offset="1" stop-color="#6A4212"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#vbE2B566)"/><path d="M52 118h16l-8 12z" fill="#6A4212"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg><span style="font-size: 12px; font-weight: 500">Nico</span></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px"><svg width="26" height="32" viewBox="0 0 120 132" aria-hidden="true" style="display: inline-block; overflow: visible; "><defs><radialGradient id="vbDD6A60" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFC9B6"/><stop offset=".42" stop-color="#DD6A60"/><stop offset="1" stop-color="#6E1A25"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#vbDD6A60)"/><path d="M52 118h16l-8 12z" fill="#6E1A25"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg><span style="font-size: 12px; font-weight: 500">Noah</span></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px"><svg width="26" height="32" viewBox="0 0 120 132" aria-hidden="true" style="display: inline-block; overflow: visible; "><defs><radialGradient id="vbE6A3A2" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FCE0D8"/><stop offset=".42" stop-color="#E6A3A2"/><stop offset="1" stop-color="#7C3341"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#vbE6A3A2)"/><path d="M52 118h16l-8 12z" fill="#7C3341"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg><span style="font-size: 12px; font-weight: 500">Ben</span></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px"><svg width="26" height="32" viewBox="0 0 120 132" aria-hidden="true" style="display: inline-block; overflow: visible; box-shadow: 0 0 0 2px #FFFDFA, 0 0 0 4px #C21F35;"><defs><radialGradient id="vbC21F35" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FF9A92"/><stop offset=".42" stop-color="#C21F35"/><stop offset="1" stop-color="#4A030F"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#vbC21F35)"/><path d="M52 118h16l-8 12z" fill="#4A030F"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg><span style="font-size: 12px; font-weight: 600">You</span></div>
+    </div>
+    <div style="position: absolute; left: 24px; right: 24px; bottom: 28px; font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; line-height: 23px; color: #5F574F">Six people. One choosing, five holding balloons.</div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 540px; display: flex; flex-direction: column; gap: 14px">
+    <h1 style="margin: 0; font-family: 'Fraunces', 'New York', Georgia, serif; font-weight: 500; font-size: 30px; line-height: 34px; letter-spacing: -0.015em">A room is six people.</h1>
+    <p style="margin: 0; font-size: 17px; line-height: 23px; color: #5F574F">Most nights you hold a balloon. Now and then, you are the one choosing. Rooms open on the hour, so there is always one about to start.</p>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; bottom: 34px">
+    <a href="S03Rounds.html" style="display: flex; align-items: center; justify-content: center; height: 54px; border-radius: 16px; background: #1C1917; color: #FFFDFA; font-size: 17px; font-weight: 600; text-decoration: none">Next</a>
+  </div>
+</div>
+</body>
+</html>

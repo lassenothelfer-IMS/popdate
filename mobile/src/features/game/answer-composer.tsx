@@ -85,13 +85,13 @@ export function AnswerComposer({
     <View style={styles.composer}>
       <View style={styles.row}>
         <View
-          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
+          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.outline }]}>
           <TextInput
             accessibilityLabel={t('game.yourAnswer')}
             placeholder={t('game.answerPlaceholder', { name: popperName })}
-            placeholderTextColor={theme.textTertiary}
+            placeholderTextColor={theme.textFaint}
             keyboardAppearance={scheme}
-            selectionColor={theme.text}
+            selectionColor={theme.gold}
             // Read when the field gets focus, once the count shows.
             accessibilityHint={text.length >= COUNTER_FROM ? countLeft(t, left) : undefined}
             value={text}

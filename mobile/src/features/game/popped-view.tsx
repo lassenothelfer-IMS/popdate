@@ -7,7 +7,7 @@ import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, Motion, Space } from '@/constants/theme';
+import { Ease, Motion, Space } from '@/constants/theme';
 import { useT } from '@/i18n';
 
 const MARK_SIZE = 56;
@@ -103,7 +103,7 @@ export function PoppedView({
           <ThemedText type="display" style={styles.text}>
             {title}
           </ThemedText>
-          <ThemedText type="callout" themeColor="textSecondary" style={styles.text}>
+          <ThemedText type="body" themeColor="textSecondary" style={styles.text}>
             {line} {next}
           </ThemedText>
         </View>
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Gutter * 2,
+    paddingHorizontal: Space.xl + Space.xs,
     paddingTop: Space.xl,
     paddingBottom: Space.xl,
   },
@@ -128,11 +128,11 @@ const styles = StyleSheet.create({
     height: balloonHeight(MARK_SIZE),
   },
   copy: {
-    marginTop: 20,
+    marginTop: Space.lg,
   },
   group: {
     alignItems: 'center',
-    gap: Space.xs,
+    gap: Space.sm,
   },
   text: {
     textAlign: 'center',

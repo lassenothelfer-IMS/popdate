@@ -106,7 +106,7 @@ export function PushPrompt({ style }: { style?: StyleProp<ViewStyle> }) {
           onPress={notNow}
           pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={({ pressed }) => [styles.text, pressed && styles.pressed]}>
-          <ThemedText type="label" themeColor="textSecondary">
+          <ThemedText type="headline" themeColor="textTertiary">
             {t('common.notNow')}
           </ThemedText>
         </Pressable>
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   card: {
     gap: Space.sm,
     padding: Space.md,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
   },

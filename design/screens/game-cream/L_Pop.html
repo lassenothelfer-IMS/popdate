@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Cream: The pop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+.pd-stage{position:absolute;left:0;right:0;top:150px;height:420px}
+.pd-bal{position:absolute;left:95px;top:30px;width:200px;height:216px;transform-origin:50% 100%;animation:pd-swell 1.6s cubic-bezier(.34,1.3,.64,1) 600ms both,pd-gone 1ms linear 2300ms both}
+@keyframes pd-swell{0%{transform:scale(1)}55%{transform:scale(1.08) rotate(-2deg)}85%{transform:scale(1.18) rotate(1.5deg)}100%{transform:scale(1.24)}}
+@keyframes pd-gone{to{opacity:0;visibility:hidden}}
+.pd-str{position:absolute;left:194px;top:242px;width:2px;height:150px;background:linear-gradient(#E9BE72,rgba(233,190,114,0));transform-origin:top;animation:pd-strdrop 1.3s cubic-bezier(.5,0,.8,.4) 2300ms both}
+@keyframes pd-strdrop{to{transform:translateY(420px) rotate(-35deg);opacity:0}}
+.pd-ring{position:absolute;left:135px;top:70px;width:120px;height:120px;border-radius:50%;border:3px solid #1C1917;opacity:0;animation:pd-ring 650ms cubic-bezier(.2,.8,.3,1) 2300ms both}
+@keyframes pd-ring{0%{opacity:.95;transform:scale(.5)}100%{opacity:0;transform:scale(3.2);border-width:1px}}
+.pd-flash{position:absolute;left:55px;top:-10px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(255,250,240,.95) 0%,rgba(255,220,200,.5) 30%,rgba(255,200,180,0) 70%);opacity:0;animation:pd-flash 420ms ease-out 2300ms both}
+@keyframes pd-flash{0%{opacity:0;transform:scale(.3)}25%{opacity:1}100%{opacity:0;transform:scale(1.6)}}
+.pd-shard{position:absolute;left:180px;top:120px;opacity:0;animation:pd-shard 1100ms cubic-bezier(.15,.75,.3,1) 2310ms both}
+@keyframes pd-shard{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}70%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--r)) scale(.6)}}
+.pd-after{opacity:0;animation:pd-after 800ms cubic-bezier(.22,1,.36,1) 2900ms both}
+@keyframes pd-after{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.pd-shake{animation:pd-shake 320ms linear 2300ms both}
+@keyframes pd-shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-4px,2px)}50%{transform:translate(4px,-2px)}75%{transform:translate(-2px,-3px)}}
+.pd-count{animation:pd-tick 1s steps(1) infinite}
+@keyframes pd-tick{0%{opacity:1}50%{opacity:.85}}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-shake" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box">
+  <div style="position: absolute; left: 20px; right: 20px; top: 62px; display: flex; align-items: center; justify-content: space-between">
+    <div style="display: flex; flex-direction: column; gap: 1px"><div style="font-size: 15px; font-weight: 600; line-height: 18px">Round 1 of 4</div><div style="font-size: 12px; color: #5F574F; line-height: 14px">Mia has chosen</div></div>
+    <a href="L_Main.html" style="padding: 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #1C1917; text-decoration: none; background: #E9DDC8">Leave</a>
+  </div>
+
+  <div class="pd-stage">
+    <div class="pd-flash"></div>
+    <div class="pd-ring"></div>
+    <svg class="pd-bal" viewBox="0 0 120 130" aria-hidden="true"><defs><radialGradient id="popc" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFC9B6"/><stop offset=".42" stop-color="#DD6A60"/><stop offset="1" stop-color="#6E1A25"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#popc)"/><path d="M52 118h16l-8 12z" fill="#6E1A25"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg>
+    <div class="pd-str"></div>
+    <svg class="pd-shard" style="--dx: -150px; --dy: -120px; --r: -260deg" width="46" height="30" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#DD6A60"/></svg>
+    <svg class="pd-shard" style="--dx: 150px; --dy: -100px; --r: 200deg" width="40" height="26" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#FFC9B6"/></svg>
+    <svg class="pd-shard" style="--dx: -160px; --dy: 40px; --r: 120deg" width="52" height="34" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#DD6A60"/></svg>
+    <svg class="pd-shard" style="--dx: 170px; --dy: 60px; --r: -150deg" width="44" height="28" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#6E1A25"/></svg>
+    <svg class="pd-shard" style="--dx: -60px; --dy: 170px; --r: 300deg" width="36" height="24" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#DD6A60"/></svg>
+    <svg class="pd-shard" style="--dx: 80px; --dy: 180px; --r: -320deg" width="30" height="20" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#FFC9B6"/></svg>
+    <svg class="pd-shard" style="--dx: 20px; --dy: -190px; --r: 60deg" width="28" height="18" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#DD6A60"/></svg>
+    <svg class="pd-shard" style="--dx: -110px; --dy: 130px; --r: -80deg" width="58" height="38" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#6E1A25"/></svg>
+    <svg class="pd-shard" style="--dx: 120px; --dy: 150px; --r: 240deg" width="24" height="16" viewBox="0 0 46 30" aria-hidden="true"><path d="M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z" fill="#FFC9B6"/></svg>
+  </div>
+
+  <div class="pd-after" style="position: absolute; left: 20px; right: 20px; top: 500px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center">
+    <div style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 38px; line-height: 42px; letter-spacing: -0.02em">Noah's balloon<br>popped.</div>
+    <div style="font-size: 15px; color: #5F574F">Four balloons left. You're still floating.</div>
+  </div>
+
+  <div class="pd-after" style="position: absolute; left: 20px; right: 20px; top: 630px; display: flex; align-items: center; justify-content: center; gap: 16px">
+    <svg width="14" height="17" viewBox="0 0 120 130" aria-hidden="true"><defs><radialGradient id="p1" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFF3D6"/><stop offset=".42" stop-color="#E2B566"/><stop offset="1" stop-color="#6A4212"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#p1)"/><path d="M52 118h16l-8 12z" fill="#6A4212"/></svg>
+    <svg width="14" height="17" viewBox="0 0 120 130" aria-hidden="true"><defs><radialGradient id="p2" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FCE0D8"/><stop offset=".45" stop-color="#E6A3A2"/><stop offset="1" stop-color="#7C3341"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#p2)"/><path d="M52 118h16l-8 12z" fill="#7C3341"/></svg>
+    <svg width="14" height="17" viewBox="0 0 120 130" aria-hidden="true"><defs><radialGradient id="p3" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#E57A8E"/><stop offset=".42" stop-color="#8E1430"/><stop offset="1" stop-color="#2E020B"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#p3)"/><path d="M52 118h16l-8 12z" fill="#2E020B"/></svg>
+    <svg width="17" height="20" viewBox="0 0 120 130" aria-hidden="true" style="filter: drop-shadow(0 0 0 #F3E9DA)"><defs><radialGradient id="p4" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FF9A92"/><stop offset=".42" stop-color="#C21F35"/><stop offset="1" stop-color="#4A030F"/></radialGradient></defs><circle cx="60" cy="62" r="62" fill="none" stroke="#1C1917" stroke-width="5"/><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#p4)"/><path d="M52 118h16l-8 12z" fill="#4A030F"/></svg>
+    <span style="width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(28,25,23,.3)"></span>
+  </div>
+
+  <div class="pd-after" style="position: absolute; left: 0; right: 0; bottom: 48px; display: flex; flex-direction: column; align-items: center; gap: 2px">
+    <div style="font-size: 13px; font-weight: 600; color: #5F574F">Round 2 in</div>
+    <a href="L_FinalTwo.html" class="pd-count" style="font-family: 'Fraunces', serif; font-weight: 300; font-size: 56px; line-height: 56px; color: #1C1917; text-decoration: none; font-variant-numeric: tabular-nums">4</a>
+  </div>
+</div>
+</body>
+</html>

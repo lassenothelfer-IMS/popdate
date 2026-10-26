@@ -91,7 +91,7 @@ export function LeaveSheet({
             },
           ]}>
           <View style={[styles.grabber, { backgroundColor: theme.surfacePressed }]} />
-          <ThemedText type="task" accessibilityRole="header" style={[styles.center, styles.title]}>
+          <ThemedText type="question" accessibilityRole="header" style={[styles.center, styles.title]}>
             {title}
           </ThemedText>
           <ThemedText

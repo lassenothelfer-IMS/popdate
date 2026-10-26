@@ -74,13 +74,13 @@ export function WheelPicker({ columns, invalid = false }: WheelPickerProps) {
         styles.card,
         {
           backgroundColor: theme.field,
-          borderColor: invalid ? theme.accentText : theme.outline,
+          borderColor: invalid ? theme.danger : theme.outline,
           transitionProperty: 'borderColor',
           transitionDuration: Motion.state,
           transitionTimingFunction: CssEase.out,
         },
       ]}>
-      <View pointerEvents="none" style={[styles.band, { backgroundColor: theme.surface }]} />
+      <View pointerEvents="none" style={[styles.band, { backgroundColor: theme.surfacePressed }]} />
       <View style={styles.columns}>
         {columns.map((column) => (
           <Wheel key={column.label} {...column} />
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
     // The canvas draws 216pt inside a 1pt edge.
     height: HEIGHT + 2,
     borderWidth: 1,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.card,
     borderCurve: 'continuous',
     overflow: 'hidden',
   },
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     right: Space.xs,
     top: EDGE,
     height: ROW,
-    borderRadius: Radius.sm,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
   },
   columns: {

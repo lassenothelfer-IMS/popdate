@@ -92,11 +92,11 @@ export function PhotoBadge({ label }: { label: string }) {
   const theme = useTheme();
   return (
     <View
-      style={[styles.badge, { backgroundColor: theme.surface }]}
+      style={[styles.badge, { backgroundColor: 'rgba(18, 4, 10, 0.55)' }]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       {/* Grows with the text size, but never covers much of the photo. */}
-      <ThemedText type="caption" maxFontSizeMultiplier={1.35}>
+      <ThemedText type="captionStrong" maxFontSizeMultiplier={1.35} style={{ color: theme.text }}>
         {label}
       </ThemedText>
     </View>

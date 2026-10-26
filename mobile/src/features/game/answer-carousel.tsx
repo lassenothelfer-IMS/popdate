@@ -61,6 +61,8 @@ const DEVELOP_FROM = 0.97;
 const DOT = 10;
 
 const CHROME = 2 * (CARD_EDGE + CARD_PAD);
+/** Gold at 22%: the edge of every photo card. */
+const CARD_RING = 'rgba(233, 190, 114, 0.22)';
 
 /**
  * The card width that fits a whole card, answer and marked ring included, into
@@ -253,7 +255,8 @@ function AnswerCard({ contestant, seat, width, marked, developed, onPress }: Ans
       )} ${t('game.balloonOf', { name })}`}
       accessibilityHint={selectable ? t('game.markHint', { name }) : undefined}
       background={theme.field}
-      style={[styles.card, { width, borderColor: theme.outline }]}>
+      // A photo card: 22pt corners and a faint candle-gold edge.
+      style={[styles.card, { width, borderColor: CARD_RING }]}>
       {latest ? (
         // The reveal: the photo develops once it is in view. No stagger, no haptic.
         // Under Reduce Motion only the fade is left.
@@ -327,11 +330,11 @@ const styles = StyleSheet.create({
   card: {
     padding: CARD_PAD,
     borderWidth: CARD_EDGE,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.card,
     borderCurve: 'continuous',
   },
   photo: {
-    borderRadius: Radius.sm,
+    borderRadius: Radius.card - CARD_PAD - CARD_EDGE,
   },
   body: {
     paddingTop: Space.sm,
@@ -371,7 +374,7 @@ const styles = StyleSheet.create({
     right: -RING - CARD_EDGE,
     bottom: -RING - CARD_EDGE,
     left: -RING - CARD_EDGE,
-    borderRadius: Radius.lg + RING,
+    borderRadius: Radius.card + RING,
     borderCurve: 'continuous',
     borderWidth: RING,
   },

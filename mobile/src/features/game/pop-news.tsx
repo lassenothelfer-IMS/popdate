@@ -83,7 +83,7 @@ export function PopNews({ text, detail, color, animate, announce = true }: PopNe
           {text}
         </ThemedText>
         {detail ? (
-          <ThemedText type="callout" themeColor="textSecondary" style={styles.center}>
+          <ThemedText type="callout" themeColor="gold" style={styles.center}>
             {detail}
           </ThemedText>
         ) : null}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Cream: Report sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+.pd-sheet{animation:pd-sheet 520ms cubic-bezier(.32,.72,0,1) both}
+@keyframes pd-sheet{from{transform:translateY(100%)}to{transform:none}}
+.pd-dim{animation:pd-dim 400ms ease-out both}
+@keyframes pd-dim{from{opacity:0}to{opacity:1}}
+
+.pd-root{isolation:isolate}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(1){animation-delay:40ms}.pd-root > *:nth-child(2){animation-delay:110ms}.pd-root > *:nth-child(3){animation-delay:180ms}.pd-root > *:nth-child(4){animation-delay:250ms}.pd-root > *:nth-child(5){animation-delay:320ms}.pd-root > *:nth-child(6){animation-delay:390ms}.pd-root > *:nth-child(7){animation-delay:460ms}.pd-root > *:nth-child(8){animation-delay:530ms}.pd-root > *:nth-child(9){animation-delay:600ms}
+.pd-root > .pd-fx{animation:none}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pd-root a[href],.pd-root button{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms,box-shadow 180ms;-webkit-tap-highlight-color:transparent}
+.pd-root a[href]:active,.pd-root button:active{transform:scale(.97)}
+.pd-root a[href]:hover,.pd-root button:hover{opacity:.92}
+.pd-root [style*="height: 3px"]{transform-origin:left center;animation:pd-fill 600ms cubic-bezier(.22,1,.36,1) both;animation-delay:calc(200ms + var(--i,0)*40ms)}
+@keyframes pd-fill{from{transform:scaleX(.2);opacity:.4}to{transform:none;opacity:1}}
+.pd-root input,.pd-root textarea{transition:box-shadow 200ms}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+
+.pd-root a[href][style*="background: #1C1917"],.pd-root button[style*="background: #1C1917"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(28,25,23,.18),0 10px 24px -10px rgba(28,25,23,.45)}
+.pd-root a[href][style*="background: #CF3A2F"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 14px 32px -10px rgba(240,105,92,.6)}
+.pd-glow{position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 50% 62%,rgba(255,138,110,.16) 0%,rgba(255,138,110,0) 70%);animation:pd-breathe 7s ease-in-out infinite;z-index:0}
+@keyframes pd-breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.pd-root > *:not(.pd-fx){position:relative}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box"><svg class="pd-fx pd-grain" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.05;mix-blend-mode:multiply;z-index:5"><filter id="pdg"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#pdg)"></rect></svg>
+  <div style="position: absolute; left: 20px; right: 20px; top: 62px; display: flex; align-items: center; justify-content: space-between; opacity: .5">
+    <div style="display: flex; flex-direction: column; gap: 1px"><div style="font-size: 15px; font-weight: 600; line-height: 18px">Round 1 of 4</div><div style="font-size: 12px; color: #5F574F; line-height: 14px">Choose whose balloon to pop</div></div>
+  </div>
+  <div style="position: absolute; left: 20px; right: 20px; top: 180px; height: 440px; border-radius: 22px; background: #DDE4EA; opacity: .5"></div>
+
+  <div class="pd-dim" style="position: absolute; inset: 0; background: rgba(28,25,23,.6)"></div>
+
+  <div class="pd-sheet" style="position: absolute; left: 0; right: 0; bottom: 0; border-radius: 28px 28px 0 0; background: #FFFDFA; box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 -20px 60px rgba(0,0,0,.5); padding: 12px 20px 40px; box-sizing: border-box">
+    <div style="width: 36px; height: 5px; border-radius: 3px; background: rgba(28,25,23,.3); margin: 0 auto 18px"></div>
+    <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px">
+      <div style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 26px; line-height: 30px; letter-spacing: -0.015em">Pop Noah and report?</div>
+      <div style="font-size: 14px; line-height: 19px; color: #5F574F">His balloon pops now and he can't rejoin this room. Tell us why, we read every one.</div>
+    </div>
+    <div style="display: flex; flex-direction: column">
+      <button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 52px; border: 0; border-bottom: 1px solid rgba(28,25,23,0.08); background: transparent; font-family: inherit; font-size: 16px; color: #1C1917; text-align: left"><span>Not the person in the photos</span><span style="width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(28,25,23,.3)"></span></button>
+      <button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 52px; border: 0; border-bottom: 1px solid rgba(28,25,23,0.08); background: transparent; font-family: inherit; font-size: 16px; color: #1C1917; text-align: left"><span>Rude or hateful answer</span><span style="width: 20px; height: 20px; border-radius: 50%; background: #1C1917; display: flex; align-items: center; justify-content: center"><svg width="11" height="9" viewBox="0 0 11 9" fill="none" stroke="#FFFDFA" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 4.5 4 7.5 10 1.5"></path></svg></span></button>
+      <button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 52px; border: 0; border-bottom: 1px solid rgba(28,25,23,0.08); background: transparent; font-family: inherit; font-size: 16px; color: #1C1917; text-align: left"><span>Sexual content</span><span style="width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(28,25,23,.3)"></span></button>
+      <button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 52px; border: 0; border-bottom: 1px solid rgba(28,25,23,0.08); background: transparent; font-family: inherit; font-size: 16px; color: #1C1917; text-align: left"><span>Under 18</span><span style="width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(28,25,23,.3)"></span></button>
+      <button type="button" style="display: flex; align-items: center; justify-content: space-between; height: 52px; border: 0; background: transparent; font-family: inherit; font-size: 16px; color: #1C1917; text-align: left"><span>Something else</span><span style="width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(28,25,23,.3)"></span></button>
+    </div>
+    <div style="display: flex; gap: 10px; margin-top: 18px">
+      <a href="L_C03Listen.html" style="flex: 1; display: flex; align-items: center; justify-content: center; height: 54px; border-radius: 16px; background: #E9DDC8; color: #1C1917; font-size: 17px; font-weight: 600; text-decoration: none; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.14)">Cancel</a>
+      <a href="L_C04Popped.html" style="flex: 1.4; display: flex; align-items: center; justify-content: center; height: 54px; border-radius: 16px; background: #CF3A2F; color: #F3E9DA; font-size: 17px; font-weight: 600; text-decoration: none">Pop and report</a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

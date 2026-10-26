@@ -68,7 +68,7 @@ export function HowToPlayScreen() {
               {art}
             </View>
             <View style={styles.caption}>
-              <ThemedText type="quote" themeColor="textTertiary" style={styles.number}>
+              <ThemedText type="quote" themeColor="gold" style={styles.number}>
                 {i + 1}
               </ThemedText>
               <ThemedText style={styles.flex}>{t(text)}</ThemedText>
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: Space.md,
     borderWidth: 1,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.card,
     borderCurve: 'continuous',
   },
   caption: {

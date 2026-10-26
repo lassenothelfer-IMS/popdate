@@ -50,12 +50,14 @@ export function TextField({
       AccessibilityInfo.announceForAccessibilityWithOptions(errorMessage, { queue: true });
     }
   }, [errorMessage]);
-  const edge = error ? theme.danger : focused || multiline ? theme.borderStrong : theme.outline;
+  const edge = error ? theme.danger : theme.borderStrong;
+  // Focused: a 2 pt ring in the text color, drawn inside so the text never moves.
+  const ring = focused && !error ? { boxShadow: `inset 0 0 0 2px ${theme.text}` } : null;
 
   return (
     <View style={styles.field}>
       {label ? (
-        <ThemedText type="footnote" themeColor="textSecondary">
+        <ThemedText type="kicker">
           {label}
         </ThemedText>
       ) : null}
@@ -64,10 +66,11 @@ export function TextField({
           styles.box,
           multiline && styles.multiline,
           { backgroundColor: theme.field, borderColor: edge },
+          ring,
         ]}>
         <TextInput
           accessibilityLabel={rest.accessibilityLabel ?? label}
-          placeholderTextColor={theme.textTertiary}
+          placeholderTextColor={theme.textFaint}
           keyboardAppearance={scheme}
           selectionColor={theme.text}
           multiline={multiline}

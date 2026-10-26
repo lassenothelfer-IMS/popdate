@@ -3,13 +3,13 @@ import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { Avatar } from '@/components/avatar';
 import { Ease, Motion } from '@/constants/theme';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 
 /** The popper's initial (or photo) settles into the seat once the room is known. Opacity only. */
 const personIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
-/** A 28pt circle, about as tall as a balloon seat, so the row stays level. */
-export const POPPER_SEAT_SIZE = 28;
+/** The person choosing sits beside the balloons as a 44pt plush circle with a gold ring. */
+export const POPPER_SEAT_SIZE = 44;
 /** Matches the outline of an empty balloon seat. */
 const GHOST_STROKE = 1.5;
 
@@ -21,14 +21,13 @@ type PopperSeatProps = {
 };
 
 /**
- * The one seat in the queue that isn't a balloon: the person choosing, as a 28pt
- * avatar on the neutral tile. Empty, it is a borderStrong outline like an empty
+ * The one seat in the queue that isn't a balloon: the person choosing, as a 44pt
+ * avatar on plush with a gold ring. Empty, it is a borderStrong outline like an empty
  * balloon seat; filled before the room answers, it is the bare tile.
  * Decorative: the queue count carries the meaning.
  */
 export function PopperSeat({ filled, name, photoUri }: PopperSeatProps) {
   const theme = useTheme();
-  const scheme = useScheme();
 
   if (!filled) {
     return (
@@ -36,8 +35,8 @@ export function PopperSeat({ filled, name, photoUri }: PopperSeatProps) {
     );
   }
 
-  // The canvas's own neutral tile: surface by day, one step up by night.
-  const tile = scheme === 'dark' ? theme.surfacePressed : theme.surface;
+  // Plush, like every avatar in Velvet hour.
+  const tile = theme.surface;
   return (
     <View
       style={[

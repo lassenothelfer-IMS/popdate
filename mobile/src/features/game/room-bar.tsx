@@ -71,7 +71,7 @@ export function RoomBar({
           <View style={styles.phase}>
             <ThemedText
               type="footnote"
-              themeColor="textSecondary"
+              themeColor="textTertiary"
               maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
               style={styles.shrink}>
               {subtitle}
@@ -94,7 +94,11 @@ export function RoomBar({
                 {leaving ? (
                   <ActivityIndicator color={theme.textSecondary} />
                 ) : (
-                  <ThemedText type="label" maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}>
+                  <ThemedText
+                    type="label"
+                    themeColor="textTertiary"
+                    maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
+                    style={styles.leaveLabel}>
                     {t('game.leave')}
                   </ThemedText>
                 )}
@@ -152,7 +156,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xxs,
+    gap: Space.xs,
   },
   leave: {
     minWidth: MinTouch,
@@ -161,14 +165,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  leaveLabel: {
+    fontWeight: 600,
+  },
   pressed: {
     opacity: 0.6,
   },
   rounds: {
-    marginTop: Space.xs,
+    marginTop: Space.sm,
   },
   rail: {
-    marginTop: 14,
+    marginTop: Space.md,
     paddingBottom: Space.sm,
   },
 });

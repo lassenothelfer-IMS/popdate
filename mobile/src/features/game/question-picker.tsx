@@ -62,7 +62,7 @@ export function QuestionPicker({
                 accessibilityState={{ checked: selected, disabled: locked }}
                 disabled={locked}
                 onPress={() => onSelect(question.id)}
-                background={selected ? theme.accentWash : theme.page}
+                background={selected ? theme.accentWash : 'transparent'}
                 style={styles.option}>
                 <ThemedText style={styles.text}>{question.text}</ThemedText>
                 {/* Drawn over the row, so picking one never moves its text. */}
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   option: {
     paddingHorizontal: ROW_INSET + 1,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: Radius.md,
     borderCurve: 'continuous',
   },

@@ -59,7 +59,12 @@ export function OptionRow({ label, selected, onPress, shape = 'radio' }: OptionR
         haptics.selection();
         onPress();
       }}
-      style={[styles.row, { borderColor: selected ? theme.borderStrong : theme.outline }]}>
+      style={[
+        styles.row,
+        // Selected: a 2 pt ring in the text color, drawn inside so the row never moves.
+        { borderColor: theme.outline },
+        selected && { boxShadow: `inset 0 0 0 2px ${theme.inverse}`, borderColor: 'transparent' },
+      ]}>
       <ThemedText type="body" style={styles.label}>
         {label}
       </ThemedText>

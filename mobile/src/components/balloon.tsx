@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
-import Svg, { Ellipse, Path } from 'react-native-svg';
+import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
 
-import { Ease, Motion } from '@/constants/theme';
+import { Ease, lacquerFor, Motion } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
@@ -54,8 +54,11 @@ export function Balloon({
   shine = true,
 }: BalloonProps) {
   const theme = useTheme();
+  const gradientId = `lacquer${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const height = balloonHeight(size);
   const line = toUnits(Math.max(1, size / 70), size);
+  // A seat hue is lacquered: a radial gradient lit from the top left, a darker knot.
+  const lacquer = lacquerFor(color);
 
   if (ghost) {
     return (
@@ -67,21 +70,44 @@ export function Balloon({
   }
   return (
     <Svg width={size} height={height} viewBox={VIEW_BOX}>
-      {string ? (
-        <Path d={STRING} fill="none" stroke={color} strokeOpacity={0.55} strokeWidth={line} />
+      {lacquer ? (
+        <Defs>
+          <RadialGradient id={gradientId} cx="34%" cy="26%" r="78%">
+            <Stop offset="0" stopColor={lacquer.hi} />
+            <Stop offset="0.42" stopColor={lacquer.color} />
+            <Stop offset="1" stopColor={lacquer.shadow} />
+          </RadialGradient>
+        </Defs>
       ) : null}
-      <Path d={KNOT} fill={color} />
-      <Path d={BODY} fill={color} />
+      {string ? (
+        <Path d={STRING} fill="none" stroke={theme.gold} strokeOpacity={0.75} strokeWidth={line} />
+      ) : null}
+      <Path d={KNOT} fill={lacquer?.knot ?? color} />
+      <Path d={BODY} fill={lacquer ? `url(#${gradientId})` : color} />
       {shine ? (
-        <Ellipse
-          cx={8.2}
-          cy={8}
-          rx={1.8}
-          ry={3}
-          fill="#FFFDFA"
-          fillOpacity={0.22}
-          transform="rotate(-20 8.2 8)"
-        />
+        <>
+          {/* The highlight, and a faint gold rim on the shadow side (brand/balloon-*.svg). */}
+          <Ellipse
+            cx={8}
+            cy={7.2}
+            rx={1.6}
+            ry={3}
+            fill="#FFF3E6"
+            fillOpacity={lacquer?.shine ?? 0.22}
+            transform="rotate(-28 8 7.2)"
+          />
+          {lacquer ? (
+            <Ellipse
+              cx={17.6}
+              cy={16.8}
+              rx={0.8}
+              ry={2}
+              fill="#E9BE72"
+              fillOpacity={0.22}
+              transform="rotate(30 17.6 16.8)"
+            />
+          ) : null}
+        </>
       ) : null}
     </Svg>
   );

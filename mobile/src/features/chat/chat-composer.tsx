@@ -30,7 +30,7 @@ type ChatComposerProps = {
   name: string;
 };
 
-/** The message field and an ink send button side by side, like the room's answer composer. */
+/** The message field on plush and a cream send button side by side, like the room's answer composer. */
 export function ChatComposer({ value: text, onChangeText, onSend, sending, name }: ChatComposerProps) {
   const t = useT();
   const theme = useTheme();
@@ -64,13 +64,13 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
     <View style={styles.composer}>
       <View style={styles.row}>
         <View
-          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
+          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.outline }]}>
           <TextInput
             accessibilityLabel={t('chat.messageLabel')}
             placeholder={t('chat.placeholder', { name })}
-            placeholderTextColor={theme.textTertiary}
+            placeholderTextColor={theme.textFaint}
             keyboardAppearance={scheme}
-            selectionColor={theme.text}
+            selectionColor={theme.gold}
             // Read when the field gets focus, once the count shows.
             accessibilityHint={text.length >= COUNTER_FROM ? countLabel : undefined}
             value={text}
@@ -84,7 +84,7 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
             style={[styles.input, Platform.OS === 'web' && styles.noOutline, { color: theme.text }]}
           />
         </View>
-        {/* Always ink; it only answers once there is something to send. */}
+        {/* Always cream; it only answers once there is something to send. */}
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={t('chat.send')}

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Cream: Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+.pd-row{transition:background 160ms}
+.pd-row:active{background:#E9DDC8 !important}
+
+.pd-root{isolation:isolate}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(1){animation-delay:40ms}.pd-root > *:nth-child(2){animation-delay:110ms}.pd-root > *:nth-child(3){animation-delay:180ms}.pd-root > *:nth-child(4){animation-delay:250ms}.pd-root > *:nth-child(5){animation-delay:320ms}.pd-root > *:nth-child(6){animation-delay:390ms}.pd-root > *:nth-child(7){animation-delay:460ms}.pd-root > *:nth-child(8){animation-delay:530ms}.pd-root > *:nth-child(9){animation-delay:600ms}
+.pd-root > .pd-fx{animation:none}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pd-root a[href],.pd-root button{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms,box-shadow 180ms;-webkit-tap-highlight-color:transparent}
+.pd-root a[href]:active,.pd-root button:active{transform:scale(.97)}
+.pd-root a[href]:hover,.pd-root button:hover{opacity:.92}
+.pd-root [style*="height: 3px"]{transform-origin:left center;animation:pd-fill 600ms cubic-bezier(.22,1,.36,1) both;animation-delay:calc(200ms + var(--i,0)*40ms)}
+@keyframes pd-fill{from{transform:scaleX(.2);opacity:.4}to{transform:none;opacity:1}}
+.pd-root input,.pd-root textarea{transition:box-shadow 200ms}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+
+.pd-root a[href][style*="background: #1C1917"],.pd-root button[style*="background: #1C1917"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(28,25,23,.18),0 10px 24px -10px rgba(28,25,23,.45)}
+.pd-root a[href][style*="background: #CF3A2F"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 14px 32px -10px rgba(240,105,92,.6)}
+.pd-glow{position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 50% 62%,rgba(255,138,110,.16) 0%,rgba(255,138,110,0) 70%);animation:pd-breathe 7s ease-in-out infinite;z-index:0}
+@keyframes pd-breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.pd-root > *:not(.pd-fx){position:relative}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box"><svg class="pd-fx pd-grain" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.05;mix-blend-mode:multiply;z-index:5"><filter id="pdg"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#pdg)"></rect></svg>
+  <a href="L_Main.html" style="position: absolute; left: 20px; top: 70px; display: flex; align-items: center; gap: 4px; height: 44px; font-size: 15px; font-weight: 500; color: #1C1917; text-decoration: none"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1C1917" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"></path></svg>Back</a>
+  <h1 style="position: absolute; left: 20px; top: 124px; margin: 0; font-family: 'Fraunces', 'New York', Georgia, serif; font-weight: 500; font-size: 40px; line-height: 42px; letter-spacing: -0.02em">Settings</h1>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 196px; display: flex; flex-direction: column; gap: 22px">
+    <div style="display: flex; flex-direction: column">
+      <div style="font-size: 13px; font-weight: 600; color: #5F574F; padding-bottom: 8px">Account</div>
+      <a href="L_Profile.html" class="pd-row" style="display: flex; align-items: center; justify-content: space-between; height: 52px; margin: 0 -8px; padding: 0 8px; border-radius: 10px; border-bottom: 1px solid rgba(28,25,23,0.08); color: #1C1917; text-decoration: none; font-size: 17px">Edit profile<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#8C8378" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1 1l6 6-6 6"></path></svg></a>
+      <a href="L_Profile.html" class="pd-row" style="display: flex; align-items: center; justify-content: space-between; height: 52px; margin: 0 -8px; padding: 0 8px; border-radius: 10px; color: #1C1917; text-decoration: none; font-size: 17px">Selfie verification<span style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: #1F7A4C">Verified<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#8C8378" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1 1l6 6-6 6"></path></svg></span></a>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <div style="font-size: 13px; font-weight: 600; color: #5F574F; padding-bottom: 8px">Preferences</div>
+      <a href="L_Settings.html" class="pd-row" style="display: flex; align-items: center; justify-content: space-between; height: 52px; margin: 0 -8px; padding: 0 8px; border-radius: 10px; border-bottom: 1px solid rgba(28,25,23,0.08); color: #1C1917; text-decoration: none; font-size: 17px">Language<span style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: #5F574F">System default<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#8C8378" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1 1l6 6-6 6"></path></svg></span></a>
+      <a href="L_Settings.html" class="pd-row" style="display: flex; align-items: center; justify-content: space-between; height: 52px; margin: 0 -8px; padding: 0 8px; border-radius: 10px; border-bottom: 1px solid rgba(28,25,23,0.08); color: #1C1917; text-decoration: none; font-size: 17px">Region<span style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: #5F574F">Switzerland<svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#8C8378" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1 1l6 6-6 6"></path></svg></span></a>
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 0; border-bottom: 1px solid rgba(28,25,23,0.08)">
+        <span style="font-size: 17px">Appearance</span>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #E9DDC8; color: #1C1917; font-family: inherit; font-size: 15px; font-weight: 500">Match system</button>
+          <button type="button" style="height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #E9DDC8; color: #1C1917; font-family: inherit; font-size: 15px; font-weight: 500">Cream</button>
+          <button type="button" style="height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #1C1917; color: #FFFDFA; font-family: inherit; font-size: 15px; font-weight: 600">Velvet</button>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 0">
+        <span style="font-size: 17px">App icon</span>
+        <div style="display: flex; gap: 12px"><span style="width: 52px; height: 52px; border-radius: 12px; background: radial-gradient(90% 80% at 50% 42%,#5A1A22 0%,#2C0B13 55%,#12040A 100%); position: relative; overflow: hidden; display: inline-block; box-shadow: 0 0 0 2px #1C1917"><svg viewBox="0 0 220 300" width="36" height="49" aria-hidden="true" style="position: absolute; left: 8px; top: 2px"><defs><radialGradient id="icc" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FF9A92"/><stop offset=".42" stop-color="#C21F35"/><stop offset="1" stop-color="#4A030F"/></radialGradient><radialGradient id="icg" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFF3D6"/><stop offset=".42" stop-color="#E2B566"/><stop offset="1" stop-color="#6A4212"/></radialGradient></defs><path d="M68 160C70 182 92 196 110 206M152 140C150 170 128 190 110 206M110 206c-3 14-12 26-20 40M110 206c4 14 8 30 2 48" stroke="#E9BE72" stroke-width="7" fill="none" stroke-linecap="round"/><g transform="translate(8 26) rotate(-12 60 130)"><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#icc)"/><path d="M52 118h16l-8 12z" fill="#4A030F"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".55"/></g><g transform="translate(92 6) rotate(12 60 130)"><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#icg)"/><path d="M52 118h16l-8 12z" fill="#6A4212"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFFBF2" opacity=".7"/></g></svg></span><span style="width: 52px; height: 52px; border-radius: 12px; background: #F3E3CF; position: relative; overflow: hidden; display: inline-block; box-shadow: inset 0 0 0 1px rgba(233,190,114,.25)"><svg viewBox="0 0 220 300" width="36" height="49" aria-hidden="true" style="position: absolute; left: 8px; top: 2px"><defs><radialGradient id="icc" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FF9A92"/><stop offset=".42" stop-color="#C21F35"/><stop offset="1" stop-color="#4A030F"/></radialGradient><radialGradient id="icg" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFF3D6"/><stop offset=".42" stop-color="#E2B566"/><stop offset="1" stop-color="#6A4212"/></radialGradient></defs><path d="M68 160C70 182 92 196 110 206M152 140C150 170 128 190 110 206M110 206c-3 14-12 26-20 40M110 206c4 14 8 30 2 48" stroke="#9A6A26" stroke-width="7" fill="none" stroke-linecap="round"/><g transform="translate(8 26) rotate(-12 60 130)"><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#icc)"/><path d="M52 118h16l-8 12z" fill="#4A030F"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".55"/></g><g transform="translate(92 6) rotate(12 60 130)"><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#icg)"/><path d="M52 118h16l-8 12z" fill="#6A4212"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFFBF2" opacity=".7"/></g></svg></span><span style="width: 52px; height: 52px; border-radius: 12px; background: #C21F35; position: relative; overflow: hidden; display: inline-block; box-shadow: inset 0 0 0 1px rgba(233,190,114,.25)"><svg viewBox="0 0 220 300" width="36" height="49" aria-hidden="true" style="position: absolute; left: 8px; top: 2px"><defs><radialGradient id="icc" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FF9A92"/><stop offset=".42" stop-color="#C21F35"/><stop offset="1" stop-color="#4A030F"/></radialGradient><radialGradient id="icg" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#FFF3D6"/><stop offset=".42" stop-color="#E2B566"/><stop offset="1" stop-color="#6A4212"/></radialGradient></defs><path d="M68 160C70 182 92 196 110 206M152 140C150 170 128 190 110 206M110 206c-3 14-12 26-20 40M110 206c4 14 8 30 2 48" stroke="#F6E7D6" stroke-width="7" fill="none" stroke-linecap="round"/><g transform="translate(8 26) rotate(-12 60 130)"><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#icc)"/><path d="M52 118h16l-8 12z" fill="#4A030F"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".55"/></g><g transform="translate(92 6) rotate(12 60 130)"><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#icg)"/><path d="M52 118h16l-8 12z" fill="#6A4212"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFFBF2" opacity=".7"/></g></svg></span></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <div style="font-size: 13px; font-weight: 600; color: #5F574F; padding-bottom: 8px">Sound and haptics</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 52px; border-bottom: 1px solid rgba(28,25,23,0.08); font-size: 17px">Pop and match sounds<span style="width: 50px; height: 30px; border-radius: 15px; background: #1C1917; position: relative"><span style="position: absolute; right: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: #F3E9DA"></span></span></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 52px; font-size: 17px">Haptics<span style="width: 50px; height: 30px; border-radius: 15px; background: #1C1917; position: relative"><span style="position: absolute; right: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: #F3E9DA"></span></span></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column">
+      <div style="font-size: 13px; font-weight: 600; color: #5F574F; padding-bottom: 8px">Notifications</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 52px; border-bottom: 1px solid rgba(28,25,23,0.08); font-size: 17px">Your room is ready<span style="width: 50px; height: 30px; border-radius: 15px; background: #1C1917; position: relative"><span style="position: absolute; right: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: #F3E9DA"></span></span></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; height: 52px; font-size: 17px">New matches<span style="width: 50px; height: 30px; border-radius: 15px; background: #D6C9B3; position: relative"><span style="position: absolute; left: 2px; top: 2px; width: 26px; height: 26px; border-radius: 50%; background: #1C1917"></span></span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

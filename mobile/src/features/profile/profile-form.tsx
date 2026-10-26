@@ -345,7 +345,7 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
         />
         {/* The order is the point of this grid, so every photo wears its number. */}
         <View
-          style={[styles.number, { backgroundColor: theme.field }]}
+          style={[styles.number, { backgroundColor: theme.surface, borderColor: theme.borderStrong }]}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
           <ThemedText type="captionStrong" maxFontSizeMultiplier={1.2}>
@@ -374,7 +374,7 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
         onPress={onAdd}
         background={theme.field}
         style={[styles.slot, styles.addSlot, size, { borderColor: theme.borderStrong }]}>
-        <Icon name="add" size={lead ? 28 : 22} color={theme.text} />
+        <Icon name="add" size={lead ? 28 : 22} color={theme.gold} />
         {/* The slot keeps its size, so the label shrinks rather than overflow it. */}
         <ThemedText
           type="headline"
@@ -391,8 +391,8 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
     <View
       accessible
       accessibilityLabel={t('profile.emptySlot', { position })}
-      style={[styles.slot, size, { backgroundColor: theme.surface }]}>
-      <ThemedText type="label" themeColor="textSecondary" numberOfLines={1} adjustsFontSizeToFit>
+      style={[styles.slot, styles.emptySlot, size, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
+      <ThemedText type="label" themeColor="textFaint" numberOfLines={1} adjustsFontSizeToFit>
         {position}
       </ThemedText>
     </View>
@@ -551,10 +551,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The next empty slot: a dashed gold edge on plush, so it reads as the place to tap.
   addSlot: {
     gap: 8,
     padding: 8,
     borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  emptySlot: {
+    borderWidth: StyleSheet.hairlineWidth,
   },
   addLabel: {
     textAlign: 'center',
@@ -566,6 +571,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: Radius.pill,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

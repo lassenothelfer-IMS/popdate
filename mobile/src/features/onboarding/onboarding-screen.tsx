@@ -29,7 +29,7 @@ import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import { WheelPicker } from '@/features/onboarding/wheel-picker';
 import { testProfileDetails } from '@/features/profile/test-profile';
-import { useTheme } from '@/hooks/use-theme';
+import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useLocale, useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
@@ -101,6 +101,7 @@ function checkBirthday({ day, month, year }: BirthParts): { birthDate: string } 
 export function OnboardingScreen() {
   const { setOnboarding, saveProfile } = useSession();
   const theme = useTheme();
+  const seats = useSeats();
   const t = useT();
   const locale = useLocale();
   const reduced = useReduceMotion();
@@ -246,7 +247,7 @@ export function OnboardingScreen() {
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
               style={styles.welcomeBalloon}>
-              <Balloon color={theme.accent} size={160} />
+              <Balloon color={youSeat(seats).color} size={190} />
             </View>
             <View
               ref={headingRef}
@@ -403,7 +404,7 @@ export function OnboardingScreen() {
               aria-checked={termsAccepted}
               accessibilityLabel={t('onboarding.termsLabel')}
               onPress={toggleTerms}
-              style={styles.terms}>
+              style={[styles.terms, { borderColor: termsAccepted ? theme.borderStrong : theme.outline }]}>
               <CheckMark checked={termsAccepted} shape="checkbox" />
               {/* TODO(Elias): link the real Terms and Privacy Policy here. Until then a tap
                   on either link toggles the box like the rest of it. */}
@@ -462,8 +463,8 @@ const WELCOME_BELOW = 38;
 const styles = StyleSheet.create({
   welcomeContent: {
     flexGrow: 1,
-    // The wordmark sits 20pt down, where it does on Home.
-    paddingTop: 20,
+    // The wordmark sits at the safe area plus 10pt, where it does on Home.
+    paddingTop: 10,
   },
   welcome: {
     flexGrow: 1,
@@ -476,11 +477,11 @@ const styles = StyleSheet.create({
   welcomeBelow: {
     flexGrow: WELCOME_BELOW,
   },
-  // On the canvas the balloon's top is 156pt above the line and 26pt in from the right edge.
+  // One huge champagne balloon, right of center, its body dipping over the headline's first line.
   welcomeBalloon: {
     position: 'absolute',
-    top: -156,
-    right: 6,
+    top: -214,
+    right: 18,
   },
   welcomeBody: {
     marginTop: Space.md,
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
     marginTop: Space.xs,
   },
   title: {
-    marginTop: Space.md,
+    marginTop: Space.lg,
   },
   answer: {
     marginTop: 28,
@@ -516,8 +517,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: Space.sm,
     padding: Space.md,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
+    borderWidth: 1,
   },
   link: {
     textDecorationLine: 'underline',

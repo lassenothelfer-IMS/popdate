@@ -82,7 +82,7 @@ const DEFAULT_SETTINGS: Settings = {
   language: 'system',
   region: null,
   units: 'metric',
-  appearance: 'system',
+  appearance: 'dark',
   commentFilter: true,
   notifications: { roomLive: true, newMatch: true, messages: true },
 };

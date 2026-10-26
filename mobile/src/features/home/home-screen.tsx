@@ -110,7 +110,7 @@ export function HomeScreen() {
         <Avatar name={profile.name} uri={profile.photos[0]} tone={youSeat(seats)} size={64} />
         <View style={styles.youText}>
           <ThemedText type="heading">{profile.name}</ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary">
+          <ThemedText type="footnote" themeColor="textTertiary">
             {ageFromBirthDate(profile.birthDate)} · {profile.city}
           </ThemedText>
         </View>
@@ -136,7 +136,7 @@ export function HomeScreen() {
           onPress={() => router.push('/how-to-play')}
           pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={({ pressed }) => [styles.howTo, pressed && styles.pressed]}>
-          <ThemedText type="label" style={styles.link}>
+          <ThemedText type="label" themeColor="accentText" style={styles.link}>
             {t('home.howToPlay')}
           </ThemedText>
         </Pressable>
@@ -218,7 +218,7 @@ function MatchRow({ match }: { match: Match }) {
         </ThemedText>
       </ThemedText>
       <View style={styles.chevron}>
-        <Icon name="chevronRight" size={14} color={theme.textTertiary} />
+        <Icon name="chevronRight" size={14} color={theme.gold} />
       </View>
     </PressableHighlight>
   );
@@ -228,9 +228,9 @@ function MatchRow({ match }: { match: Match }) {
 const YOU_INSET = Space.sm;
 
 const styles = StyleSheet.create({
-  // Home starts 8pt lower than the other screens: the wordmark has the top to itself.
+  // Home starts at the safe area plus 10, with the wordmark alone at the top.
   content: {
-    paddingTop: 20,
+    paddingTop: 10,
   },
   flex: {
     flex: 1,
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.md,
-    marginTop: 28 - YOU_INSET,
+    marginTop: 32 - YOU_INSET,
     marginHorizontal: -YOU_INSET,
     padding: YOU_INSET,
     borderRadius: Radius.lg,
@@ -259,8 +259,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   play: {
-    gap: 10,
-    marginTop: 28 - YOU_INSET,
+    gap: Space.sm,
+    marginTop: 32 - YOU_INSET,
   },
   // A 44pt target around one line of text, pulled in so it reads as part of the note above.
   howTo: {
@@ -296,9 +296,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
     minHeight: 64,
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.xs,
-    borderWidth: 1,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
   },

@@ -11,10 +11,10 @@ import { useT } from '@/i18n';
 
 const timerIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
-/** Ink from 10 seconds left, and once everyone is waiting on the popper. Never red. */
+/** Filled gold from 10 seconds left, and once everyone is waiting on the popper. Never red. */
 const URGENT_FROM = 10;
-const PILL_HEIGHT = 28;
-const ICON_SIZE = 13;
+const PILL_HEIGHT = 32;
+const ICON_SIZE = 14;
 
 type RoundTimerProps = {
   deadline: number | null;
@@ -46,18 +46,21 @@ export function RoundTimer({ deadline, popReminder }: RoundTimerProps) {
       style={[
         styles.pill,
         {
-          backgroundColor: urgent ? theme.inverse : theme.surface,
-          transitionProperty: 'backgroundColor',
+          // A capsule with a 1pt candle-gold ring; it fills gold when time runs short.
+          backgroundColor: urgent ? theme.gold : 'transparent',
+          borderColor: urgent ? theme.gold : 'rgba(233, 190, 114, 0.45)',
+          transitionProperty: ['backgroundColor', 'borderColor'],
           transitionDuration: Motion.state,
           transitionTimingFunction: CssEase.out,
         },
       ]}>
-      <Icon name="timer" size={ICON_SIZE} color={urgent ? theme.onInverse : theme.text} />
+      <Icon name="timer" size={ICON_SIZE} color={urgent ? theme.onInverse : theme.gold} />
       {/* Capped with the rest of the bar, so "Everyone's waiting" never pushes Leave off. */}
       <ThemedText
         type="timer"
-        themeColor={urgent ? 'onInverse' : 'text'}
-        maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}>
+        themeColor={urgent ? 'onInverse' : 'gold'}
+        maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
+        style={styles.digits}>
         {text}
       </ThemedText>
     </Animated.View>
@@ -69,9 +72,14 @@ const styles = StyleSheet.create({
     minHeight: PILL_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xxs,
-    paddingHorizontal: 10,
+    gap: 6,
+    paddingHorizontal: Space.sm,
     borderRadius: Radius.pill,
     borderCurve: 'continuous',
+    borderWidth: 1,
+  },
+  digits: {
+    fontSize: 14,
+    fontWeight: 600,
   },
 });
