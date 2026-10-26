@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
 
-import { MinTouch } from '@/constants/theme';
+import { Colors, MinTouch } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** The balloon in the 120 x 134 box the logo is drawn in. */
@@ -19,23 +19,32 @@ const GLYPHS = [
   'M3368.0 12Q3299.0 12 3245.5 -22.0Q3192.0 -56 3162.0 -116.5Q3132.0 -177 3132.0 -255Q3132.0 -335 3165.0 -395.0Q3198.0 -455 3255.5 -488.5Q3313.0 -522 3386.0 -522Q3447.0 -522 3494.5 -498.0Q3542.0 -474 3570.5 -430.5Q3599.0 -387 3603.0 -330L3604.0 -315H3268.0V-310Q3268.0 -204 3315.0 -140.5Q3362.0 -77 3441.0 -77Q3489.0 -77 3532.5 -100.5Q3576.0 -124 3603.0 -164L3612.0 -161Q3595.0 -110 3559.0 -71.0Q3523.0 -32 3474.0 -10.0Q3425.0 12 3368.0 12ZM3269.0 -330H3472.0Q3472.0 -409 3446.5 -458.0Q3421.0 -507 3375.0 -507Q3331.0 -507 3302.0 -459.0Q3273.0 -411 3269.0 -330Z',
 ];
 
-/** The wordmark at 20 pt (headers), including the string below the baseline. */
-const HEIGHT = 22;
+/** The box is 1.11 em tall: the glyphs plus the string below the baseline. */
+const EM_HEIGHT = 1.11;
 
 /**
  * "Popdate" where the "o" is a crimson lacquer balloon whose gold string hangs
  * below the baseline. Small on purpose: the content leads.
  */
-export function Wordmark() {
-  const theme = useTheme();
-  const width = (HEIGHT * 3676) / 1110;
+type WordmarkProps = {
+  /** The font size in points: 20 in headers, 16 on the recap card, 15 in the Live Activity. */
+  size?: number;
+  /** Draw in one theme whatever the app's theme is, like the recap card, which is always Cream. */
+  tone?: 'velvet' | 'cream';
+};
+
+export function Wordmark({ size = 20, tone }: WordmarkProps) {
+  const current = useTheme();
+  const theme = tone ? Colors[tone === 'cream' ? 'light' : 'dark'] : current;
+  const height = size * EM_HEIGHT;
+  const width = (height * 3676) / 1110;
   return (
     <View
       style={styles.row}
       accessible
       accessibilityRole="header"
       accessibilityLabel="Popdate">
-      <Svg width={width} height={HEIGHT} viewBox="-20 -750 3676 1110">
+      <Svg width={width} height={height} viewBox="-20 -750 3676 1110">
         <Defs>
           <RadialGradient id="wordmarkBalloon" cx="34%" cy="26%" r="78%">
             <Stop offset="0" stopColor="#FF9A92" />
