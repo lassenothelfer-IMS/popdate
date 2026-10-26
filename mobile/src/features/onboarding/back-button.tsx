@@ -7,8 +7,8 @@ import { MinTouch, Space } from '@/constants/theme';
 import { useT } from '@/i18n';
 
 /**
- * A chevron and "Back", a quiet button in the tertiary tone, like the system back button. It's a text action, so it
- * dims while pressed instead of scaling.
+ * A chevron and "Back" in the text color, 15/500, like the system back button. It's a text
+ * action, so it dims while pressed instead of scaling.
  */
 export function BackButton({ onPress }: { onPress: () => void }) {
   const t = useT();
@@ -21,8 +21,8 @@ export function BackButton({ onPress }: { onPress: () => void }) {
       hitSlop={{ left: Space.sm, right: Space.sm }}
       pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-      <Icon name="back" size={17} color={theme.textTertiary} />
-      <ThemedText type="headline" themeColor="textTertiary">
+      <Icon name="back" size={16} color={theme.text} />
+      <ThemedText type="label">
         {t('common.back')}
       </ThemedText>
     </Pressable>
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 2,
+    gap: 4,
     minHeight: MinTouch,
     paddingRight: 6,
     // The chevron's artwork has side bearing; this lines its stroke up with the text below.

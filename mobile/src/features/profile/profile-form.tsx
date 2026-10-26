@@ -4,6 +4,7 @@ import {
   AccessibilityInfo,
   Platform,
   StyleSheet,
+  Text,
   useWindowDimensions,
   View,
   type StyleProp,
@@ -20,7 +21,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { Section } from '@/components/section';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { Gutter, MaxContentWidth, MinTouch, Radius } from '@/constants/theme';
+import { Fonts, Gutter, MaxContentWidth, MinTouch, Radius, Velvet } from '@/constants/theme';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
@@ -28,9 +29,11 @@ import { useSettings } from '@/state/settings';
 import { cmToFeetInches, feetInchesToCm, formatHeight } from '@/utils/units';
 
 export const PHOTO_COUNT = 6;
-/** The grid: three columns of 96pt rows; the lead photo spans two by two. */
-const GRID_GAP = 8;
-const ROW_HEIGHT = 96;
+/** The grid: three columns of 108 pt rows, 10 apart; the lead photo spans two by two. */
+const GRID_GAP = 10;
+const ROW_HEIGHT = 108;
+/** The "Photo n" tag's dark glass, the same on every photo in both themes. */
+const TAG_GLASS = 'rgba(29, 7, 14, 0.55)';
 const LEAD_HEIGHT = ROW_HEIGHT * 2 + GRID_GAP;
 const HEIGHT_MIN = 120;
 const HEIGHT_MAX = 230;
@@ -253,10 +256,12 @@ export type ProfileForm = ReturnType<typeof useProfileForm>;
 type PhotoSectionProps = {
   form: ProfileForm;
   style?: StyleProp<ViewStyle>;
+  /** Just the grid, for a screen whose title already says "photos" (profile setup). */
+  bare?: boolean;
 };
 
 /** "Photos" and the six-slot grid: the lead photo two by two, then five more, in order. */
-export function PhotoSection({ form, style }: PhotoSectionProps) {
+export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
   const t = useT();
   const seats = useSeats();
   const { width: windowWidth } = useWindowDimensions();
@@ -288,25 +293,32 @@ export function PhotoSection({ form, style }: PhotoSectionProps) {
     );
   }
 
+  const grid = (
+    <View
+      style={[styles.grid, bare && style]}
+      onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
+      <View style={styles.gridRow}>
+        {slot(0)}
+        <View style={styles.grid}>
+          {slot(1)}
+          {slot(2)}
+        </View>
+      </View>
+      <View style={styles.gridRow}>
+        {slot(3)}
+        {slot(4)}
+        {slot(5)}
+      </View>
+    </View>
+  );
+  if (bare) return grid;
+
   return (
     <Section
       title={t('profile.photos')}
       aside={t('profile.photosCount', { filled: photos.length, total: PHOTO_COUNT })}
       style={[styles.section, style]}>
-      <View style={styles.grid} onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
-        <View style={styles.gridRow}>
-          {slot(0)}
-          <View style={styles.grid}>
-            {slot(1)}
-            {slot(2)}
-          </View>
-        </View>
-        <View style={styles.gridRow}>
-          {slot(3)}
-          {slot(4)}
-          {slot(5)}
-        </View>
-      </View>
+      {grid}
     </Section>
   );
 }
@@ -343,13 +355,21 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
           style={StyleSheet.absoluteFill}
           accessibilityLabel={t('profile.yourPhoto', { position })}
         />
-        {/* The order is the point of this grid, so every photo wears its number. */}
+        {/* The order is the point of this grid, so every photo wears its number. The
+            lead says which round sees it, on the text color; the rest on dark glass. */}
         <View
-          style={[styles.number, { backgroundColor: theme.surface, borderColor: theme.borderStrong }]}
+          style={[
+            styles.number,
+            lead ? styles.leadTag : styles.smallTag,
+            { backgroundColor: lead ? theme.inverse : TAG_GLASS },
+          ]}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
-          <ThemedText type="captionStrong" maxFontSizeMultiplier={1.2}>
-            {position}
+          <ThemedText
+            type="captionStrong"
+            maxFontSizeMultiplier={1.2}
+            style={[styles.tagText, { color: lead ? theme.onInverse : Velvet.cream }]}>
+            {lead ? t('profile.roundTag', { round: 1 }) : position}
           </ThemedText>
         </View>
         <PressableScale
@@ -357,32 +377,50 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
           accessibilityLabel={t('profile.removePhoto', { position })}
           onPress={onRemove}
           containerStyle={styles.removeTarget}
-          style={[styles.removeCircle, { backgroundColor: theme.inverse }]}>
-          <Icon name="close" size={10} color={theme.onInverse} />
+          style={[styles.removeCircle, { backgroundColor: theme.field }]}>
+          <Icon name="close" size={10} color={theme.text} />
         </PressableScale>
       </View>
     );
   }
 
-  if (isNext) {
-    const title = lead ? t('profile.addLeadPhoto') : t('profile.add');
+  if (isNext && lead) {
+    // The first photo: the one place to tap, on accent soft with a coral edge.
     return (
       <PressableHighlight
         accessibilityRole="button"
-        accessibilityLabel={lead ? title : t('profile.addPhotosLabel')}
+        accessibilityLabel={t('profile.addLeadPhoto')}
         accessibilityHint={t('profile.addPhotoHint', { position })}
         onPress={onAdd}
-        background={theme.field}
-        style={[styles.slot, styles.addSlot, size, { borderColor: theme.borderStrong }]}>
-        <Icon name="add" size={lead ? 28 : 22} color={theme.gold} />
+        background={theme.accentWash}
+        style={[styles.slot, styles.addSlot, size, { boxShadow: `inset 0 0 0 1.5px ${theme.accent}` }]}>
+        <Icon name="add" size={28} color={theme.accentText} />
         {/* The slot keeps its size, so the label shrinks rather than overflow it. */}
         <ThemedText
           type="headline"
-          numberOfLines={lead ? 2 : 1}
+          themeColor="accentText"
+          numberOfLines={2}
           adjustsFontSizeToFit
-          style={styles.addLabel}>
-          {title}
+          style={[styles.addLabel, styles.addTitle]}>
+          {t('profile.firstPhoto')}
         </ThemedText>
+        <ThemedText type="caption" themeColor="accentText" style={[styles.addLabel, styles.addNote]}>
+          {t('profile.roundSees', { round: 1 })}
+        </ThemedText>
+      </PressableHighlight>
+    );
+  }
+
+  if (isNext) {
+    return (
+      <PressableHighlight
+        accessibilityRole="button"
+        accessibilityLabel={t('profile.addPhotosLabel')}
+        accessibilityHint={t('profile.addPhotoHint', { position })}
+        onPress={onAdd}
+        background={theme.surface}
+        style={[styles.slot, styles.addSlot, size]}>
+        <Icon name="add" size={22} color={theme.textSecondary} />
       </PressableHighlight>
     );
   }
@@ -391,10 +429,10 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
     <View
       accessible
       accessibilityLabel={t('profile.emptySlot', { position })}
-      style={[styles.slot, styles.emptySlot, size, { backgroundColor: theme.surface, borderColor: theme.outline }]}>
-      <ThemedText type="label" themeColor="textFaint" numberOfLines={1} adjustsFontSizeToFit>
+      style={[styles.slot, size, { backgroundColor: theme.surface }]}>
+      <Text style={[styles.emptyNumber, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
         {position}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
@@ -402,66 +440,89 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
 type DetailsSectionProps = {
   form: ProfileForm;
   style?: StyleProp<ViewStyle>;
+  /** Just the fields, for a screen whose title already introduces them (profile setup). */
+  bare?: boolean;
 };
 
-/** "About you": first name, city, height (in your units), job or school, and the bio. */
-export function DetailsSection({ form, style }: DetailsSectionProps) {
+/**
+ * "About you": first name and city, then height (in your units) beside job or
+ * school, then the bio with what is left of its length.
+ */
+export function DetailsSection({ form, style, bare = false }: DetailsSectionProps) {
   const t = useT();
   const bioLeft = BIO_MAX - form.bio.length;
+  const metric = form.height.units === 'metric';
+  const job = (
+    <TextField
+      label={t('profile.jobOrSchool')}
+      value={form.job}
+      onChangeText={form.setJob}
+      maxLength={60}
+    />
+  );
+
+  const fields = (
+    <View style={[styles.fields, bare && style]}>
+      <TextField
+        label={t('profile.firstName')}
+        value={form.name}
+        onChangeText={form.setName}
+        maxLength={30}
+        autoCapitalize="words"
+        autoComplete="given-name"
+        textContentType="givenName"
+      />
+      <TextField
+        label={t('profile.city')}
+        value={form.city}
+        onChangeText={form.setCity}
+        maxLength={40}
+        autoCapitalize="words"
+        textContentType="addressCity"
+      />
+      {/* Checked inline by the ring, icon and message. No error haptic: that's for the save.
+          Centimeters fit beside the job; feet and inches need the whole row. */}
+      {metric ? (
+        <View style={styles.pair}>
+          <View style={styles.pairPart}>
+            <TextField
+              label={t('profile.height')}
+              accessibilityLabel={t('profile.heightCmLabel')}
+              value={form.height.cm}
+              onChangeText={(text) => form.changeHeight('cm', text)}
+              onBlur={form.blurHeight}
+              keyboardType="number-pad"
+              maxLength={3}
+              suffix={t('profile.cm')}
+              error={form.showHeightError}
+              hint={form.showHeightError ? form.heightError : undefined}
+            />
+          </View>
+          <View style={styles.pairPart}>{job}</View>
+        </View>
+      ) : (
+        <>
+          <ImperialHeight form={form} />
+          {job}
+        </>
+      )}
+      <TextField
+        label={t('profile.bio')}
+        value={form.bio}
+        onChangeText={form.setBio}
+        maxLength={BIO_MAX}
+        multiline
+        placeholder={t('profile.bioPlaceholder')}
+        hint={t('profile.bioShown')}
+        counter={t('profile.charactersLeft', { count: bioLeft })}
+      />
+    </View>
+  );
+  if (bare) return fields;
 
   return (
     <Section title={t('profile.aboutYou')} style={[styles.section, style]}>
-      <View style={styles.fields}>
-        <TextField
-          label={t('profile.firstName')}
-          value={form.name}
-          onChangeText={form.setName}
-          maxLength={30}
-          autoCapitalize="words"
-          autoComplete="given-name"
-          textContentType="givenName"
-        />
-        <TextField
-          label={t('profile.city')}
-          value={form.city}
-          onChangeText={form.setCity}
-          maxLength={40}
-          autoCapitalize="words"
-          textContentType="addressCity"
-        />
-        {/* Checked inline by the ring, icon and message. No error haptic: that's for the save. */}
-        {form.height.units === 'metric' ? (
-          <TextField
-            label={t('profile.height')}
-            accessibilityLabel={t('profile.heightCmLabel')}
-            value={form.height.cm}
-            onChangeText={(text) => form.changeHeight('cm', text)}
-            onBlur={form.blurHeight}
-            keyboardType="number-pad"
-            maxLength={3}
-            suffix={t('profile.cm')}
-            error={form.showHeightError}
-            hint={form.showHeightError ? form.heightError : undefined}
-          />
-        ) : (
-          <ImperialHeight form={form} />
-        )}
-        <TextField
-          label={t('profile.jobOrSchool')}
-          value={form.job}
-          onChangeText={form.setJob}
-          maxLength={60}
-        />
-        <TextField
-          label={t('profile.bio')}
-          value={form.bio}
-          onChangeText={form.setBio}
-          maxLength={BIO_MAX}
-          multiline
-          placeholder={t('profile.bioPlaceholder')}
-          counter={t('profile.charactersLeft', { count: bioLeft })}
-        />
-      </View>
+      {fields}
     </Section>
   );
 }
@@ -551,29 +612,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // The next empty slot: a dashed gold edge on plush, so it reads as the place to tap.
+  // The next slot to fill: the place to tap.
   addSlot: {
     gap: 8,
     padding: 8,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  emptySlot: {
-    borderWidth: StyleSheet.hairlineWidth,
   },
   addLabel: {
     textAlign: 'center',
   },
+  addTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  addNote: {
+    opacity: 0.8,
+  },
+  emptyNumber: {
+    fontFamily: Fonts.serif,
+    fontSize: 20,
+    lineHeight: 24,
+  },
   number: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 22,
-    height: 22,
     borderRadius: Radius.pill,
-    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  leadTag: {
+    top: 10,
+    left: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+  },
+  smallTag: {
+    top: 8,
+    left: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  tagText: {
+    fontSize: 11,
+    lineHeight: 13,
   },
   removeTarget: {
     position: 'absolute',
@@ -585,14 +664,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   removeCircle: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fields: {
-    gap: 12,
+    gap: 16,
+  },
+  pair: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  pairPart: {
+    flex: 1,
   },
   // Matches TextField's own label-to-box spacing.
   heightGroup: {
