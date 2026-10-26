@@ -14,35 +14,61 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
-import { api, type Match, type Message, type ReportReason } from '@/api';
+import { api, type Match, type Message, type ReportReason, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
+import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MinTouch, Motion, Space } from '@/constants/theme';
+import { Ease, Gutter, Motion, Space } from '@/constants/theme';
 import { ChatComposer } from '@/features/chat/chat-composer';
-import { MessageList } from '@/features/chat/message-list';
+import { MessageList, type Seed } from '@/features/chat/message-list';
 import { acknowledge, confirmStep, useChoice } from '@/features/chat/prompts';
-import { BackButton } from '@/features/onboarding/back-button';
+import { ReportSheet } from '@/features/chat/report-sheet';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useFilterText, useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
 
-/** The reasons in the order the report sheet lists them. */
-const REPORT_REASONS: { reason: ReportReason; key: string }[] = [
-  { reason: 'harassment', key: 'chat.reasonHarassment' },
-  { reason: 'inappropriate', key: 'chat.reasonInappropriate' },
-  { reason: 'fake', key: 'chat.reasonFake' },
-  { reason: 'underage', key: 'chat.reasonUnderage' },
-  { reason: 'spam', key: 'chat.reasonSpam' },
-  { reason: 'other', key: 'chat.reasonOther' },
-];
+/** The seed's pieces are always these, so the first open knows to rise them in before the room loads. */
+const SEED_KEYS = ['seed-pill', 'seed-question', 'seed-answer'] as const;
+
+/**
+ * The room's last round at the top of the chat: who asked what, and the answer
+ * that kept the last balloon. The room only keeps its final round, so earlier
+ * rounds can't be seeded yet.
+ */
+function seedFromRoom(room: Room | null | undefined, myId: string, t: Translate): Seed | null {
+  if (!room || room.status !== 'finished' || !room.question) return null;
+  const winner = room.contestants.find((contestant) => contestant.id === room.winnerId);
+  const round = room.round;
+  const askedByMe = room.popper.id === myId;
+  const entries: Seed['entries'] = [
+    {
+      key: SEED_KEYS[1],
+      mine: askedByMe,
+      label: askedByMe ? t('chat.youAsked', { round }) : t('chat.theyAsked', { name: room.popper.name, round }),
+      text: room.question.text,
+      question: true,
+    },
+  ];
+  if (winner?.answer) {
+    const answeredByMe = winner.id === myId;
+    entries.push({
+      key: SEED_KEYS[2],
+      mine: answeredByMe,
+      label: answeredByMe ? t('chat.youAnswered') : t('chat.theyAnswered', { name: winner.name }),
+      text: winner.answer,
+      question: false,
+    });
+  }
+  return { pill: t('chat.seedPill', { count: room.totalRounds }), entries };
+}
 
 /** Within this distance of the end, a new message scrolls into view; further up, you're reading. */
 const NEAR_END = 80;
@@ -139,10 +165,14 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const [error, setError] = useState<string | null>(null);
   /** Their latest message, for Android's and the web's live region. */
   const [heard, setHeard] = useState<string | null>(null);
+  /** What was on screen when the chat opened: only that rises in. */
+  const [firstOpen, setFirstOpen] = useState<ReadonlySet<string> | null>(null);
+  const [reporting, setReporting] = useState(false);
 
   const { name, age } = match.other;
   const tone = seatFor(seats, match.other.id);
   const formatTime = makeTimeFormat(locale, region);
+  const seed = seedFromRoom(room, myId, t);
   // You were the one picked when you're the room's winner; otherwise you chose together.
   const winner = room?.winnerId != null && room.winnerId === myId;
   const emptyLine = t(winner ? 'chat.emptyWinner' : 'chat.emptyTogether', { name });
@@ -164,6 +194,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       setMessages(list);
       if (seen === null) {
         seen = new Set(list.map((message) => message.id));
+        setFirstOpen(new Set([...SEED_KEYS, ...seen]));
         return;
       }
       for (const message of list) {
@@ -214,24 +245,20 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       title: t('common.nameAge', { name, age }),
       choices: [{ label: t('chat.report') }, { label: t('chat.block'), destructive: true }],
     });
-    if (picked === 0) await report();
+    if (picked === 0) setReporting(true);
     if (picked === 1) await block();
   }
 
-  async function report() {
-    const picked = await choose({
-      title: t('chat.reportTitle', { name }),
-      message: t('chat.reportMessage', { name }),
-      choices: REPORT_REASONS.map(({ key }) => ({ label: t(key) })),
-    });
-    if (picked === null) return;
+  async function report(reason: ReportReason) {
     setBusy(true);
     setError(null);
     try {
-      await api.report(match.other.id, REPORT_REASONS[picked].reason);
+      await api.report(match.other.id, reason);
       haptics.success();
+      setReporting(false);
       acknowledge(t('chat.reported'));
     } catch {
+      setReporting(false);
       fail(t('chat.reportFailed'));
     } finally {
       setBusy(false);
@@ -273,19 +300,29 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
           />
         </>
       }>
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <View style={styles.back}>
-          <BackButton onPress={leave} />
-        </View>
+      <View style={styles.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+          onPress={leave}
+          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          style={({ pressed }) => [styles.iconButton, styles.back, pressed && styles.pressed]}>
+          <Icon name="back" size={20} color={theme.text} />
+        </Pressable>
         <View
           accessible
           accessibilityRole="header"
-          accessibilityLabel={t('common.nameAge', { name, age })}
+          accessibilityLabel={`${t('common.nameAge', { name, age })}, ${t('chat.matchedAt', { time: formatTime(match.createdAt) })}`}
           style={styles.person}>
           <Avatar name={name} uri={match.other.photo} tone={tone} size={40} />
-          <ThemedText type="row" numberOfLines={1} style={styles.name}>
-            {t('common.nameAge', { name, age })}
-          </ThemedText>
+          <View style={styles.name}>
+            <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
+              {t('common.nameAge', { name, age })}
+            </ThemedText>
+            <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1}>
+              {t('chat.matchedAt', { time: formatTime(match.createdAt) })}
+            </ThemedText>
+          </View>
         </View>
         <OptionsButton
           label={t('chat.options')}
@@ -313,7 +350,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         onLayout={() => {
           if (nearEnd.current) scrollToEnd(false);
         }}>
-        {messages === null ? null : messages.length === 0 ? (
+        {messages === null ? null : messages.length === 0 && !seed ? (
           <Animated.View entering={contentIn} style={styles.empty}>
             <Avatar name={name} uri={match.other.photo} tone={tone} size={64} />
             <ThemedText type="body" themeColor="textSecondary" style={styles.centeredText}>
@@ -321,15 +358,15 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
             </ThemedText>
           </Animated.View>
         ) : (
-          <Animated.View entering={contentIn}>
-            <MessageList
-              messages={messages}
-              myId={myId}
-              name={name}
-              filter={filter}
-              formatTime={formatTime}
-            />
-          </Animated.View>
+          <MessageList
+            messages={messages}
+            myId={myId}
+            name={name}
+            filter={filter}
+            formatTime={formatTime}
+            seed={seed}
+            firstOpen={firstOpen}
+          />
         )}
       </ScrollView>
 
@@ -341,6 +378,13 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       ) : null}
 
       {sheet}
+      <ReportSheet
+        visible={reporting}
+        name={name}
+        sending={busy}
+        onCancel={() => setReporting(false)}
+        onReport={(reason) => void report(reason)}
+      />
     </Screen>
   );
 }
@@ -394,32 +438,42 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
   },
+  // The handoff's chat header: back, a 40 pt avatar, name over when you matched, options.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xs,
+    gap: Space.sm,
     minHeight: 56,
     paddingHorizontal: Gutter,
     paddingBottom: Space.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  back: {
+  iconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  // The chevron lines up with the gutter.
+  back: {
+    marginLeft: -10,
   },
   person: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Space.sm,
   },
   name: {
     flexShrink: 1,
+    gap: 1,
   },
-  // The glyph lines up with the gutter; the touch area stays 44pt.
+  nameText: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
   options: {
-    width: MinTouch,
-    height: MinTouch,
-    marginRight: -Space.sm,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },

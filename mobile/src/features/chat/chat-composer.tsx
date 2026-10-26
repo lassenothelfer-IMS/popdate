@@ -4,7 +4,7 @@ import { AccessibilityInfo, ActivityIndicator, Platform, StyleSheet, TextInput, 
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, MinTouch, Radius, Space } from '@/constants/theme';
+import { Fonts, Space } from '@/constants/theme';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
@@ -14,11 +14,12 @@ export const MAX_MESSAGE_LENGTH = 1000;
 const COUNTER_FROM = 900;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */
 const SPOKEN_COUNTS = [0, 10, 20, MAX_MESSAGE_LENGTH - COUNTER_FROM];
-/** One line of message. The field grows from here as the message wraps. */
-const FIELD_HEIGHT = 52;
+/** One line of message: a 48 pt pill. The field grows from here as the message wraps. */
+const FIELD_HEIGHT = 48;
 /** About four lines, then the field scrolls. */
 const FIELD_MAX_HEIGHT = 120;
-const SEND_SIZE = MinTouch;
+/** The send button sits inside the pill, 6 pt from its right end. */
+const SEND_SIZE = 36;
 
 type ChatComposerProps = {
   /** The draft lives in the screen, so a failed send keeps it. */
@@ -30,7 +31,7 @@ type ChatComposerProps = {
   name: string;
 };
 
-/** The message field on plush and a cream send button side by side, like the room's answer composer. */
+/** The message field: a pill on surface 1 with a strong hairline, and the send button inside it. */
 export function ChatComposer({ value: text, onChangeText, onSend, sending, name }: ChatComposerProps) {
   const t = useT();
   const theme = useTheme();
@@ -62,29 +63,30 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
 
   return (
     <View style={styles.composer}>
-      <View style={styles.row}>
-        <View
-          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.outline }]}>
-          <TextInput
-            accessibilityLabel={t('chat.messageLabel')}
-            placeholder={t('chat.placeholder', { name })}
-            placeholderTextColor={theme.textFaint}
-            keyboardAppearance={scheme}
-            selectionColor={theme.gold}
-            // Read when the field gets focus, once the count shows.
-            accessibilityHint={text.length >= COUNTER_FROM ? countLabel : undefined}
-            value={text}
-            onChangeText={changeText}
-            maxLength={MAX_MESSAGE_LENGTH}
-            multiline
-            // A web textarea opens two rows tall; start at one.
-            rows={Platform.OS === 'web' ? 1 : undefined}
-            autoCapitalize="sentences"
-            // The box's edge frames the field; drop the browser's outline around the text area.
-            style={[styles.input, Platform.OS === 'web' && styles.noOutline, { color: theme.text }]}
-          />
-        </View>
-        {/* Always cream; it only answers once there is something to send. */}
+      <View
+        style={[
+          styles.pill,
+          { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.borderStrong}` },
+        ]}>
+        <TextInput
+          accessibilityLabel={t('chat.messageLabel')}
+          placeholder={t('chat.placeholder', { name })}
+          placeholderTextColor={theme.textTertiary}
+          keyboardAppearance={scheme}
+          selectionColor={theme.text}
+          // Read when the field gets focus, once the count shows.
+          accessibilityHint={text.length >= COUNTER_FROM ? countLabel : undefined}
+          value={text}
+          onChangeText={changeText}
+          maxLength={MAX_MESSAGE_LENGTH}
+          multiline
+          // A web textarea opens two rows tall; start at one.
+          rows={Platform.OS === 'web' ? 1 : undefined}
+          autoCapitalize="sentences"
+          // The pill's edge frames the field; drop the browser's outline around the text area.
+          style={[styles.input, Platform.OS === 'web' && styles.noOutline, { color: theme.text }]}
+        />
+        {/* Always in the text color; it only answers once there is something to send. */}
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={t('chat.send')}
@@ -97,7 +99,7 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
           {sending ? (
             <ActivityIndicator color={theme.onInverse} />
           ) : (
-            <Icon name="send" size={18} color={theme.onInverse} />
+            <Icon name="send" size={16} color={theme.onInverse} />
           )}
         </PressableScale>
       </View>
@@ -114,36 +116,33 @@ const styles = StyleSheet.create({
   composer: {
     gap: Space.xxs,
   },
-  row: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: Space.xs,
-  },
-  box: {
-    flex: 1,
-    justifyContent: 'center',
     minHeight: FIELD_HEIGHT,
-    borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: FIELD_HEIGHT / 2,
     borderCurve: 'continuous',
-    paddingHorizontal: Space.md,
+    paddingLeft: Space.md,
+    paddingRight: 6,
   },
-  // 14 above and below a 22pt line fills the 52pt field inside its 1pt edge.
+  // 13.5 above and below a 21 pt line fills the 48 pt pill.
   input: {
+    flex: 1,
     maxHeight: FIELD_MAX_HEIGHT,
     paddingHorizontal: 0,
-    paddingTop: 14,
-    paddingBottom: 14,
+    paddingTop: 13.5,
+    paddingBottom: 13.5,
     fontFamily: Fonts.sans,
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 21,
     textAlignVertical: 'top',
   },
   noOutline: {
     outlineWidth: 0,
   },
-  // Centered on a one-line field, and stays at the bottom as the field grows.
+  // Centered on a one-line pill, and stays at the bottom as the field grows.
   sendSlot: {
+    marginLeft: Space.xs,
     marginBottom: (FIELD_HEIGHT - SEND_SIZE) / 2,
   },
   send: {
