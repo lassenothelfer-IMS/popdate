@@ -60,6 +60,7 @@ import { RoomBar } from '@/features/game/room-bar';
 import { LockLine, MY_PHOTO_FRAME, MyPhoto, QuestionBlock } from '@/features/game/room-blocks';
 import { RoundTimer } from '@/features/game/round-timer';
 import { usePopBeat } from '@/features/game/use-pop-beat';
+import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useRoom } from '@/hooks/use-server';
 import { useTextScale } from '@/hooks/use-text-scale';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
@@ -104,6 +105,12 @@ const TIGHT_SPACING: RevealSpacing = {
 
 /** A failed call, and the phase it was made in. Null for leave and replay: those stay until the next call. */
 type CallError = { phase: string | null; message: string };
+
+/** Renders nothing. While it is mounted, Android's back button runs `onBack` instead. */
+function BackAsksToLeave({ onBack }: { onBack: () => void }) {
+  useHardwareBack(onBack);
+  return null;
+}
 
 function phaseLabel(t: Translate, status: Exclude<RoomStatus, 'finished'>) {
   switch (status) {
@@ -287,6 +294,16 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     if (shownError && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(shownError);
   }, [shownError]);
 
+  // An Alert outlives the room: once the game ends or hands off, its Leave does nothing.
+  const roomLive = useRef(true);
+  const live = room != null && room.status !== 'finished';
+  useEffect(() => {
+    roomLive.current = live;
+    return () => {
+      roomLive.current = false;
+    };
+  }, [live]);
+
   if (room === undefined) return <LoadingScreen label={t('game.loadingRoom')} />;
   if (room === null) {
     return (
@@ -396,6 +413,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   }
 
   function confirmLeave() {
+    if (!roomLive.current) return;
     haptics.medium();
     void leave();
   }
@@ -407,7 +425,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
       : t('game.leaveWatching');
 
   function askLeave() {
-    if (leaving) return;
+    if (leaving || replaying) return;
     // Alert does nothing on the web, so the web confirms in a sheet instead.
     if (Platform.OS === 'web') {
       setLeaveFailed(false);
@@ -674,11 +692,14 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   // popped view says nothing about the room, and the room you stay to watch, or the
   // result once the game ends, is said as it takes over.
   const announcer = <Announcer text={showPopped ? null : spokenPhase()} />;
+  // Android's back button asks first, like Leave, so it can't walk out of a live game.
+  const backAsks = finished ? null : <BackAsksToLeave onBack={askLeave} />;
 
   if (showPopped && me) {
     return (
       <>
         {announcer}
+        {backAsks}
         <PoppedView
           popperName={room.popper.name}
           round={me.poppedInRound}
@@ -871,6 +892,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   return (
     <>
       {announcer}
+      {backAsks}
       {/* Whatever is already there when the room opens renders still, and nothing
           fades out when the room itself goes away. Only changes animate. */}
       <LayoutAnimationConfig skipEntering skipExiting>

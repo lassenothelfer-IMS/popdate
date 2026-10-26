@@ -64,7 +64,8 @@ export function Screen({
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.fill}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Android draws edge to edge, so the window no longer shrinks for the keyboard either.
+          behavior={Platform.OS === 'web' ? undefined : 'padding'}
           // The keyboard covers the home-indicator inset, so the footer sits 12 above it, not 34.
           keyboardVerticalOffset={footer ? -(bottom - Space.sm) : 0}>
           {scroll ? (

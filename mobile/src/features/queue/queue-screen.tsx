@@ -15,6 +15,7 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { CssEase, Ease, Fonts, Gutter, Motion, Space } from '@/constants/theme';
 import { PopperSeat } from '@/features/queue/popper-seat';
+import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
 import { useT, type Translate } from '@/i18n';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
@@ -249,6 +250,10 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
     entered.current = true;
     openRoom(roomId);
   }
+
+  // Android's back button cancels like the button, so the queue doesn't fill a room
+  // you've left. Once you're matched it does nothing: the room is on its way.
+  useHardwareBack(() => void handleCancel());
 
   return (
     <Screen

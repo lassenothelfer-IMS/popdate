@@ -45,7 +45,8 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -180,6 +180,8 @@ export function SettingsScreen() {
     try {
       await action();
       haptics.medium();
+      // Onboarding starts a fresh stack, with no home left underneath to go back to.
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/onboarding');
     } catch {
       setEnding(null);
