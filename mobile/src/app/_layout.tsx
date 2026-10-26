@@ -11,6 +11,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { ApiProvider } from '@/api/provider';
 import { Colors, Fonts } from '@/constants/theme';
 import { useScheme } from '@/hooks/use-theme';
 import { SessionProvider } from '@/state/session';
@@ -42,11 +43,13 @@ export default function RootLayout() {
 
   // Settings sit above the theme, so your Appearance and Language apply to every screen.
   return (
-    <SessionProvider>
-      <SettingsProvider>
-        <ThemedStack />
-      </SettingsProvider>
-    </SessionProvider>
+    <ApiProvider>
+      <SessionProvider>
+        <SettingsProvider>
+          <ThemedStack />
+        </SettingsProvider>
+      </SessionProvider>
+    </ApiProvider>
   );
 }
 
