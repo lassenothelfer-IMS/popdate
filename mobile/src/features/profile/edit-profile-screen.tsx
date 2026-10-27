@@ -106,9 +106,7 @@ export function EditProfileScreen() {
             onPress={goBack}
             hitSlop={8}
             style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}>
-            <ThemedText type="label" themeColor="accentText">
-              {t('common.cancel')}
-            </ThemedText>
+            <ThemedText type="label">{t('common.cancel')}</ThemedText>
           </Pressable>
           <ThemedText type="headline" accessibilityRole="header">
             {t('settings.editProfile')}

@@ -33,15 +33,15 @@ const velvet = {
   borderStrong: 'rgba(217, 154, 163, 0.35)',
   /** The empty ring of a radio or checkbox. */
   control: '#CDBCC3',
-  /** Accent: the primary button fill, selected chips, radios and checkboxes, the toggle on, the You tag. */
-  inverse: '#D99AA3',
+  /** Ink: selected chips, radios and checkboxes, the You tag. Primary buttons use the accent. */
+  inverse: '#F8EDEB',
   onInverse: '#30262F',
   /** A light edge for fills that want one. */
   highlight: 'rgba(255, 255, 255, 0.25)',
-  /** Accent: the Pop and Match buttons, active progress, the unread dot. */
+  /** Accent: primary buttons, Pop and Match, active progress, the toggle on, the unread dot. */
   accent: '#D99AA3',
   onAccent: '#30262F',
-  /** Accent as text: links, text buttons, the back arrow, Save. */
+  /** Accent as text, sparingly: Save, "Write your own". Links and text buttons use the text tones. */
   accentText: '#D99AA3',
   /** Accent soft: error cards, the selected question row. */
   accentWash: '#49323D',
@@ -68,9 +68,9 @@ const velvet = {
 
 const cream: Palette = {
   page: '#FFF9F6',
-  surface: '#F7D7C9',
-  surfacePressed: '#F4C4AE',
-  field: '#FCEDEE',
+  surface: '#F2E8E3',
+  surfacePressed: '#EADDD7',
+  field: '#FBF4F1',
   text: '#3A2A2A',
   textSecondary: '#7A6262',
   textTertiary: '#7A6262',
@@ -79,22 +79,22 @@ const cream: Palette = {
   outline: 'rgba(184, 117, 125, 0.18)',
   borderStrong: 'rgba(184, 117, 125, 0.35)',
   control: '#7A6262',
-  inverse: '#B8757D',
+  inverse: '#3A2A2A',
   onInverse: '#FFF9F6',
   highlight: 'rgba(255, 255, 255, 0.25)',
   accent: '#B8757D',
   onAccent: '#FFF9F6',
-  accentText: '#B8757D',
+  accentText: '#8F5A60',
   accentWash: '#FCEDEE',
   gold: '#8F5A60',
-  track: '#F7D7C9',
-  paper: '#FCEDEE',
+  track: '#EADDD7',
+  paper: '#FBF4F1',
   onPaper: '#3A2A2A',
   danger: '#CF3A2F',
   success: '#1F7A4C',
   successFill: '#1F7A4C',
   scrim: 'rgba(58, 42, 42, 0.35)',
-  sheet: '#FCEDEE',
+  sheet: '#FBF4F1',
   secondary: '#F7D7C9',
   onSecondary: '#3A2A2A',
 };

@@ -12,7 +12,7 @@ type ButtonProps = {
    * `primary`: the one main action of a screen, a full-width rose button.
    * `coral`: Pop, Match, Recording, and Pop and report. Rose like the primary now.
    * `secondary`: a quieter peach alternative.
-   * `ghost`: a 44 pt rose text button under the primary, like "Skip" or "Stay and watch".
+   * `ghost`: a 44 pt text button under the primary, like "Skip" or "Stay and watch".
    */
   variant?: 'primary' | 'coral' | 'secondary' | 'ghost';
   /** Drawn before the title, like the target's balloon in "Pop Sara's balloon". */
@@ -36,10 +36,10 @@ export function Button({
   const scheme = useScheme();
   const inactive = disabled && !loading;
   const fills = {
-    primary: { background: theme.inverse, label: theme.onInverse },
+    primary: { background: theme.accent, label: theme.onAccent },
     coral: { background: theme.accent, label: theme.onAccent },
     secondary: { background: theme.secondary, label: theme.onSecondary },
-    ghost: { background: 'transparent', label: theme.accentText },
+    ghost: { background: 'transparent', label: theme.textSecondary },
   } as const;
   const fill = inactive
     ? {
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     fontWeight: 600,
     textAlign: 'center',
   },
-  /** Text buttons: 15/500 in the accent. */
+  /** Text buttons: 15/500 in the secondary tone. */
   textLabel: {
     fontSize: 15,
     lineHeight: 20,

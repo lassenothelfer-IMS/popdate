@@ -283,7 +283,7 @@ export function OnboardingScreen() {
             onPress={() => goTo('birthday')}
             hitSlop={{ top: 8, bottom: 8, left: Space.sm, right: Space.sm }}
             style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
-            <ThemedText type="label" themeColor="accentText">
+            <ThemedText type="label" themeColor="textSecondary">
               {t('onboarding.skip')}
             </ThemedText>
           </Pressable>
@@ -404,11 +404,11 @@ export function OnboardingScreen() {
                   on either link toggles the box like the rest of it. */}
               <ThemedText type="callout" style={[styles.flex, styles.termsText]}>
                 {t('onboarding.termsBefore')}
-                <ThemedText accessibilityRole="link" themeColor="accentText" style={styles.link}>
+                <ThemedText accessibilityRole="link" style={styles.link}>
                   {t('onboarding.terms')}
                 </ThemedText>
                 {t('onboarding.termsAnd')}
-                <ThemedText accessibilityRole="link" themeColor="accentText" style={styles.link}>
+                <ThemedText accessibilityRole="link" style={styles.link}>
                   {t('onboarding.privacy')}
                 </ThemedText>
                 {t('onboarding.termsAfter')}
