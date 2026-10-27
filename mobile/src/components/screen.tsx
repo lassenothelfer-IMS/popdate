@@ -1,12 +1,18 @@
-import { useEffect, useId, type ReactNode } from 'react';
+import { createContext, use, useEffect, useId, useRef, type ReactNode } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
   type StyleProp,
+  type TextInputInstance,
+  type ViewInstance,
   type ViewStyle,
 } from 'react-native';
 import Animated, {
@@ -33,7 +39,8 @@ export function Grain() {
   const scheme = useScheme();
   const { width, height } = useWindowDimensions();
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  if (scheme !== 'dark') return null;
+  // The web reports a zero-size window at first; the gradients' stops would be NaN.
+  if (scheme !== 'dark' || !width || !height) return null;
   return (
     <View
       style={StyleSheet.absoluteFill}
@@ -103,6 +110,77 @@ function BreathingLamp({ width, height, gradient }: { width: number; height: num
   );
 }
 
+/** Room left between a revealed field and the edge of what you can see. */
+const REVEAL_MARGIN = Space.md;
+/** Lets the keyboard's room settle into the layout before a field is measured. */
+const REVEAL_DELAY = 60;
+
+const RevealContext = createContext<((input: TextInputInstance | null) => void) | null>(null);
+
+/**
+ * Inside a scrolling Screen: call it with a field as it gains focus (or grows
+ * while you type) and the screen scrolls it clear of the keyboard and footer.
+ * Null outside one.
+ */
+export function useRevealField() {
+  return use(RevealContext);
+}
+
+/**
+ * Keeps the focused field in view. The keyboard avoider only shrinks the scroll
+ * area, so without this a field low on the page stays hidden under the footer
+ * while you type into it.
+ */
+function useFieldReveal(enabled: boolean) {
+  const viewportRef = useRef<ViewInstance>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollY = useRef(0);
+  const target = useRef<TextInputInstance | null>(null);
+
+  function scrollIntoView() {
+    const input = target.current;
+    const viewport = viewportRef.current;
+    if (!input || !viewport || !input.isFocused()) return;
+    viewport.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
+      input.measureInWindow((_x, top, _w, height) => {
+        const visibleTop = viewTop + REVEAL_MARGIN;
+        const visibleBottom = viewTop + viewHeight - REVEAL_MARGIN;
+        // Below the fold: bring its bottom up, where the caret of a growing bio is.
+        const below = top + height - visibleBottom;
+        const delta = below > 0 ? below : top < visibleTop ? top - visibleTop : 0;
+        if (delta === 0) return;
+        scrollRef.current?.scrollTo({ y: Math.max(0, scrollY.current + delta), animated: true });
+      });
+    });
+  }
+
+  useEffect(() => {
+    if (!enabled || Platform.OS === 'web') return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      clearTimeout(timer);
+      timer = setTimeout(scrollIntoView, REVEAL_DELAY);
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [enabled]);
+
+  function reveal(input: TextInputInstance | null) {
+    target.current = input;
+    // On a first focus the keyboard is still coming up: keyboardDidShow measures then.
+    // Moving between fields, it's already up and the layout is final.
+    if (Platform.OS !== 'web' && Keyboard.isVisible()) setTimeout(scrollIntoView, REVEAL_DELAY);
+  }
+
+  function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    scrollY.current = event.nativeEvent.contentOffset.y;
+  }
+
+  return { viewportRef, scrollRef, onScroll, reveal };
+}
+
 type ScreenProps = {
   children: ReactNode;
   /** Pinned below the content, above the keyboard. */
@@ -126,6 +204,7 @@ export function Screen({
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { viewportRef, scrollRef, onScroll, reveal } = useFieldReveal(scroll);
   // The bottom inset belongs to whatever sits lowest: the footer, or the content.
   const bottom = Math.max(insets.bottom, Space.md);
 
@@ -140,23 +219,30 @@ export function Screen({
           // The keyboard covers the home-indicator inset, so the footer sits 12 above it, not 34.
           keyboardVerticalOffset={footer ? -(bottom - Space.sm) : 0}>
           {scroll ? (
-            <ScrollView
-              style={styles.fill}
-              contentContainerStyle={[
-                styles.content,
-                !footer && { paddingBottom: bottom + Space.lg },
-                contentStyle,
-              ]}
-              keyboardShouldPersistTaps="handled"
-              // On web a click starts a scroll gesture, so any dismiss mode would blur every field.
-              // On-drag rather than interactive: the footer can't follow an interactive drag.
-              keyboardDismissMode={Platform.select({
-                ios: 'on-drag',
-                android: 'on-drag',
-                default: 'none',
-              })}>
-              {children}
-            </ScrollView>
+            <RevealContext value={reveal}>
+              <View ref={viewportRef} style={styles.fill}>
+                <ScrollView
+                  ref={scrollRef}
+                  onScroll={onScroll}
+                  scrollEventThrottle={16}
+                  style={styles.fill}
+                  contentContainerStyle={[
+                    styles.content,
+                    !footer && { paddingBottom: bottom + Space.lg },
+                    contentStyle,
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                  // On web a click starts a scroll gesture, so any dismiss mode would blur every field.
+                  // On-drag rather than interactive: the footer can't follow an interactive drag.
+                  keyboardDismissMode={Platform.select({
+                    ios: 'on-drag',
+                    android: 'on-drag',
+                    default: 'none',
+                  })}>
+                  {children}
+                </ScrollView>
+              </View>
+            </RevealContext>
           ) : (
             <View
               style={[

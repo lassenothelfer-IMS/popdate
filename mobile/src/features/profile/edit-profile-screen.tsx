@@ -8,6 +8,8 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
 import { MinTouch, Space } from '@/constants/theme';
+import { GenderSection, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
+import { identityOf } from '@/features/profile/identity';
 import { DetailsSection, PhotoSection, useProfileForm } from '@/features/profile/profile-form';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -39,10 +41,16 @@ export function EditProfileScreen() {
           heightCm: profile.heightCm,
           job: profile.job,
           bio: profile.bio,
+          genderDetails: profile.genderDetails,
+          sexuality: profile.sexuality,
           photos: profile.photos,
         }
       : null,
   );
+  const [identity, setIdentity] = useState<IdentityChoice>(() => ({
+    identity: profile ? identityOf(profile) : null,
+    side: profile?.gender ?? null,
+  }));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,20 +64,24 @@ export function EditProfileScreen() {
 
   if (!profile) return <Redirect href="/" />;
 
-  const { details, changed } = form;
-  const canSave = details !== null && changed && !saving && !saved;
-  const missing = details ? null : form.missing('save');
+  const { details } = form;
+  const side = resolvedSide(identity);
+  const identityChanged = identity.identity !== identityOf(profile) || side !== profile.gender;
+  const changed = form.changed || identityChanged;
+  const canSave = details !== null && side !== null && changed && !saving && !saved;
+  const missing = !details ? form.missing('save') : side === null ? t('profile.pickSide') : null;
 
   async function handleSave() {
-    if (!profile || !details) return;
+    if (!profile || !details || !side) return;
     setSaving(true);
     setError(null);
     try {
       // Onboarding's answers are gone after setup; the profile still holds them.
       await saveProfile(details, {
         birthDate: profile.birthDate,
-        gender: profile.gender,
+        gender: side,
         wantsToMeet: profile.wantsToMeet,
+        genderIdentity: identity.identity ?? undefined,
         termsAcceptedAt: profile.termsAcceptedAt,
       });
       setSaving(false);
@@ -133,6 +145,11 @@ export function EditProfileScreen() {
         </Rise>
         <Rise index={2}>
           <DetailsSection form={form} style={styles.aboutSection} />
+          <GenderSection
+            form={form}
+            identity={{ value: identity, onChange: setIdentity }}
+            style={styles.aboutSection}
+          />
           <ThemedText type="caption" themeColor="textTertiary" style={styles.locked}>
             {t('settings.editLocked')}
           </ThemedText>

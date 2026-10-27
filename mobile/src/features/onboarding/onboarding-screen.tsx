@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type TextInputInstance,
   type ViewInstance,
 } from 'react-native';
 import Animated, {
@@ -35,6 +36,7 @@ import { BrandBalloon, Fonts, MinTouch, Motion, Radius, Space } from '@/constant
 import { INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
+import { IdentityPicker, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -115,7 +117,8 @@ export function OnboardingScreen() {
   const [from, setFrom] = useState<Step | null>(null);
   const headingRef = useRef<ViewInstance>(null);
   const [birth, setBirth] = useState<BirthEntry>({ day: '', month: '', year: '' });
-  const [gender, setGender] = useState<Gender | null>(null);
+  const [identity, setIdentity] = useState<IdentityChoice>({ identity: null, side: null });
+  const gender = resolvedSide(identity);
   const [wantsToMeet, setWantsToMeet] = useState<Gender | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -180,6 +183,7 @@ export function OnboardingScreen() {
       birthDate: birthCheck.birthDate,
       gender,
       wantsToMeet,
+      genderIdentity: identity.identity ?? undefined,
       termsAcceptedAt: new Date().toISOString(),
     });
     router.replace('/profile-setup');
@@ -190,6 +194,7 @@ export function OnboardingScreen() {
       birthDate: '2000-05-17',
       gender: 'woman' as const,
       wantsToMeet: 'man' as const,
+      genderIdentity: 'woman',
       termsAcceptedAt: new Date().toISOString(),
     };
     setOnboarding(answers);
@@ -346,12 +351,7 @@ export function OnboardingScreen() {
           <Birthday birth={birth} onChange={setBirth} check={birthCheck} error={birthdayError} />
         ) : null}
 
-        {question === 'gender' ? (
-          <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel={title}>
-            <OptionRow label={t('onboarding.woman')} selected={gender === 'woman'} onPress={() => setGender('woman')} />
-            <OptionRow label={t('onboarding.man')} selected={gender === 'man'} onPress={() => setGender('man')} />
-          </View>
-        ) : null}
+        {question === 'gender' ? <IdentityPicker value={identity} onChange={setIdentity} label={title} /> : null}
 
         {question === 'meet' ? (
           <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel={title}>
@@ -488,26 +488,88 @@ type BirthdayProps = {
   error: string | null;
 };
 
-/** Day, month and year in three fields, then the age the room will see, or what is wrong. */
+/**
+ * Day, month and year in three fields, then the age the room will see, or what is
+ * wrong. A full field hands the cursor on to the next one, and deleting past the
+ * start of a field goes back to the one before.
+ */
 function Birthday({ birth, onChange, check, error }: BirthdayProps) {
   const t = useT();
   const theme = useTheme();
+  const dayRef = useRef<TextInputInstance>(null);
+  const monthRef = useRef<TextInputInstance>(null);
+  const yearRef = useRef<TextInputInstance>(null);
   const parts = [
-    { key: 'day', label: t('onboarding.day'), max: 2, placeholder: t('onboarding.dayPlaceholder') },
-    { key: 'month', label: t('onboarding.month'), max: 2, placeholder: t('onboarding.monthPlaceholder') },
-    { key: 'year', label: t('onboarding.year'), max: 4, placeholder: t('onboarding.yearPlaceholder') },
+    {
+      key: 'day',
+      label: t('onboarding.day'),
+      max: 2,
+      placeholder: t('onboarding.dayPlaceholder'),
+      ref: dayRef,
+      previous: null,
+    },
+    {
+      key: 'month',
+      label: t('onboarding.month'),
+      max: 2,
+      placeholder: t('onboarding.monthPlaceholder'),
+      ref: monthRef,
+      previous: dayRef,
+    },
+    {
+      key: 'year',
+      label: t('onboarding.year'),
+      max: 4,
+      placeholder: t('onboarding.yearPlaceholder'),
+      ref: yearRef,
+      previous: monthRef,
+    },
   ] as const;
+
+  /**
+   * Digits typed into one field fill it, and any it can't hold run on into the
+   * next ones, so typing fast or pasting a whole date lands in the right places.
+   * The cursor follows to the next field once one is full.
+   */
+  function change(index: number, text: string) {
+    const next = { ...birth };
+    let rest = digitsOnly(text);
+    let landed = index;
+    for (let i = index; i < parts.length; i++) {
+      const { key, max } = parts[i];
+      let value = rest.slice(0, max);
+      rest = rest.slice(max);
+      // No day starts with 4 to 9 and no month with 2 to 9: that digit is the whole number.
+      const first = Number(value);
+      if (value.length === 1 && ((key === 'day' && first > 3) || (key === 'month' && first > 1))) {
+        value = `0${value}`;
+      }
+      next[key] = value;
+      landed = i;
+      if (!rest) break;
+    }
+    onChange(next);
+    const { key, max } = parts[landed];
+    const filled = next[key].length === max && (landed > index || next[key].length > birth[key].length);
+    const focus = filled && landed < parts.length - 1 ? landed + 1 : landed;
+    if (focus !== index) parts[focus].ref.current?.focus();
+  }
+
   return (
     <View style={styles.birthday}>
       <View style={styles.birthRow}>
-        {parts.map((part) => (
+        {parts.map((part, index) => (
           <View key={part.key} style={styles.flex}>
             <TextField
+              ref={part.ref}
               label={part.label}
               value={birth[part.key]}
-              onChangeText={(text) => onChange({ ...birth, [part.key]: digitsOnly(text) })}
+              onChangeText={(text) => change(index, text)}
+              onKeyPress={({ nativeEvent }) => {
+                if (nativeEvent.key === 'Backspace' && birth[part.key] === '') part.previous?.current?.focus();
+              }}
+              autoFocus={part.key === 'day' && birth.day === ''}
               keyboardType="number-pad"
-              maxLength={part.max}
               placeholder={part.placeholder}
               error={error !== null}
               accessibilityHint={error ?? undefined}

@@ -1,20 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import {
   AccessibilityInfo,
   Platform,
   StyleSheet,
   TextInput,
   View,
+  type TextInputInstance,
   type TextInputProps,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { ErrorIcon, errorEnter } from '@/components/error-line';
+import { useRevealField } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Space } from '@/constants/theme';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
 type TextFieldProps = TextInputProps & {
+  ref?: Ref<TextInputInstance>;
   label?: string;
   /** Short help under the field, or the error message when `error` is set. */
   hint?: string;
@@ -36,12 +39,19 @@ export function TextField({
   multiline,
   onFocus,
   onBlur,
+  onContentSizeChange,
   accessibilityHint,
+  ref,
   ...rest
 }: TextFieldProps) {
   const theme = useTheme();
   const scheme = useScheme();
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInputInstance>(null);
+  // The caller's ref still reaches the input, to move focus from field to field.
+  useImperativeHandle(ref, () => inputRef.current as TextInputInstance);
+  // In a scrolling screen, a focused field scrolls clear of the keyboard and footer.
+  const reveal = useRevealField();
   const errorMessage = error && hint ? hint : undefined;
 
   // VoiceOver ignores live regions, so say a new error once, after the key echo.
@@ -69,6 +79,7 @@ export function TextField({
           ring,
         ]}>
         <TextInput
+          ref={inputRef}
           accessibilityLabel={rest.accessibilityLabel ?? label}
           placeholderTextColor={theme.textFaint}
           keyboardAppearance={scheme}
@@ -76,7 +87,13 @@ export function TextField({
           multiline={multiline}
           onFocus={(event) => {
             setFocused(true);
+            reveal?.(inputRef.current);
             onFocus?.(event);
+          }}
+          onContentSizeChange={(event) => {
+            // A bio grows a line at a time: keep its newest line above the keyboard.
+            if (multiline && focused) reveal?.(inputRef.current);
+            onContentSizeChange?.(event);
           }}
           onBlur={(event) => {
             setFocused(false);
@@ -148,6 +165,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // Shrinks to leave room for a suffix; a web input otherwise keeps its own minimum width.
+    minWidth: 0,
     alignSelf: 'stretch',
     paddingVertical: Space.sm,
     fontFamily: Fonts.sans,

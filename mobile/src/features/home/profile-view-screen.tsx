@@ -22,6 +22,7 @@ import { VerifiedCheck } from '@/components/verified-check';
 import { Gutter, MinTouch, Radius, Space, Velvet } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useScheme, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
+import { identityLine } from '@/features/profile/identity';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
@@ -105,6 +106,9 @@ export function ProfileViewScreen() {
             </View>
             <ThemedText type="callout" themeColor="textSecondary">
               {meta}
+            </ThemedText>
+            <ThemedText type="callout" themeColor="textSecondary">
+              {identityLine(t, profile)}
             </ThemedText>
           </View>
         </View>

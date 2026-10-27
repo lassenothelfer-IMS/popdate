@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Platform,
   StyleSheet,
   Text,
@@ -13,7 +14,7 @@ import {
 import Animated from 'react-native-reanimated';
 
 import type { Units } from '@/api';
-import { ErrorIcon, errorEnter } from '@/components/error-line';
+import { ErrorIcon, ErrorLine, errorEnter } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { Photo, type PhotoTone } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
@@ -22,6 +23,7 @@ import { Section } from '@/components/section';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Gutter, MaxContentWidth, MinTouch, Radius, Velvet } from '@/constants/theme';
+import { asSexuality, type Sexuality } from '@/features/profile/identity';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
@@ -128,6 +130,11 @@ export function useProfileForm(initial: ProfileDetails | null) {
   const [heightBlurred, setHeightBlurred] = useState(false);
   const [job, setJob] = useState(initial?.job ?? '');
   const [bio, setBio] = useState(initial?.bio ?? '');
+  const [genderDetails, setGenderDetails] = useState(initial?.genderDetails ?? '');
+  const [sexuality, setSexuality] = useState<Sexuality | null>(asSexuality(initial?.sexuality));
+  // The picker is open, or iCloud is still handing over the photos you chose.
+  const [picking, setPicking] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   // If the units setting changes under the form, show the same height in the new units.
   const height =
@@ -165,6 +172,8 @@ export function useProfileForm(initial: ProfileDetails | null) {
           heightCm,
           job: job.trim(),
           bio: bio.trim(),
+          genderDetails: genderDetails.trim() || undefined,
+          sexuality: sexuality ?? undefined,
           photos,
         }
       : null;
@@ -177,7 +186,9 @@ export function useProfileForm(initial: ProfileDetails | null) {
     city.trim() !== before.city.trim() ||
     heightCm !== before.heightCm ||
     job.trim() !== before.job.trim() ||
-    bio.trim() !== before.bio.trim();
+    bio.trim() !== before.bio.trim() ||
+    genderDetails.trim() !== (before.genderDetails ?? '').trim() ||
+    sexuality !== asSexuality(before.sexuality);
 
   /** What still stands between you and the footer's action, or null when nothing does. */
   function missing(purpose: 'start' | 'save'): string | null {
@@ -206,19 +217,35 @@ export function useProfileForm(initial: ProfileDetails | null) {
   }
 
   async function addPhotos() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: PHOTO_COUNT - photos.length,
-      orderedSelection: true,
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-    const picked = result.assets.map((asset) => asset.uri);
-    setPhotos((current) => [...current, ...picked].slice(0, PHOTO_COUNT));
+    // A second tap while photos are still loading would open a second picker.
+    if (picking) return;
+    setPicking(true);
+    setPhotoError(null);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: PHOTO_COUNT - photos.length,
+        orderedSelection: true,
+        quality: 0.8,
+        // Most iPhone photos are Live Photos, often kept in iCloud only. Without this
+        // the first pick of one fails, and only a second try finds it downloaded.
+        shouldDownloadFromNetwork: true,
+      });
+      if (result.canceled) return;
+      const picked = result.assets.map((asset) => asset.uri);
+      setPhotos((current) => [...current, ...picked].slice(0, PHOTO_COUNT));
+    } catch {
+      const message = t('profile.photosFailed');
+      setPhotoError(message);
+      AccessibilityInfo.announceForAccessibility(message);
+    } finally {
+      setPicking(false);
+    }
   }
 
   function removePhoto(index: number) {
+    setPhotoError(null);
     setPhotos((current) => current.filter((_, i) => i !== index));
   }
 
@@ -230,6 +257,8 @@ export function useProfileForm(initial: ProfileDetails | null) {
     photos,
     setPhotos,
     addPhotos,
+    picking,
+    photoError,
     removePhoto,
     name,
     setName,
@@ -244,6 +273,10 @@ export function useProfileForm(initial: ProfileDetails | null) {
     setJob,
     bio,
     setBio,
+    genderDetails,
+    setGenderDetails,
+    sexuality,
+    setSexuality,
     complete,
     details,
     changed,
@@ -285,6 +318,7 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
         size={index === 0 ? leadSize : smallSize}
         uri={photos[index]}
         isNext={index === photos.length}
+        busy={form.picking}
         name={form.name.trim()}
         tone={tone}
         onAdd={form.addPhotos}
@@ -309,6 +343,7 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
         {slot(4)}
         {slot(5)}
       </View>
+      {form.photoError ? <ErrorLine message={form.photoError} /> : null}
     </View>
   );
   if (bare) return grid;
@@ -330,6 +365,8 @@ type PhotoSlotProps = {
   uri: string | undefined;
   /** The first empty slot: where the next photo goes. */
   isNext: boolean;
+  /** Photos are on their way in: the next slot spins and taps wait. */
+  busy: boolean;
   /** Your first name, for a mock photo's initial. */
   name: string;
   tone: PhotoTone;
@@ -338,7 +375,7 @@ type PhotoSlotProps = {
 };
 
 /** One slot of the photo grid: filled, the next one to add, or a quiet numbered placeholder. */
-function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: PhotoSlotProps) {
+function PhotoSlot({ index, size, uri, isNext, busy, name, tone, onAdd, onRemove }: PhotoSlotProps) {
   const t = useT();
   const theme = useTheme();
   const position = index + 1;
@@ -391,10 +428,16 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
         accessibilityRole="button"
         accessibilityLabel={t('profile.addLeadPhoto')}
         accessibilityHint={t('profile.addPhotoHint', { position })}
+        accessibilityState={{ busy }}
         onPress={onAdd}
+        disabled={busy}
         background={theme.accentWash}
         style={[styles.slot, styles.addSlot, size, { boxShadow: `inset 0 0 0 1.5px ${theme.accent}` }]}>
-        <Icon name="add" size={28} color={theme.accentText} />
+        {busy ? (
+          <ActivityIndicator color={theme.accentText} />
+        ) : (
+          <Icon name="add" size={28} color={theme.accentText} />
+        )}
         {/* The slot keeps its size, so the label shrinks rather than overflow it. */}
         <ThemedText
           type="headline"
@@ -417,10 +460,16 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
         accessibilityRole="button"
         accessibilityLabel={t('profile.addPhotosLabel')}
         accessibilityHint={t('profile.addPhotoHint', { position })}
+        accessibilityState={{ busy }}
         onPress={onAdd}
+        disabled={busy}
         background={theme.surface}
         style={[styles.slot, styles.addSlot, size]}>
-        <Icon name="add" size={22} color={theme.textSecondary} />
+        {busy ? (
+          <ActivityIndicator color={theme.textSecondary} />
+        ) : (
+          <Icon name="add" size={22} color={theme.textSecondary} />
+        )}
       </PressableHighlight>
     );
   }

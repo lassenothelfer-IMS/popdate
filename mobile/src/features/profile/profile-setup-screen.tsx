@@ -16,6 +16,7 @@ import { Toggle } from '@/components/toggle';
 import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Colors, Fonts, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
+import { GenderSection } from '@/features/profile/gender-section';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import {
   DetailsSection,
@@ -221,6 +222,7 @@ function AboutStep({ form, saving, error, onBack, onSave }: AboutStepProps) {
       <StepHeading title={t('profile.aboutTitle')} intro={t('profile.aboutIntro')} />
       <Rise index={2} style={styles.body}>
         <DetailsSection form={form} bare />
+        <GenderSection form={form} style={styles.genderSection} />
       </Rise>
     </Screen>
   );
@@ -446,6 +448,9 @@ const styles = StyleSheet.create({
   actions: {
     gap: 6,
   },
+  genderSection: {
+    marginTop: Space.xs,
+  },
   footerNote: {
     textAlign: 'center',
   },
@@ -522,14 +527,15 @@ const styles = StyleSheet.create({
     marginTop: 40,
     gap: 10,
   },
-  // The photo card stands right of center; the count card leans on its lower left.
+  // The photo card stands right of center; the count card leans on its left edge,
+  // above the name panel so it never covers your name.
   stage: {
     marginTop: 28,
-    height: 380,
+    height: 364,
   },
   card: {
     position: 'absolute',
-    left: 50,
+    left: 60,
     top: 0,
     width: 260,
     height: 340,
@@ -588,7 +594,7 @@ const styles = StyleSheet.create({
   count: {
     position: 'absolute',
     left: 0,
-    top: 240,
+    top: 92,
     width: 120,
     height: 120,
     borderRadius: Radius.lg,

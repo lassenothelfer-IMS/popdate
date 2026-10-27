@@ -24,7 +24,12 @@ import type {
   RoomStatus,
 } from '@/api/types';
 import { ageFromBirthDate } from '@/utils/birth-date';
+import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { maskProfanity } from '@/utils/profanity';
+
+/** Your mock profile and settings outlive a reload, so you don't start over each time. */
+const PROFILE_KEY = 'popdate.mockProfile';
+const SETTINGS_KEY = 'popdate.mockSettings';
 
 const LOBBY_SIZE = 6;
 const ANSWER_MS = 60_000;
@@ -165,13 +170,32 @@ class MockServer implements PopdateApi {
   private messageListeners = new Map<string, Set<(messages: Message[]) => void>>();
 
   nextRole: MockRole = 'random';
+  /** What was kept on the device from the last launch, read once. */
+  private restored: Promise<void> | null = null;
+
+  private restore() {
+    this.restored ??= (async () => {
+      const [profile, settings] = await Promise.all([
+        readJson<Profile>(PROFILE_KEY),
+        readJson<Settings>(SETTINGS_KEY),
+      ]);
+      if (profile) {
+        this.profile = profile;
+        this.userId = profile.id;
+      }
+      if (settings) this.settings = { ...this.settings, ...settings };
+    })();
+    return this.restored;
+  }
 
   async signIn() {
+    await this.restore();
     this.userId ??= `user-${randomId()}`;
     return this.userId;
   }
 
   async getMyProfile() {
+    await this.restore();
     return this.profile;
   }
 
@@ -180,6 +204,7 @@ class MockServer implements PopdateApi {
     if (draft.photos.length !== 6) throw new Error('A profile needs exactly 6 photos.');
     if (ageFromBirthDate(draft.birthDate) < 18) throw new Error('You need to be 18 or older.');
     this.profile = { ...draft, id: userId };
+    await writeJson(PROFILE_KEY, this.profile);
     return this.profile;
   }
 
@@ -335,16 +360,20 @@ class MockServer implements PopdateApi {
     this.blocked = [];
     this.verification = 'none';
     this.settings = { ...DEFAULT_SETTINGS, notifications: { ...DEFAULT_SETTINGS.notifications } };
+    void removeJson(PROFILE_KEY);
+    void removeJson(SETTINGS_KEY);
   }
 
   // Settings
 
   async getSettings() {
+    await this.restore();
     return structuredClone(this.settings);
   }
 
   async saveSettings(settings: Settings) {
     this.settings = structuredClone(settings);
+    await writeJson(SETTINGS_KEY, this.settings);
     return structuredClone(this.settings);
   }
 

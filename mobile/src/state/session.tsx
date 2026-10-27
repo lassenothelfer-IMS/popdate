@@ -7,6 +7,8 @@ export type OnboardingAnswers = {
   birthDate: string;
   gender: Gender;
   wantsToMeet: Gender;
+  /** How you describe your gender. `gender` above is the side of the room it plays on. */
+  genderIdentity?: string;
   termsAcceptedAt: string;
 };
 

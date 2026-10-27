@@ -98,13 +98,17 @@ const PAIR_OVERLAP = 18;
 const PAIR_DROP = 20;
 
 /** The final two slide in from 60 pt either side, turning to their tilt, 150 ms apart. */
+/**
+ * A pair card slides in from its side and settles into its tilt. The tilt itself
+ * sits on the card inside, so this starts by undoing it and ends at none.
+ */
 function pairIn(side: -1 | 1) {
   return webSafeKeyframe(
     new Keyframe({
-      0: { opacity: 0, transform: [{ translateX: 60 * side }, { rotate: '0deg' }] },
+      0: { opacity: 0, transform: [{ translateX: 60 * side }, { rotate: `${-PAIR_TILT * side}deg` }] },
       100: {
         opacity: 1,
-        transform: [{ translateX: 0 }, { rotate: `${PAIR_TILT * side}deg` }],
+        transform: [{ translateX: 0 }, { rotate: '0deg' }],
         easing: Easing.bezier(0.22, 1, 0.36, 1),
       },
     })
@@ -238,17 +242,19 @@ export function AnswerCarousel({
               marginLeft: index === 0 ? 0 : -PAIR_OVERLAP,
               marginTop: index === 0 ? PAIR_DROP : 0,
               zIndex: contestant.id === markedId ? 1 : 0,
-              transform: [{ rotate: `${index === 0 ? -PAIR_TILT : PAIR_TILT}deg` }],
             }}>
-            <AnswerCard
-              contestant={contestant}
-              seat={seat}
-              width={pairWidth}
-              marked={contestant.id === markedId}
-              breathe={contestant.id === markedId && !reduced}
-              developed={developed}
-              onPress={onSelect ? () => onSelect(contestant.id) : undefined}
-            />
+            {/* The tilt lives here, apart from the entrance, so the entrance can't overwrite it. */}
+            <View style={{ transform: [{ rotate: `${index === 0 ? -PAIR_TILT : PAIR_TILT}deg` }] }}>
+              <AnswerCard
+                contestant={contestant}
+                seat={seat}
+                width={pairWidth}
+                marked={contestant.id === markedId}
+                breathe={contestant.id === markedId && !reduced}
+                developed={developed}
+                onPress={onSelect ? () => onSelect(contestant.id) : undefined}
+              />
+            </View>
           </Animated.View>
         ))}
       </View>

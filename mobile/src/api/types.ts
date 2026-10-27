@@ -4,6 +4,10 @@
  * photo is shown: it only reads these and calls `PopdateApi`.
  */
 
+/**
+ * The two groups rooms are matched from. How you describe your own gender is
+ * `Profile.genderIdentity`; this is only the side of the room you play on.
+ */
 export type Gender = 'woman' | 'man';
 
 export type Profile = {
@@ -13,6 +17,15 @@ export type Profile = {
   birthDate: string;
   gender: Gender;
   wantsToMeet: Gender;
+  /**
+   * How you describe your gender, shown on your profile, like `nonbinary` or
+   * `transWoman` (see `features/profile/identity.ts`). Missing: read `gender`.
+   */
+  genderIdentity?: string;
+  /** Optional words of your own about your gender, like your pronouns. */
+  genderDetails?: string;
+  /** Optional: your sexuality, like `bisexual`. Not shown when missing. */
+  sexuality?: string;
   city: string;
   heightCm: number;
   job: string;
