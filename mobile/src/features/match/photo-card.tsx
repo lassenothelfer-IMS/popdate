@@ -61,7 +61,7 @@ export function PhotoCard({ uri, label, seat, width, height, radius, accessibili
       ) : (
         <Photo uri={uri} hairline={false} style={StyleSheet.absoluteFill} />
       )}
-      {/* The photo scrim: rgba(29,7,14,.8) at the foot, clear by half way up. */}
+      {/* The photo scrim: the deep canvas at .8 at the foot, clear by half way up. */}
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id={`scrim${id}`} x1="0" y1="1" x2="0" y2="0">

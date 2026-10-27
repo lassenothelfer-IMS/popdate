@@ -41,7 +41,7 @@ export function ProgressSegments({ total, filled, accessibilityLabel, gap = 6 }:
           style={[
             styles.segment,
             {
-              backgroundColor: i < filled ? theme.text : theme.track,
+              backgroundColor: i < filled ? theme.accent : theme.track,
               transitionProperty: 'backgroundColor',
               transitionDuration: Motion.state,
               transitionTimingFunction: CssEase.out,

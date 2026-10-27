@@ -19,7 +19,7 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { ThemedText } from '@/components/themed-text';
 import { VerifiedCheck } from '@/components/verified-check';
-import { Gutter, MinTouch, Radius, Space, Velvet } from '@/constants/theme';
+import { Gutter, MinTouch, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useScheme, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { identityLine } from '@/features/profile/identity';
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   dotRest: {
     width: 8,
-    backgroundColor: 'rgba(246, 234, 230, 0.4)',
+    backgroundColor: PhotoGlass.dot,
   },
   heroText: {
     position: 'absolute',

@@ -5,7 +5,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Motion, Radius, Space } from '@/constants/theme';
+import { Fonts, Motion, PhotoGlass, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const MOCK_PREFIX = 'mock://';
@@ -92,7 +92,7 @@ export function PhotoBadge({ label }: { label: string }) {
   const theme = useTheme();
   return (
     <View
-      style={[styles.badge, { backgroundColor: 'rgba(18, 4, 10, 0.55)' }]}
+      style={[styles.badge, { backgroundColor: PhotoGlass.tag }]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       {/* Grows with the text size, but never covers much of the photo. */}

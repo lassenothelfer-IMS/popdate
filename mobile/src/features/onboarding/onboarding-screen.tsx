@@ -19,6 +19,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
 import type { Gender } from '@/api';
 import { Balloon } from '@/components/balloon';
@@ -32,14 +33,14 @@ import { Screen } from '@/components/screen';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { BrandBalloon, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { BrandBalloon, Fonts, HeroGlow, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import { IdentityPicker, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { useTheme } from '@/hooks/use-theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
@@ -282,7 +283,7 @@ export function OnboardingScreen() {
             onPress={() => goTo('birthday')}
             hitSlop={{ top: 8, bottom: 8, left: Space.sm, right: Space.sm }}
             style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
-            <ThemedText type="label" themeColor="textSecondary">
+            <ThemedText type="label" themeColor="accentText">
               {t('onboarding.skip')}
             </ThemedText>
           </Pressable>
@@ -403,11 +404,11 @@ export function OnboardingScreen() {
                   on either link toggles the box like the rest of it. */}
               <ThemedText type="callout" style={[styles.flex, styles.termsText]}>
                 {t('onboarding.termsBefore')}
-                <ThemedText accessibilityRole="link" style={styles.link}>
+                <ThemedText accessibilityRole="link" themeColor="accentText" style={styles.link}>
                   {t('onboarding.terms')}
                 </ThemedText>
                 {t('onboarding.termsAnd')}
-                <ThemedText accessibilityRole="link" style={styles.link}>
+                <ThemedText accessibilityRole="link" themeColor="accentText" style={styles.link}>
                   {t('onboarding.privacy')}
                 </ThemedText>
                 {t('onboarding.termsAfter')}
@@ -432,6 +433,7 @@ export function OnboardingScreen() {
  */
 function WelcomeBalloon() {
   const theme = useTheme();
+  const dark = useScheme() === 'dark';
   const reduced = useReduceMotion();
   const float = useSharedValue(0);
   useEffect(() => {
@@ -454,13 +456,29 @@ function WelcomeBalloon() {
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={styles.welcomeArt}>
-      <Animated.View style={[styles.welcomeString, { backgroundColor: theme.text }, string]} />
+      {/* Dark only: a soft rose glow behind the balloon, like a blur of the surface tone. */}
+      {dark ? (
+        <Svg style={styles.welcomeGlow} width={GLOW} height={GLOW}>
+          <Defs>
+            <RadialGradient id="heroGlow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={HeroGlow.color} stopOpacity={HeroGlow.opacity} />
+              <Stop offset="0.6" stopColor={HeroGlow.color} stopOpacity={HeroGlow.opacity * 0.5} />
+              <Stop offset="1" stopColor={HeroGlow.color} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle cx={GLOW / 2} cy={GLOW / 2} r={GLOW / 2} fill="url(#heroGlow)" />
+        </Svg>
+      ) : null}
+      <Animated.View style={[styles.welcomeString, { backgroundColor: theme.gold }, string]} />
       <Animated.View style={[styles.welcomeBalloon, balloon]}>
         <Balloon color={BrandBalloon.color} size={300} string={false} />
       </Animated.View>
     </View>
   );
 }
+
+/** The hero glow's square, centered on the balloon's body. */
+const GLOW = 420;
 
 /** Three dots over the intro cards, the current one a 20 pt bar. */
 function PageDots({ count, active, label }: { count: number; active: number; label: string }) {
@@ -473,7 +491,7 @@ function PageDots({ count, active, label }: { count: number; active: number; lab
           style={[
             styles.dot,
             i === active && styles.dotActive,
-            { backgroundColor: i === active ? theme.text : theme.track },
+            { backgroundColor: i === active ? theme.accent : theme.track },
           ]}
         />
       ))}
@@ -626,6 +644,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+  },
+  // Centered on the body: 300 wide and about 190 down the box.
+  welcomeGlow: {
+    position: 'absolute',
+    left: 150 - GLOW / 2,
+    top: 190 - GLOW / 2,
   },
   welcomeString: {
     position: 'absolute',

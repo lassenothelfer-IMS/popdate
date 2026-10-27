@@ -14,7 +14,7 @@ import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Toggle } from '@/components/toggle';
 import { Wordmark } from '@/components/wordmark';
-import { BrandBalloon, Colors, Fonts, Radius, Space, Velvet } from '@/constants/theme';
+import { BrandBalloon, Colors, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
 import { GenderSection } from '@/features/profile/gender-section';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
@@ -426,8 +426,8 @@ function ReadyStep({ profile }: { profile: Profile }) {
 }
 
 /** The photo tag's dark glass and the info panel's, the same on any photo in both themes. */
-const TAG_GLASS = 'rgba(29, 7, 14, 0.55)';
-const INFO_GLASS = 'rgba(29, 7, 14, 0.85)';
+const TAG_GLASS = PhotoGlass.tag;
+const INFO_GLASS = PhotoGlass.info;
 
 const styles = StyleSheet.create({
   progress: {

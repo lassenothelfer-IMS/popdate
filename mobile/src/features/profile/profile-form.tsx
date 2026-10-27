@@ -22,7 +22,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { Section } from '@/components/section';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Gutter, MaxContentWidth, MinTouch, Radius, Velvet } from '@/constants/theme';
+import { Fonts, Gutter, MaxContentWidth, MinTouch, PhotoGlass, Radius, Velvet } from '@/constants/theme';
 import { asSexuality, type Sexuality } from '@/features/profile/identity';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
@@ -35,7 +35,7 @@ export const PHOTO_COUNT = 6;
 const GRID_GAP = 10;
 const ROW_HEIGHT = 108;
 /** The "Photo n" tag's dark glass, the same on every photo in both themes. */
-const TAG_GLASS = 'rgba(29, 7, 14, 0.55)';
+const TAG_GLASS = PhotoGlass.tag;
 const LEAD_HEIGHT = ROW_HEIGHT * 2 + GRID_GAP;
 const HEIGHT_MIN = 120;
 const HEIGHT_MAX = 230;

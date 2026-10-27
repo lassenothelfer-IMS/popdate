@@ -3,8 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
 
-import { Ease, lacquerFor, Motion } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { BrandBalloon, BrandLacquer, Ease, lacquerFor, Motion } from '@/constants/theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 /**
@@ -54,11 +54,14 @@ export function Balloon({
   shine = true,
 }: BalloonProps) {
   const theme = useTheme();
+  const brand = BrandLacquer[useScheme()];
   const gradientId = `lacquer${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const height = balloonHeight(size);
   const line = toUnits(Math.max(1, size / 70), size);
   // A seat hue is lacquered: a radial gradient lit from the top left, a darker knot.
   const lacquer = lacquerFor(color);
+  // The brand balloon (and you) wears the theme's rose lacquer instead.
+  const isBrand = color.toLowerCase() === BrandBalloon.color.toLowerCase();
 
   if (ghost) {
     return (
@@ -73,27 +76,34 @@ export function Balloon({
       {lacquer ? (
         <Defs>
           <RadialGradient id={gradientId} cx="34%" cy="26%" r="78%">
-            <Stop offset="0" stopColor={lacquer.hi} />
-            <Stop offset="0.42" stopColor={lacquer.color} />
-            <Stop offset="1" stopColor={lacquer.shadow} />
+            {(isBrand
+              ? brand.stops
+              : ([
+                  [0, lacquer.hi],
+                  [0.42, lacquer.color],
+                  [1, lacquer.shadow],
+                ] as const)
+            ).map(([offset, stop]) => (
+              <Stop key={offset} offset={offset} stopColor={stop} />
+            ))}
           </RadialGradient>
         </Defs>
       ) : null}
       {string ? (
         <Path d={STRING} fill="none" stroke={theme.gold} strokeOpacity={0.75} strokeWidth={line} />
       ) : null}
-      <Path d={KNOT} fill={lacquer?.knot ?? color} />
+      <Path d={KNOT} fill={isBrand ? brand.knot : (lacquer?.knot ?? color)} />
       <Path d={BODY} fill={lacquer ? `url(#${gradientId})` : color} />
       {shine ? (
         <>
-          {/* The highlight, and a faint gold rim on the shadow side (brand/balloon-*.svg). */}
+          {/* The highlight, and a faint rim on the shadow side (brand/balloon-*.svg). */}
           <Ellipse
             cx={8}
             cy={7.2}
             rx={1.6}
             ry={3}
-            fill="#FFF3E6"
-            fillOpacity={lacquer?.shine ?? 0.22}
+            fill={isBrand ? brand.specular.color : '#FFF3E6'}
+            fillOpacity={isBrand ? brand.specular.opacity : (lacquer?.shine ?? 0.22)}
             transform="rotate(-28 8 7.2)"
           />
           {lacquer ? (
@@ -102,8 +112,8 @@ export function Balloon({
               cy={16.8}
               rx={0.8}
               ry={2}
-              fill="#E9BE72"
-              fillOpacity={0.22}
+              fill={brand.rim.color}
+              fillOpacity={isBrand ? brand.rim.opacity : 0.22}
               transform="rotate(30 17.6 16.8)"
             />
           ) : null}

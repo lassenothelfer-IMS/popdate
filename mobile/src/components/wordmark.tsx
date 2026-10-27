@@ -1,8 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
 
-import { Colors, MinTouch } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { BrandLacquer, Colors, MinTouch } from '@/constants/theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 
 /** The balloon in the 120 x 134 box the logo is drawn in. */
 const BODY =
@@ -23,7 +23,7 @@ const GLYPHS = [
 const EM_HEIGHT = 1.11;
 
 /**
- * "Popdate" where the "o" is a crimson lacquer balloon whose gold string hangs
+ * "Popdate" where the "o" is the rose lacquer balloon whose string hangs
  * below the baseline. Small on purpose: the content leads.
  */
 type WordmarkProps = {
@@ -35,7 +35,11 @@ type WordmarkProps = {
 
 export function Wordmark({ size = 20, tone }: WordmarkProps) {
   const current = useTheme();
-  const theme = tone ? Colors[tone === 'cream' ? 'light' : 'dark'] : current;
+  const scheme = useScheme();
+  const mode = tone ? (tone === 'cream' ? 'light' : 'dark') : scheme;
+  const theme = tone ? Colors[mode] : current;
+  // The same rose lacquer as the hero balloon; the string is the accent pressed.
+  const lacquer = BrandLacquer[mode];
   const height = size * EM_HEIGHT;
   const width = (height * 3676) / 1110;
   return (
@@ -47,9 +51,9 @@ export function Wordmark({ size = 20, tone }: WordmarkProps) {
       <Svg width={width} height={height} viewBox="-20 -750 3676 1110">
         <Defs>
           <RadialGradient id="wordmarkBalloon" cx="34%" cy="26%" r="78%">
-            <Stop offset="0" stopColor="#FF9A92" />
-            <Stop offset="0.42" stopColor="#C21F35" />
-            <Stop offset="1" stopColor="#4A030F" />
+            {lacquer.stops.map(([offset, stop]) => (
+              <Stop key={offset} offset={offset} stopColor={stop} />
+            ))}
           </RadialGradient>
         </Defs>
         {GLYPHS.map((d, i) => (
@@ -64,8 +68,17 @@ export function Wordmark({ size = 20, tone }: WordmarkProps) {
             strokeLinecap="round"
           />
           <Path d={BODY} fill="url(#wordmarkBalloon)" />
-          <Path d={KNOT} fill="#4A030F" />
-          <Ellipse cx={40} cy={36} rx={8} ry={15} rotation={-28} origin="40, 36" fill="#FFF3E6" opacity={0.55} />
+          <Path d={KNOT} fill={lacquer.knot} />
+          <Ellipse
+            cx={40}
+            cy={36}
+            rx={8}
+            ry={15}
+            rotation={-28}
+            origin="40, 36"
+            fill={lacquer.specular.color}
+            opacity={lacquer.specular.opacity}
+          />
         </G>
       </Svg>
     </View>
