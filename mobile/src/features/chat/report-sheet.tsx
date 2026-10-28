@@ -3,8 +3,10 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { ReportReason } from '@/api';
 import { Button } from '@/components/button';
+import { CheckMark } from '@/components/option-row';
 import { Icon } from '@/components/icon';
 import { Sheet } from '@/components/sheet';
+import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,21 +28,26 @@ type ReportSheetProps = {
   /** While the report is being sent: the buttons wait. */
   sending: boolean;
   onCancel: () => void;
-  onReport: (reason: ReportReason) => void;
+  /** The reason, anything you added, and whether to block them too. */
+  onReport: (reason: ReportReason, details: string, alsoBlock: boolean) => void;
 };
 
 /**
  * Report someone: a title, why it matters, one reason picked from a short list
- * of radio rows, then Cancel or Report side by side.
+ * of radio rows, an optional line about what happened, whether to block them
+ * too, then Cancel or Report side by side.
  */
 export function ReportSheet({ visible, name, sending, onCancel, onReport }: ReportSheetProps) {
   const t = useT();
   const theme = useTheme();
   const [picked, setPicked] = useState<ReportReason | null>(null);
+  const [details, setDetails] = useState('');
+  const [alsoBlock, setAlsoBlock] = useState(true);
 
   function close() {
     if (sending) return;
     setPicked(null);
+    setDetails('');
     onCancel();
   }
 
@@ -90,6 +97,27 @@ export function ReportSheet({ visible, name, sending, onCancel, onReport }: Repo
           );
         })}
       </View>
+      <TextField
+        label={t('chat.reportDetails')}
+        value={details}
+        onChangeText={setDetails}
+        placeholder={t('chat.reportDetailsPlaceholder')}
+        maxLength={300}
+        multiline
+      />
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: alsoBlock }}
+        aria-checked={alsoBlock}
+        accessibilityLabel={t('chat.alsoBlock', { name })}
+        onPress={() => {
+          haptics.selection();
+          setAlsoBlock((on) => !on);
+        }}
+        style={({ pressed }) => [styles.alsoBlock, pressed && styles.pressed]}>
+        <CheckMark checked={alsoBlock} shape="checkbox" />
+        <ThemedText style={styles.reasonLabel}>{t('chat.alsoBlock', { name })}</ThemedText>
+      </Pressable>
       <View style={styles.actions}>
         <View style={styles.cancel}>
           <Button title={t('common.cancel')} variant="secondary" disabled={sending} onPress={close} />
@@ -100,7 +128,7 @@ export function ReportSheet({ visible, name, sending, onCancel, onReport }: Repo
             disabled={picked === null}
             loading={sending}
             onPress={() => {
-              if (picked) onReport(picked);
+              if (picked) onReport(picked, details.trim(), alsoBlock);
             }}
           />
         </View>
@@ -138,6 +166,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  alsoBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    minHeight: 44,
   },
   actions: {
     flexDirection: 'row',

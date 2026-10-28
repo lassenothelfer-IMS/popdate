@@ -63,7 +63,11 @@ export function ProfileViewScreen() {
 
   const verified = verification === 'verified';
   const name = t('common.nameAge', { name: profile.name, age: ageFromBirthDate(profile.birthDate) });
-  const meta = [profile.city, formatHeight(profile.heightCm, settings.units), profile.job]
+  const meta = [
+    profile.city,
+    profile.heightCm ? formatHeight(profile.heightCm, settings.units) : null,
+    profile.job,
+  ]
     .filter(Boolean)
     .join(', ');
 

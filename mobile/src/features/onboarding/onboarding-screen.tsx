@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
-import type { Gender } from '@/api';
+import type { Interest } from '@/api';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
@@ -120,7 +120,7 @@ export function OnboardingScreen() {
   const [birth, setBirth] = useState<BirthEntry>({ day: '', month: '', year: '' });
   const [identity, setIdentity] = useState<IdentityChoice>({ identity: null, side: null });
   const gender = resolvedSide(identity);
-  const [wantsToMeet, setWantsToMeet] = useState<Gender | null>(null);
+  const [wantsToMeet, setWantsToMeet] = useState<Interest | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const birthCheck = checkBirthday(birth);
@@ -366,6 +366,11 @@ export function OnboardingScreen() {
               selected={wantsToMeet === 'man'}
               onPress={() => setWantsToMeet('man')}
             />
+            <OptionRow
+              label={t('onboarding.everyone')}
+              selected={wantsToMeet === 'everyone'}
+              onPress={() => setWantsToMeet('everyone')}
+            />
           </View>
         ) : null}
 
@@ -400,15 +405,20 @@ export function OnboardingScreen() {
               background={theme.field}
               style={[styles.terms, { borderColor: theme.border }]}>
               <CheckMark checked={termsAccepted} shape="checkbox" />
-              {/* TODO(Elias): link the real Terms and Privacy Policy here. Until then a tap
-                  on either link toggles the box like the rest of it. */}
+              {/* Each link opens its page; a tap anywhere else toggles the box. */}
               <ThemedText type="callout" style={[styles.flex, styles.termsText]}>
                 {t('onboarding.termsBefore')}
-                <ThemedText accessibilityRole="link" style={styles.link}>
+                <ThemedText
+                  accessibilityRole="link"
+                  style={styles.link}
+                  onPress={() => router.push('/settings/terms' as Href)}>
                   {t('onboarding.terms')}
                 </ThemedText>
                 {t('onboarding.termsAnd')}
-                <ThemedText accessibilityRole="link" style={styles.link}>
+                <ThemedText
+                  accessibilityRole="link"
+                  style={styles.link}
+                  onPress={() => router.push('/settings/privacy' as Href)}>
                   {t('onboarding.privacy')}
                 </ThemedText>
                 {t('onboarding.termsAfter')}
@@ -479,6 +489,10 @@ function WelcomeBalloon() {
 
 /** The hero glow's square, centered on the balloon's body. */
 const GLOW = 420;
+
+/** AutoFill hints for the three birthday fields. */
+const CONTENT_TYPES = { day: 'birthdateDay', month: 'birthdateMonth', year: 'birthdateYear' } as const;
+const AUTOCOMPLETE = { day: 'birthdate-day', month: 'birthdate-month', year: 'birthdate-year' } as const;
 
 /** Three dots over the intro cards, the current one a 20 pt bar. */
 function PageDots({ count, active, label }: { count: number; active: number; label: string }) {
@@ -587,6 +601,8 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
                 if (nativeEvent.key === 'Backspace' && birth[part.key] === '') part.previous?.current?.focus();
               }}
               autoFocus={part.key === 'day' && birth.day === ''}
+              textContentType={CONTENT_TYPES[part.key]}
+              autoComplete={AUTOCOMPLETE[part.key]}
               keyboardType="number-pad"
               placeholder={part.placeholder}
               error={error !== null}

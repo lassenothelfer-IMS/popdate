@@ -133,6 +133,7 @@ export const settings: Strings = {
     previewTitle: 'Is your face clear?',
     cameraLabel: 'Camera preview',
     selfieLabel: 'Your selfie',
+    legalUpdated: 'Last updated %{date}',
   },
   de: {
     verifyCheckTitle: 'Selfie-Check',
@@ -270,6 +271,7 @@ export const settings: Strings = {
     previewTitle: 'Ist dein Gesicht gut zu sehen?',
     cameraLabel: 'Kameravorschau',
     selfieLabel: 'Dein Selfie',
+    legalUpdated: 'Zuletzt aktualisiert: %{date}',
   },
   fr: {
     verifyCheckTitle: 'Vérification selfie',
@@ -408,6 +410,7 @@ export const settings: Strings = {
     previewTitle: 'Ton visage est-il bien visible ?',
     cameraLabel: 'Aperçu de la caméra',
     selfieLabel: 'Ton selfie',
+    legalUpdated: 'Dernière mise à jour : %{date}',
   },
   it: {
     verifyCheckTitle: 'Controllo selfie',
@@ -545,5 +548,6 @@ export const settings: Strings = {
     previewTitle: 'Il tuo viso si vede bene?',
     cameraLabel: 'Anteprima della fotocamera',
     selfieLabel: 'Il tuo selfie',
+    legalUpdated: 'Ultimo aggiornamento: %{date}',
   },
 };

@@ -1,4 +1,4 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
@@ -11,6 +11,7 @@ import { MinTouch, Space } from '@/constants/theme';
 import { GenderSection, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
 import { identityOf } from '@/features/profile/identity';
 import { DetailsSection, PhotoSection, useProfileForm } from '@/features/profile/profile-form';
+import { confirmStep } from '@/features/chat/prompts';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
@@ -54,6 +55,24 @@ export function EditProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Closing with unsaved edits (Cancel, the swipe down, Android's back) asks first.
+  const navigation = useNavigation();
+  const dirty =
+    profile !== null &&
+    (form.changed ||
+      identity.identity !== identityOf(profile) ||
+      resolvedSide(identity) !== profile.gender);
+  usePreventRemove(dirty && !saving && !saved, ({ data }) => {
+    void confirmStep({
+      title: t('profile.discardTitle'),
+      message: t('profile.discardMessage'),
+      confirmLabel: t('profile.discard'),
+      cancelLabel: t('profile.keepEditing'),
+    }).then((discard) => {
+      if (discard) navigation.dispatch(data.action);
+    });
+  });
 
   // "Saved" shows for a beat, then the screen closes. Leaving sooner cancels it.
   useEffect(() => {

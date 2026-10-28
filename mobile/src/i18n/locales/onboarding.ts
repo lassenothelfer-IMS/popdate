@@ -99,6 +99,7 @@ export const onboarding: Strings = {
     joinNext: 'Join the next room',
     joinFailed: "Couldn't join the queue. Try again.",
     editFirst: 'Edit my profile first',
+    everyone: 'Everyone',
   },
   de: {
     stepOf: 'Schritt %{step} von %{total}',
@@ -201,6 +202,7 @@ export const onboarding: Strings = {
     joinNext: 'Zum nächsten Raum',
     joinFailed: 'Die Warteschlange ging nicht auf. Versuch es nochmal.',
     editFirst: 'Zuerst mein Profil bearbeiten',
+    everyone: 'Alle',
   },
   fr: {
     stepOf: 'Étape %{step} sur %{total}',
@@ -303,6 +305,7 @@ export const onboarding: Strings = {
     joinNext: 'Rejoindre la prochaine salle',
     joinFailed: 'Impossible de rejoindre la file. Réessaie.',
     editFirst: 'D’abord modifier mon profil',
+    everyone: 'Tout le monde',
   },
   it: {
     stepOf: 'Passo %{step} di %{total}',
@@ -404,5 +407,6 @@ export const onboarding: Strings = {
     joinNext: 'Entra nella prossima stanza',
     joinFailed: 'Non è stato possibile entrare in coda. Riprova.',
     editFirst: 'Prima modifico il profilo',
+    everyone: 'Tutti',
   },
 };

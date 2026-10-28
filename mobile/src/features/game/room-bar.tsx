@@ -12,6 +12,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Gutter, MinTouch, Radius, Space } from '@/constants/theme';
 import { Pill } from '@/features/game/you-tag';
 import { useTheme } from '@/hooks/use-theme';
+import { MoreButton } from '@/features/chat/person-actions';
 import { useT } from '@/i18n';
 
 /**
@@ -34,6 +35,8 @@ type RoomBarProps = {
   timer?: ReactNode;
   /** Hidden once the game is over. */
   onLeave?: () => void;
+  /** Report or block someone in the room. */
+  onMore?: () => void;
   leaving: boolean;
   /** The four round segments: filled up to the round being played. */
   rounds: { total: number; filled: number; label: string };
@@ -53,6 +56,7 @@ export function RoomBar({
   watching,
   timer,
   onLeave,
+  onMore,
   leaving,
   rounds,
   rail,
@@ -82,9 +86,10 @@ export function RoomBar({
             {watching ? <Pill label={t('game.watching')} tone="quiet" /> : null}
           </View>
         </View>
-        {timer || onLeave ? (
+        {timer || onLeave || onMore ? (
           <View style={styles.actions}>
             {timer}
+            {onMore ? <MoreButton label={t('game.reportSomeone')} onPress={onMore} /> : null}
             {onLeave ? (
               <Pressable
                 accessibilityRole="button"

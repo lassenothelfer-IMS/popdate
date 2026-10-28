@@ -1,8 +1,9 @@
 import { internal } from '../_generated/api';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
-import { ANSWER_MS, POP_REMINDER_MS, QUESTION_OPTIONS_PER_ROUND, shuffle } from './game';
+import { ANSWER_MS, PICK_MS, POP_REMINDER_MS, QUESTION_OPTIONS_PER_ROUND, shuffle } from './game';
 import { ageFromBirthDate, getProfile, personCard, photoUrls } from './people';
+import { schedulePush } from '../push';
 import { questionPool } from './questions';
 
 /*
@@ -44,6 +45,12 @@ export async function createRoom(
     await ctx.db.insert('roomPlayers', { roomId, userId, seat, popped: false, left: false });
   }
   await startRound(ctx, roomId);
+  await schedulePush(ctx, [popperId, ...contestantIds], {
+    kind: 'roomLive',
+    title: 'Your room is open',
+    body: 'Six seats are filled. Round 1 is starting.',
+    data: { type: 'room', roomId },
+  });
   return roomId;
 }
 
@@ -52,15 +59,18 @@ async function startRound(ctx: MutationCtx, roomId: Id<'rooms'>) {
   const unused = (await questionPool(ctx)).filter(
     (question) => !room.usedQuestionIds.includes(question._id),
   );
+  // The popper gets PICK_MS to choose; then one of the options is picked for them.
+  const deadline = Date.now() + PICK_MS;
   await ctx.db.patch(roomId, {
     status: 'picking',
     questionId: undefined,
     questionOptionIds: shuffle(unused)
       .slice(0, QUESTION_OPTIONS_PER_ROUND)
       .map((question) => question._id),
-    deadline: undefined,
+    deadline,
     popReminder: false,
   });
+  await ctx.scheduler.runAt(deadline, internal.rooms.pickTimeUp, { roomId, round: room.round });
 }
 
 export async function startAnswering(
@@ -129,6 +139,12 @@ export async function finish(ctx: MutationCtx, roomId: Id<'rooms'>, { withWinner
       popperId: room.popperId,
       winnerId: winner.userId,
       createdAt: Date.now(),
+    });
+    await schedulePush(ctx, [room.popperId, winner.userId], {
+      kind: 'newMatch',
+      title: "It's a match",
+      body: 'Your room ended with the two of you. Say hi.',
+      data: { type: 'match', matchId },
     });
   }
   await ctx.db.patch(roomId, {

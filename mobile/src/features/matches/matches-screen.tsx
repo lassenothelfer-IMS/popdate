@@ -12,9 +12,10 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
-import { TAB_BAR_CLEARANCE, TabBar } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
+import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
@@ -47,32 +48,40 @@ export function MatchesScreen() {
   const { profile } = useSession();
   /** Null until the first load: skeleton rows, never a spinner. */
   const [threads, setThreads] = useState<Thread[] | null>(null);
+  /** The first load failed: say so, rather than showing "no matches yet". */
+  const [failed, setFailed] = useState(false);
   const { join, joining, error } = useJoinQueue();
+  // Long-press a row to report, block or unmatch; the row goes once they're gone.
+  const people = usePersonActions({
+    onGone: (person) =>
+      setThreads((current) => current?.filter((thread) => thread.match.other.id !== person.id) ?? null),
+  });
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      api
-        .listMatches()
-        .then((matches) =>
-          Promise.all(
-            matches.map(async (match) => {
-              const messages = await api.listMessages(match.id).catch(() => []);
-              return { match, last: messages.at(-1) ?? null };
-            }),
-          ),
-        )
-        .then((list) => {
-          if (active) setThreads(list);
-        })
-        .catch(() => {
-          if (active) setThreads((previous) => previous ?? []);
-        });
-      return () => {
-        active = false;
-      };
-    }, []),
-  );
+  // Loads on every visit, and again from Try again.
+  const load = useCallback(() => {
+    let active = true;
+    setFailed(false);
+    api
+      .listMatches()
+      .then((matches) =>
+        Promise.all(
+          matches.map(async (match) => {
+            const messages = await api.listMessages(match.id).catch(() => []);
+            return { match, last: messages.at(-1) ?? null };
+          }),
+        ),
+      )
+      .then((list) => {
+        if (active) setThreads(list);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useFocusEffect(load);
 
   const myId = profile?.id ?? null;
   // Newest first. Your turn: they wrote last, or nobody has written yet.
@@ -92,7 +101,12 @@ export function MatchesScreen() {
           </ThemedText>
         </Rise>
 
-        {threads === null ? (
+        {threads === null && failed ? (
+          <View style={styles.loading}>
+            <ErrorLine message={t('home.matchesFailed')} />
+            <Button title={t('common.tryAgain')} variant="secondary" onPress={() => void load()} />
+          </View>
+        ) : threads === null ? (
           <View style={styles.loading}>
             <Skeleton style={styles.skeletonCard} />
             <Skeleton style={styles.skeletonRow} />
@@ -108,7 +122,13 @@ export function MatchesScreen() {
                   {t('home.yourTurn')}
                 </ThemedText>
                 {yourTurn.map((thread) => (
-                  <ThreadRow key={thread.match.id} thread={thread} myId={myId} highlighted />
+                  <ThreadRow
+                    key={thread.match.id}
+                    thread={thread}
+                    myId={myId}
+                    highlighted
+                    onMore={() => void people.open(personOf(thread))}
+                  />
                 ))}
               </Rise>
             ) : null}
@@ -118,7 +138,12 @@ export function MatchesScreen() {
                   {t('home.earlier')}
                 </ThemedText>
                 {earlier.map((thread) => (
-                  <ThreadRow key={thread.match.id} thread={thread} myId={myId} />
+                  <ThreadRow
+                    key={thread.match.id}
+                    thread={thread}
+                    myId={myId}
+                    onMore={() => void people.open(personOf(thread))}
+                  />
                 ))}
               </Rise>
             ) : null}
@@ -128,11 +153,8 @@ export function MatchesScreen() {
             </Rise>
           </>
         )}
+        {people.element}
       </Screen>
-      <TabBar
-        active="matches"
-        labels={{ home: t('home.tabHome'), matches: t('home.tabMatches'), settings: t('home.settings') }}
-      />
     </View>
   );
 }
@@ -141,7 +163,22 @@ export function MatchesScreen() {
  * One conversation. Your turn sits in a card with a coral ring on the avatar;
  * the rest are plain rows with a hairline between them.
  */
-function ThreadRow({ thread, myId, highlighted = false }: { thread: Thread; myId: string | null; highlighted?: boolean }) {
+function personOf({ match }: Thread): Person {
+  return { id: match.other.id, name: match.other.name, age: match.other.age, matchId: match.id };
+}
+
+function ThreadRow({
+  thread,
+  myId,
+  highlighted = false,
+  onMore,
+}: {
+  thread: Thread;
+  myId: string | null;
+  highlighted?: boolean;
+  /** Report, block or unmatch: a long press, or the VoiceOver action. */
+  onMore: () => void;
+}) {
   const theme = useTheme();
   const seats = useSeats();
   const t = useT();
@@ -162,6 +199,11 @@ function ThreadRow({ thread, myId, highlighted = false }: { thread: Thread; myId
       accessibilityLabel={`${name}. ${preview}`}
       accessibilityHint={t('home.openChatHint')}
       onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+      onLongPress={onMore}
+      accessibilityActions={[{ name: 'more', label: t('chat.optionsHint', { name: match.other.name }) }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'more') onMore();
+      }}
       background={highlighted ? theme.field : 'transparent'}
       style={[
         styles.thread,
@@ -170,7 +212,12 @@ function ThreadRow({ thread, myId, highlighted = false }: { thread: Thread; myId
           : [styles.threadRow, { borderBottomColor: theme.border }],
       ]}>
       <View style={highlighted ? [styles.ring, { borderColor: theme.accent }] : null}>
-        <Avatar name={match.other.name} uri={match.other.photo} tone={seatFor(seats, match.other.id)} size={56} />
+        <Avatar
+          name={match.other.name}
+          uri={match.other.photo}
+          tone={seatFor(seats, match.other.id)}
+          size={56}
+        />
       </View>
       <View style={styles.threadText}>
         <View style={styles.threadTop}>
@@ -207,13 +254,24 @@ function EarnedCard({ onJoin, joining }: { onJoin: () => void; joining: boolean 
 }
 
 /** No matches yet: the brand balloon on a gold string, one line of why, and the way in. */
-function EmptyMatches({ onJoin, joining, error }: { onJoin: () => void; joining: boolean; error: string | null }) {
+function EmptyMatches({
+  onJoin,
+  joining,
+  error,
+}: {
+  onJoin: () => void;
+  joining: boolean;
+  error: string | null;
+}) {
   const theme = useTheme();
   const t = useT();
   return (
     <View style={styles.empty}>
       <Rise index={1} style={styles.emptyArt}>
-        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.emptyArt}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.emptyArt}>
           <Balloon color={BrandBalloon.color} size={120} string={false} />
           <Svg width={8} height={70} style={styles.emptyString}>
             <Defs>

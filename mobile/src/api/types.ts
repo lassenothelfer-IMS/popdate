@@ -10,13 +10,20 @@
  */
 export type Gender = 'woman' | 'man';
 
+/** Who you want to meet: one side of the room, or either. */
+export type Interest = Gender | 'everyone';
+
+/** The rooms reveal one photo per round over four rounds; up to two more are optional. */
+export const MIN_PHOTOS = 4;
+export const MAX_PHOTOS = 6;
+
 export type Profile = {
   id: string;
   name: string;
   /** YYYY-MM-DD */
   birthDate: string;
   gender: Gender;
-  wantsToMeet: Gender;
+  wantsToMeet: Interest;
   /**
    * How you describe your gender, shown on your profile, like `nonbinary` or
    * `transWoman` (see `features/profile/identity.ts`). Missing: read `gender`.
@@ -27,10 +34,13 @@ export type Profile = {
   /** Optional: your sexuality, like `bisexual`. Not shown when missing. */
   sexuality?: string;
   city: string;
-  heightCm: number;
+  /** Optional: null when you haven't added it. */
+  heightCm: number | null;
+  /** Optional: empty when you haven't added it. */
   job: string;
+  /** Optional: empty when you haven't added it. */
   bio: string;
-  /** Exactly 6 photo URIs, in order (position 1 to 6). */
+  /** 4 to 6 photo URIs, in order (position 1 to 6). */
   photos: string[];
   termsAcceptedAt: string;
 };
@@ -78,7 +88,10 @@ export type Room = {
   questionOptions: Question[];
   /** When the current answer or pop timer ends, in epoch milliseconds. */
   deadline: number | null;
-  /** True once the popper has gone over the pop time. There is no auto-pop. */
+  /**
+   * True once the popper has gone over the pop time. `deadline` then counts down
+   * to a random pop, so a room never stalls.
+   */
   popReminder: boolean;
   winnerId: string | null;
   matchId: string | null;
@@ -158,6 +171,8 @@ export interface PopdateApi {
   watchQueue(onChange: (status: QueueStatus) => void): Unsubscribe;
 
   watchRoom(roomId: string, onChange: (room: Room | null) => void): Unsubscribe;
+  /** The room you're still playing in, if any, so reopening the app goes back to it. */
+  getActiveRoom(): Promise<string | null>;
   pickQuestion(roomId: string, questionId: string): Promise<void>;
   postAnswer(roomId: string, text: string): Promise<void>;
   popBalloon(roomId: string, contestantId: string): Promise<void>;
@@ -165,6 +180,11 @@ export interface PopdateApi {
 
   listMatches(): Promise<Match[]>;
   getMatch(matchId: string): Promise<Match | null>;
+  /** Ends a match for both of you; the chat goes with it. */
+  unmatch(matchId: string): Promise<void>;
+
+  /** Whether the server can be reached right now; called again on every change. */
+  watchConnection(onChange: (online: boolean) => void): Unsubscribe;
 
   /** Ends the session on this phone. */
   signOut(): Promise<void>;

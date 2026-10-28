@@ -12,10 +12,12 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { ApiProvider } from '@/api/provider';
+import { OfflineBanner } from '@/components/offline-banner';
 import { Colors, Fonts } from '@/constants/theme';
 import { useScheme } from '@/hooks/use-theme';
 import { SessionProvider } from '@/state/session';
 import { SettingsProvider } from '@/state/settings';
+import { usePushRouting } from '@/utils/push-routing';
 
 // The splash stays up until both typefaces are in, so no screen paints in a fallback font.
 SplashScreen.preventAutoHideAsync();
@@ -55,6 +57,8 @@ export default function RootLayout() {
 
 function ThemedStack() {
   const scheme = useScheme();
+  // A tapped push opens its room, match or chat.
+  usePushRouting();
   const palette = Colors[scheme];
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
@@ -83,7 +87,10 @@ function ThemedStack() {
         {/* Taking the verification selfie is a task of its own: a sheet you finish or close. */}
         <Stack.Screen name="settings/verify" options={{ presentation: 'modal' }} />
         <Stack.Screen name="how-to-play" options={{ presentation: 'modal' }} />
+        {/* Editing your profile is a task you finish or cancel: a sheet that asks before discarding. */}
+        <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
       </Stack>
+      <OfflineBanner />
     </ThemeProvider>
   );
 }

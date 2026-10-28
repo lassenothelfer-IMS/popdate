@@ -247,8 +247,8 @@ test('profiles need 6 of your own photos and an 18+ birthday', async () => {
 
   const own = await storePhotos(t, 'Mia');
   await expect(
-    mia.mutation(api.profiles.saveProfile, { ...base, photos: own.slice(0, 5) }),
-  ).rejects.toThrow('A profile needs exactly 6 photos.');
+    mia.mutation(api.profiles.saveProfile, { ...base, photos: own.slice(0, 3) }),
+  ).rejects.toThrow('A profile needs 4 to 6 photos.');
   await expect(
     mia.mutation(api.profiles.saveProfile, { ...base, birthDate: '2015-05-05', photos: own }),
   ).rejects.toThrow('You need to be 18 or older.');

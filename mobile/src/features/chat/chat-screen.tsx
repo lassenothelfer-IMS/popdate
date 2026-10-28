@@ -1,5 +1,4 @@
 import { Redirect, router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -14,7 +13,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
-import { api, type Match, type Message, type ReportReason, type Room } from '@/api';
+import { api, type Match, type Message, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
@@ -25,8 +24,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, Motion, Space } from '@/constants/theme';
 import { ChatComposer } from '@/features/chat/chat-composer';
 import { MessageList, type Seed } from '@/features/chat/message-list';
-import { acknowledge, confirmStep, useChoice } from '@/features/chat/prompts';
-import { ReportSheet } from '@/features/chat/report-sheet';
+import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
@@ -151,7 +149,8 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const filter = useFilterText();
   const { locale, region } = useSettings();
   const room = useRoom(match.roomId);
-  const { choose, sheet } = useChoice();
+  // Report, block or unmatch; any of the last two closes the chat.
+  const people = usePersonActions({ onGone: leave });
   const scrollRef = useRef<ScrollViewInstance>(null);
   /** True while you're at the newest message, so new ones scroll into view. */
   const nearEnd = useRef(true);
@@ -161,13 +160,11 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Their latest message, for Android's and the web's live region. */
   const [heard, setHeard] = useState<string | null>(null);
   /** What was on screen when the chat opened: only that rises in. */
   const [firstOpen, setFirstOpen] = useState<ReadonlySet<string> | null>(null);
-  const [reporting, setReporting] = useState(false);
 
   const { name, age } = match.other;
   const tone = seatFor(seats, match.other.id);
@@ -239,50 +236,8 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
     if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
   }
 
-  async function openOptions() {
-    if (busy) return;
-    const picked = await choose({
-      title: t('common.nameAge', { name, age }),
-      choices: [{ label: t('chat.report') }, { label: t('chat.block'), destructive: true }],
-    });
-    if (picked === 0) setReporting(true);
-    if (picked === 1) await block();
-  }
-
-  async function report(reason: ReportReason) {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.report(match.other.id, reason);
-      haptics.success();
-      setReporting(false);
-      acknowledge(t('chat.reported'));
-    } catch {
-      setReporting(false);
-      fail(t('chat.reportFailed'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function block() {
-    const confirmed = await confirmStep({
-      title: t('chat.blockTitle', { name }),
-      message: t('chat.blockMessage', { name }),
-      confirmLabel: t('chat.block'),
-      cancelLabel: t('common.cancel'),
-    });
-    if (!confirmed) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.block(match.other.id);
-      haptics.medium();
-      leave();
-    } catch {
-      fail(t('chat.blockFailed', { name }));
-      setBusy(false);
-    }
+  function openOptions() {
+    void people.open({ id: match.other.id, name, age, matchId: match.id });
   }
 
   return (
@@ -324,10 +279,10 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
             </ThemedText>
           </View>
         </View>
-        <OptionsButton
+        <MoreButton
           label={t('chat.options')}
           hint={t('chat.optionsHint', { name })}
-          disabled={busy}
+          disabled={people.busy}
           onPress={openOptions}
         />
       </View>
@@ -377,49 +332,8 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         </ThemedText>
       ) : null}
 
-      {sheet}
-      <ReportSheet
-        visible={reporting}
-        name={name}
-        sending={busy}
-        onCancel={() => setReporting(false)}
-        onReport={(reason) => void report(reason)}
-      />
+      {people.element}
     </Screen>
-  );
-}
-
-/** The ellipsis in the header's corner: report or block. */
-function OptionsButton({
-  label,
-  hint,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  hint: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-      style={({ pressed }) => [styles.options, (pressed || disabled) && styles.pressed]}>
-      <SymbolView
-        name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
-        size={20}
-        tintColor={theme.text}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
-    </Pressable>
   );
 }
 
@@ -470,12 +384,6 @@ const styles = StyleSheet.create({
   nameText: {
     fontSize: 16,
     lineHeight: 20,
-  },
-  options: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   pressed: {
     opacity: 0.6,

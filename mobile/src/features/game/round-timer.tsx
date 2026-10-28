@@ -23,7 +23,7 @@ const WARN_AT = 10;
 
 type RoundTimerProps = {
   deadline: number | null;
-  /** The popper is over the pop time. There is no auto-pop. */
+  /** The popper is over the pop time; the deadline now counts down to a random pop. */
   popReminder: boolean;
   /** Buzz once at 10 s left: only while you still have an answer to send. */
   warn?: boolean;
@@ -53,7 +53,8 @@ export function RoundTimer({ deadline, popReminder, warn = false }: RoundTimerPr
     }
   }, [warn, secondsLeft, deadline]);
 
-  if (popReminder) {
+  // Over the pop time with no countdown left to show: the quiet pill.
+  if (popReminder && secondsLeft === null) {
     const waiting = t('game.everyoneWaiting');
     return (
       <Animated.View

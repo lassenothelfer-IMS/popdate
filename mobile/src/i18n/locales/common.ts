@@ -19,6 +19,7 @@ export const common: Strings = {
     you: 'You',
     nameAge: '%{name}, %{age}',
     loading: 'Loading…',
+    offline: "You're offline. Reconnecting…",
   },
   de: {
     back: 'Zurück',
@@ -37,6 +38,7 @@ export const common: Strings = {
     you: 'Du',
     nameAge: '%{name}, %{age}',
     loading: 'Lädt …',
+    offline: 'Du bist offline. Verbinde neu…',
   },
   fr: {
     back: 'Retour',
@@ -55,6 +57,7 @@ export const common: Strings = {
     you: 'Toi',
     nameAge: '%{name}, %{age}',
     loading: 'Chargement…',
+    offline: 'Tu es hors ligne. Reconnexion…',
   },
   it: {
     back: 'Indietro',
@@ -73,5 +76,6 @@ export const common: Strings = {
     you: 'Tu',
     nameAge: '%{name}, %{age}',
     loading: 'Caricamento…',
+    offline: 'Sei offline. Riconnessione…',
   },
 };

@@ -12,11 +12,10 @@ import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
-import { TAB_BAR_CLEARANCE, TabBar } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
-import { PushPrompt } from '@/features/home/push-prompt';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
@@ -156,6 +155,19 @@ export function HomeScreen() {
         </Rise>
 
         <Rise index={3} style={styles.rows}>
+          {/* Height, job and bio are optional at sign-up: a nudge until they're in. */}
+          {profile.heightCm === null || !profile.job || !profile.bio ? (
+            <LinkRow
+              title={t('home.completeProfile')}
+              subtitle={t('home.completeProfileNote')}
+              onPress={() => router.push('/profile')}
+              icon={
+                <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                  <Icon name="add" size={16} color={theme.text} />
+                </View>
+              }
+            />
+          ) : null}
           <LinkRow
             title={t('home.howToPlay')}
             subtitle={t('home.howToPlayNote')}
@@ -185,10 +197,10 @@ export function HomeScreen() {
           ))}
         </Rise>
 
-        <PushPrompt style={styles.push} />
 
-        {/* On the page, not in a card, so the chips keep their filled shape at rest. */}
-        {isMockServer ? (
+        {/* On the page, not in a card, so the chips keep their filled shape at rest.
+            Only in development: a store build never shows the bots' test controls. */}
+        {isMockServer && __DEV__ ? (
           <View style={styles.mock}>
             <ThemedText type="kicker" accessibilityRole="header">
               {t('home.testServer')}
@@ -212,10 +224,6 @@ export function HomeScreen() {
           </View>
         ) : null}
       </Screen>
-      <TabBar
-        active="home"
-        labels={{ home: t('home.tabHome'), matches: t('home.tabMatches'), settings: t('home.settings') }}
-      />
     </View>
   );
 }

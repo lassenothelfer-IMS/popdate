@@ -2,7 +2,8 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 
 import type { Doc, Id } from './_generated/dataModel';
-import { query, type QueryCtx } from './_generated/server';
+import { mutation, query, type QueryCtx } from './_generated/server';
+import { requireUserId } from './lib/auth';
 import { personCard } from './lib/people';
 
 /** A match as you see it: the `Match` shape in `src/api/types.ts`. */
@@ -35,6 +36,23 @@ export const list = query({
     ]);
     const all = [...asPopper, ...asWinner].sort((a, b) => b.createdAt - a.createdAt);
     return await Promise.all(all.map((match) => matchView(ctx, match, userId)));
+  },
+});
+
+/** Ends a match for both people: the match and its messages are deleted. */
+export const unmatch = mutation({
+  args: { matchId: v.string() },
+  handler: async (ctx, { matchId }) => {
+    const userId = await requireUserId(ctx);
+    const id = ctx.db.normalizeId('matches', matchId);
+    const match = id ? await ctx.db.get(id) : null;
+    if (!match || (match.popperId !== userId && match.winnerId !== userId)) return;
+    const messages = await ctx.db
+      .query('messages')
+      .withIndex('by_match', (q) => q.eq('matchId', match._id))
+      .collect();
+    for (const message of messages) await ctx.db.delete(message._id);
+    await ctx.db.delete(match._id);
   },
 });
 

@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -7,7 +7,7 @@ import { api, type Settings, type VerificationStatus } from '@/api';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
-import { TAB_BAR_CLEARANCE, TabBar } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouch, Space } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
@@ -30,9 +30,6 @@ import { enablePush, getPushPermission, type PushPermission } from '@/utils/push
 
 const SUPPORT_EMAIL = 'support@popdate.app';
 
-/** TODO(Elias): the hosted terms and privacy pages. Until then the rows say "Coming soon". */
-const TERMS_URL: string | null = null;
-const PRIVACY_URL: string | null = null;
 
 type SectionKey = 'preferences' | 'notifications' | 'safety' | 'account';
 type NotificationKey = keyof Settings['notifications'];
@@ -125,14 +122,6 @@ export function SettingsScreen() {
       ? settings.notifications
       : { roomLive: false, newMatch: false, messages: false };
     await save('notifications', { notifications: { ...base, [key]: on } });
-  }
-
-  function openLegal(url: string | null) {
-    if (url) {
-      Linking.openURL(url).catch(() => fail('account'));
-      return;
-    }
-    showNotice(t('settings.comingSoon'), t('settings.comingSoonBody'));
   }
 
   async function contactSupport() {
@@ -325,8 +314,8 @@ export function SettingsScreen() {
         </SettingsSection>
 
         <SettingsSection title={t('settings.legal')}>
-          <NavRow label={t('settings.terms')} onPress={() => openLegal(TERMS_URL)} />
-          <NavRow label={t('settings.privacy')} onPress={() => openLegal(PRIVACY_URL)} />
+          <NavRow label={t('settings.terms')} onPress={() => router.push('/settings/terms' as Href)} />
+          <NavRow label={t('settings.privacy')} onPress={() => router.push('/settings/privacy' as Href)} />
           <NavRow
             label={t('settings.support')}
             value={SUPPORT_EMAIL}
@@ -359,10 +348,6 @@ export function SettingsScreen() {
           </Pressable>
         </View>
       </Screen>
-      <TabBar
-        active="settings"
-        labels={{ home: t('home.tabHome'), matches: t('home.tabMatches'), settings: t('settings.title') }}
-      />
     </View>
   );
 }

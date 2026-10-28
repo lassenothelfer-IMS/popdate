@@ -1,7 +1,10 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import {
   AccessibilityInfo,
+  InputAccessoryView,
+  Keyboard,
   Platform,
+  Pressable,
   StyleSheet,
   TextInput,
   View,
@@ -15,6 +18,7 @@ import { useRevealField } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Space } from '@/constants/theme';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 type TextFieldProps = TextInputProps & {
   ref?: Ref<TextInputInstance>;
@@ -46,12 +50,17 @@ export function TextField({
 }: TextFieldProps) {
   const theme = useTheme();
   const scheme = useScheme();
+  const t = useT();
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInputInstance>(null);
   // The caller's ref still reaches the input, to move focus from field to field.
   useImperativeHandle(ref, () => inputRef.current as TextInputInstance);
   // In a scrolling screen, a focused field scrolls clear of the keyboard and footer.
   const reveal = useRevealField();
+  // iOS number pads have no return key: a Done bar above them closes the keyboard.
+  const padId = `pad${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const numberPad =
+    Platform.OS === 'ios' && (rest.keyboardType === 'number-pad' || rest.keyboardType === 'numeric');
   const errorMessage = error && hint ? hint : undefined;
 
   // VoiceOver ignores live regions, so say a new error once, after the key echo.
@@ -80,6 +89,7 @@ export function TextField({
         ]}>
         <TextInput
           ref={inputRef}
+          inputAccessoryViewID={numberPad ? padId : undefined}
           accessibilityLabel={rest.accessibilityLabel ?? label}
           placeholderTextColor={theme.textFaint}
           keyboardAppearance={scheme}
@@ -141,6 +151,21 @@ export function TextField({
           {counter}
         </ThemedText>
       ) : null}
+      {numberPad ? (
+        <InputAccessoryView nativeID={padId}>
+          <View style={[styles.padBar, { backgroundColor: theme.sheet, borderTopColor: theme.border }]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => Keyboard.dismiss()}
+              hitSlop={8}
+              style={({ pressed }) => [styles.padDone, pressed && styles.pressed]}>
+              <ThemedText type="headline" themeColor="accentText">
+                {t('common.done')}
+              </ThemedText>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
     </View>
   );
 }
@@ -190,5 +215,18 @@ const styles = StyleSheet.create({
   },
   counter: {
     textAlign: 'right',
+  },
+  padBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Space.md,
+  },
+  padDone: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.6,
   },
 });

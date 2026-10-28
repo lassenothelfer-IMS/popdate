@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 
 import { api, type Profile } from '@/api';
+import { MIN_PHOTOS } from '@/api/types';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
@@ -12,7 +13,6 @@ import { ProgressSegments } from '@/components/progress-segments';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Toggle } from '@/components/toggle';
 import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Colors, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
@@ -27,26 +27,24 @@ import {
 import { testPhotos } from '@/features/profile/test-profile';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
-import { useSession } from '@/state/session';
-import { useSettings } from '@/state/settings';
+import { SETUP_DRAFT_KEY, useSession } from '@/state/session';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
-import { enablePush, getPushPermission } from '@/utils/push';
 
 /**
  * The profile, after onboarding's questions: photos (S12, S13), a few lines
- * about you (S14), saved there; then notifications (S16) when the phone hasn't
- * been asked yet, and "You're in" (S18).
+ * about you (S14), saved there, then "You're in" (S18). Notifications are asked
+ * for later, in the queue, where they make sense.
  */
-type Phase = 'photos' | 'about' | 'notify' | 'ready';
+type Phase = 'photos' | 'about' | 'ready';
 
 /** Where each phase sits on the setup's progress bar (onboarding has steps 1 to 4). */
-const STEP: Record<'photos' | 'about' | 'notify', number> = { photos: 5, about: 6, notify: 7 };
+const STEP: Record<'photos' | 'about', number> = { photos: 5, about: 6 };
 
 export function ProfileSetupScreen() {
   const t = useT();
   const { onboarding, saveProfile } = useSession();
-  const form = useProfileForm(null);
+  const form = useProfileForm(null, { draftKey: SETUP_DRAFT_KEY });
   const [phase, setPhase] = useState<Phase>('photos');
   const [saved, setSaved] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
@@ -63,9 +61,7 @@ export function ProfileSetupScreen() {
     try {
       const profile = await saveProfile(form.details);
       setSaved(profile);
-      // Ask about notifications only while the phone hasn't been asked (never on the web).
-      const permission = await getPushPermission().catch(() => 'denied' as const);
-      setPhase(permission === 'undetermined' ? 'notify' : 'ready');
+      setPhase('ready');
     } catch {
       const message = t('profile.saveFailed');
       setError(message);
@@ -88,7 +84,6 @@ export function ProfileSetupScreen() {
       />
     );
   }
-  if (phase === 'notify') return <NotifyStep onDone={() => setPhase('ready')} />;
   return saved ? <ReadyStep profile={saved} /> : null;
 }
 
@@ -130,8 +125,10 @@ function StepHeading({ title, intro }: { title: string; intro: string }) {
 function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }) {
   const t = useT();
   const theme = useTheme();
-  const left = PHOTO_COUNT - form.photos.length;
-  const full = left === 0;
+  // Four to play; the last two slots are optional.
+  const left = Math.max(0, MIN_PHOTOS - form.photos.length);
+  const enough = left === 0;
+  const full = form.photos.length === PHOTO_COUNT;
   return (
     <Screen
       scroll
@@ -139,14 +136,14 @@ function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }
       footer={
         <View style={styles.actions}>
           <Button
-            title={full ? t('common.continue') : t('profile.addToContinue', { count: left })}
-            disabled={!full}
+            title={enough ? t('common.continue') : t('profile.addToContinue', { count: left })}
+            disabled={!enough}
             onPress={() => {
               haptics.light();
               onContinue();
             }}
           />
-          {__DEV__ && !full ? (
+          {__DEV__ && !enough ? (
             <Button
               title={t('profile.useTestPhotos')}
               variant="ghost"
@@ -223,96 +220,6 @@ function AboutStep({ form, saving, error, onBack, onSave }: AboutStepProps) {
       <Rise index={2} style={styles.body}>
         <DetailsSection form={form} bare />
         <GenderSection form={form} style={styles.genderSection} />
-      </Rise>
-    </Screen>
-  );
-}
-
-/** S16: a room waits one minute, so ask for notifications, with what they'll be. */
-function NotifyStep({ onDone }: { onDone: () => void }) {
-  const t = useT();
-  const theme = useTheme();
-  const { settings, update } = useSettings();
-  const [asking, setAsking] = useState(false);
-  const rows = [
-    { key: 'roomLive', title: t('onboarding.notifyRoom'), note: t('onboarding.notifyRoomNote') },
-    { key: 'newMatch', title: t('onboarding.notifyMatch'), note: t('onboarding.notifyMatchNote') },
-    { key: 'messages', title: t('onboarding.notifyMessages'), note: t('onboarding.notifyMessagesNote') },
-  ] as const;
-
-  async function turnOn() {
-    haptics.light();
-    setAsking(true);
-    await enablePush().catch(() => null);
-    setAsking(false);
-    onDone();
-  }
-
-  return (
-    <Screen
-      scroll
-      footerStyle="plain"
-      footer={
-        <View style={styles.actions}>
-          <Button title={t('onboarding.turnOn')} loading={asking} onPress={turnOn} />
-          <Button title={t('common.notNow')} variant="ghost" onPress={onDone} />
-        </View>
-      }>
-      <StepTop step={STEP.notify} />
-      <StepHeading title={t('onboarding.notifyTitle')} intro={t('onboarding.notifyBody')} />
-      <Rise index={2} style={styles.body}>
-        {/* What a notification looks like: decorative, the rows below say what's sent. */}
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={[styles.preview, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <View style={[styles.appIcon, { backgroundColor: theme.inverse }]}>
-            <Balloon color={BrandBalloon.color} size={10} string={false} />
-          </View>
-          <View style={styles.previewText}>
-            <View style={styles.previewTop}>
-              <ThemedText type="headline" style={styles.previewApp}>
-                Popdate
-              </ThemedText>
-              <ThemedText type="caption" themeColor="textTertiary">
-                {t('onboarding.notifyNow')}
-              </ThemedText>
-            </View>
-            <ThemedText type="callout" style={styles.previewBody}>
-              {t('onboarding.notifyPreview')}
-            </ThemedText>
-          </View>
-        </View>
-        <View>
-          {rows.map((row, i) => (
-            <View
-              key={row.key}
-              style={[
-                styles.notifyRow,
-                i < rows.length - 1 && {
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: theme.border,
-                },
-              ]}>
-              <View style={styles.notifyText}>
-                <ThemedText type="row" style={styles.notifyTitle}>
-                  {row.title}
-                </ThemedText>
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  {row.note}
-                </ThemedText>
-              </View>
-              <Toggle
-                compact
-                accessibilityLabel={row.title}
-                value={settings.notifications[row.key]}
-                onValueChange={(value) =>
-                  void update({ notifications: { ...settings.notifications, [row.key]: value } })
-                }
-              />
-            </View>
-          ))}
-        </View>
       </Rise>
     </Screen>
   );
@@ -407,7 +314,7 @@ function ReadyStep({ profile }: { profile: Profile }) {
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           style={[styles.count, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <Text style={[styles.countNumber, { color: theme.text }]}>{PHOTO_COUNT}</Text>
+          <Text style={[styles.countNumber, { color: theme.text }]}>{profile.photos.length}</Text>
           <ThemedText type="caption" themeColor="textSecondary" style={styles.countLabel}>
             {t('onboarding.photosReady')}
           </ThemedText>

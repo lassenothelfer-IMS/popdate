@@ -50,6 +50,7 @@ import {
 } from '@/features/game/answer-carousel';
 import { BalloonRail } from '@/features/game/balloon-rail';
 import { HoldToPop } from '@/features/game/hold-to-pop';
+import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { LeaveSheet } from '@/features/game/leave-sheet';
 import { LiveRow, PoppedRow } from '@/features/game/player-row';
 import { afterBeatIn, PopNews } from '@/features/game/pop-news';
@@ -80,6 +81,8 @@ const POP_BAR = Space.sm + 56 + StyleSheet.hairlineWidth;
  * footnote line, which grows with the text size.
  */
 const KEEPER_GAP = Space.xs;
+/** How long a room may take to load before the screen offers a retry. */
+const ROOM_LOAD_TIMEOUT = 12_000;
 const KEEPER_LINE = 18;
 /**
  * Until they are measured, at the default text size: the room bar, and the
@@ -201,6 +204,15 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   const room = useRoom(roomId);
   const { beat, matchInBeat, holdMs, start: startBeat, cancel: cancelBeat } = usePopBeat(room);
   const showHints = useShowHints();
+  // A room that won't load in a while: say so and offer a retry, rather than spin forever.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (room !== undefined) return;
+    const timer = setTimeout(() => setSlow(true), ROOM_LOAD_TIMEOUT);
+    return () => clearTimeout(timer);
+  }, [room]);
+  // Report or block anyone in the room; nothing to leave on, the room carries on.
+  const people = usePersonActions();
   /** The balloon the chooser is holding to pop, while the hold stage is open. */
   const [holdId, setHoldId] = useState<string | null>(null);
   // Selections are derived from the room below, so a stale id never shows.
@@ -326,6 +338,29 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     void countRoomPlayed();
   }, [endedForMe]);
 
+  if (room === undefined && slow) {
+    return (
+      <Screen
+        footerStyle="plain"
+        contentStyle={styles.centered}
+        footer={
+          <>
+            <Button
+              title={t('common.tryAgain')}
+              onPress={() => router.replace({ pathname: '/room/[id]', params: { id: roomId } })}
+            />
+            <Button title={t('game.backHome')} variant="ghost" onPress={goHome} />
+          </>
+        }>
+        <ThemedText type="title" accessibilityRole="header" style={styles.centeredText}>
+          {t('game.roomSlowTitle')}
+        </ThemedText>
+        <ThemedText type="callout" themeColor="textSecondary" style={styles.centeredText}>
+          {t('game.roomSlowBody')}
+        </ThemedText>
+      </Screen>
+    );
+  }
   if (room === undefined) return <LoadingScreen label={t('game.loadingRoom')} />;
   if (room === null) {
     return (
@@ -345,6 +380,9 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   const me = myIndex >= 0 ? room.contestants[myIndex] : undefined;
   const iAmActive = !!me && !me.popped;
   const finished = room.status === 'finished';
+  const othersInRoom: Person[] = [room.popper, ...room.contestants]
+    .filter((player) => player.id !== room.me.id)
+    .map((player) => ({ id: player.id, name: player.name, age: player.age }));
   const isPopping = room.status === 'popping';
   const answering = room.status === 'answering';
   const pending = isPopping
@@ -884,6 +922,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
         onSend={sendAnswer}
         onFocus={showQuestion}
         popperName={room.popper.name}
+        deadline={room.deadline}
       />
     );
   } else if (isPopper && pickingNow) {
@@ -982,7 +1021,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               subtitle={subtitle}
               watching={watching && !finished}
               timer={
-                answering || isPopping ? (
+                answering || isPopping || room.status === 'picking' ? (
                   <RoundTimer
                     deadline={room.deadline}
                     popReminder={room.popReminder}
@@ -991,6 +1030,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                 ) : null
               }
               onLeave={finished ? undefined : askLeave}
+              onMore={() => void people.openAmong(othersInRoom)}
               leaving={leaving}
               rounds={{
                 total: room.totalRounds,
@@ -1197,6 +1237,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               onStay={() => setConfirmingLeave(false)}
             />
           ) : null}
+          {people.element}
         </View>
       </LayoutAnimationConfig>
     </>
@@ -1204,6 +1245,14 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
 }
 
 const styles = StyleSheet.create({
+  centered: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    gap: Space.sm,
+  },
+  centeredText: {
+    textAlign: 'center',
+  },
   center: {
     flexGrow: 1,
     alignItems: 'center',

@@ -51,6 +51,9 @@ export const home: Strings = {
     unverifiedTitle: 'Not verified yet',
     unverifiedNote: 'Verified people get the cream check. Takes 20 seconds.',
     verifyAction: 'Verify',
+    matchesFailed: "Couldn't load your matches.",
+    completeProfile: 'Complete your profile',
+    completeProfileNote: 'Add your height, job and a line about you',
   },
   de: {
     settings: 'Einstellungen',
@@ -101,6 +104,9 @@ export const home: Strings = {
     unverifiedTitle: 'Noch nicht verifiziert',
     unverifiedNote: 'Verifizierte Profile bekommen den cremefarbenen Haken. Dauert 20 Sekunden.',
     verifyAction: 'Verifizieren',
+    matchesFailed: 'Deine Matches konnten nicht geladen werden.',
+    completeProfile: 'Profil vervollständigen',
+    completeProfileNote: 'Grösse, Job und ein Satz über dich',
   },
   fr: {
     settings: 'Réglages',
@@ -151,6 +157,9 @@ export const home: Strings = {
     unverifiedTitle: 'Pas encore vérifié',
     unverifiedNote: 'Les profils vérifiés ont la coche crème. Ça prend 20 secondes.',
     verifyAction: 'Vérifier',
+    matchesFailed: 'Impossible de charger tes matchs.',
+    completeProfile: 'Complète ton profil',
+    completeProfileNote: 'Ajoute ta taille, ton job et une phrase sur toi',
   },
   it: {
     settings: 'Impostazioni',
@@ -201,5 +210,8 @@ export const home: Strings = {
     unverifiedTitle: 'Non ancora verificato',
     unverifiedNote: 'I profili verificati hanno la spunta crema. Ci vogliono 20 secondi.',
     verifyAction: 'Verifica',
+    matchesFailed: 'Impossibile caricare i tuoi match.',
+    completeProfile: 'Completa il tuo profilo',
+    completeProfileNote: 'Aggiungi altezza, lavoro e una frase su di te',
   },
 };

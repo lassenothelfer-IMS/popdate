@@ -19,6 +19,7 @@ import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Colors, Ease, Fonts, SeatColors, Space } from '@/constants/theme';
+import { MoreButton, usePersonActions, type Person } from '@/features/chat/person-actions';
 import { BackButton } from '@/features/onboarding/back-button';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
@@ -90,6 +91,19 @@ function Recap({ room }: { room: Room }) {
   const height = (CARD.height / CARD.width) * width;
 
   const meId = room.me.id;
+  // Report or block anyone from the room; your match comes with Unmatch too.
+  const people = usePersonActions({ onGone: goHome });
+  const others: Person[] = [room.popper, ...room.contestants]
+    .filter((player) => player.id !== meId)
+    .map((player) => ({
+      id: player.id,
+      name: player.name,
+      age: player.age,
+      matchId:
+        room.matchId && (player.id === room.winnerId || player.id === room.popper.id)
+          ? room.matchId
+          : undefined,
+    }));
   const chooser = room.popper;
   const winner = room.contestants.find((c) => c.id === room.winnerId) ?? null;
   const headline = !winner
@@ -161,7 +175,15 @@ function Recap({ room }: { room: Room }) {
       footerStyle="plain"
       contentStyle={styles.content}
       footer={<Button title={t('match.backHome')} onPress={goHome} />}>
-      <BackButton onPress={() => (router.canGoBack() ? router.back() : goHome())} />
+      <View style={styles.top}>
+        <BackButton onPress={() => (router.canGoBack() ? router.back() : goHome())} />
+        <MoreButton
+          label={t('game.reportSomeone')}
+          disabled={people.busy}
+          onPress={() => void people.openAmong(others)}
+        />
+      </View>
+      {people.element}
 
       <View style={styles.stage}>
         <Animated.View
@@ -260,6 +282,11 @@ const styles = StyleSheet.create({
   },
   centeredText: {
     textAlign: 'center',
+  },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   content: {
     flexGrow: 1,

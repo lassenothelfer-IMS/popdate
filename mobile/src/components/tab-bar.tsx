@@ -22,8 +22,9 @@ type TabBarProps = {
 };
 
 /**
- * The floating tab bar on Home, Matches and Settings: a pill on surface 1 with a
- * hairline, 20 pt from the sides and 30 pt from the bottom. Three 44 x 36 items:
+ * The web's tab bar on Home, Matches and Settings (phones use the system tab bar,
+ * see `app/(tabs)/_layout.tsx`): a pill on surface 1 with a hairline, 20 pt from
+ * the sides and 30 pt from the bottom. Three 44 x 36 items:
  * the balloon (home), a chat bubble (matches) and a gear (settings).
  */
 export function TabBar({ active, labels }: TabBarProps) {
@@ -67,7 +68,7 @@ export function TabBar({ active, labels }: TabBarProps) {
   );
 }
 
-/** Space to leave under scrolling content so the tab bar never covers it. */
+/** Space to leave under scrolling content so a tab bar floating over it never covers it. */
 export const TAB_BAR_CLEARANCE = 36 + 12 + 30 + 16;
 
 const styles = StyleSheet.create({

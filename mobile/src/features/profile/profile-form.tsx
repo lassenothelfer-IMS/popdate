@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -9,11 +9,13 @@ import {
   useWindowDimensions,
   View,
   type StyleProp,
+  type TextInputInstance,
   type ViewStyle,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import type { Units } from '@/api';
+import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
 import { ErrorIcon, ErrorLine, errorEnter } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { Photo, type PhotoTone } from '@/components/photo';
@@ -28,9 +30,11 @@ import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
 import { useSettings } from '@/state/settings';
+import { readJson, writeJson } from '@/utils/device-store';
 import { cmToFeetInches, feetInchesToCm, formatHeight } from '@/utils/units';
 
-export const PHOTO_COUNT = 6;
+/** Slots in the grid. Four photos are enough to play; the last two are optional. */
+export const PHOTO_COUNT = MAX_PHOTOS;
 /** The grid: three columns of 108 pt rows, 10 apart; the lead photo spans two by two. */
 const GRID_GAP = 10;
 const ROW_HEIGHT = 108;
@@ -116,7 +120,23 @@ function heightRangeMessage(t: Translate, units: Units) {
  * (empty to start) and editing your profile (prefilled). Height follows your
  * units setting and is always handed back in cm.
  */
-export function useProfileForm(initial: ProfileDetails | null) {
+/** What profile setup keeps on the device while you fill it in. */
+type SetupDraft = {
+  photos: string[];
+  name: string;
+  city: string;
+  height: HeightEntry;
+  job: string;
+  bio: string;
+  genderDetails: string;
+  sexuality: Sexuality | null;
+};
+
+/**
+ * `draftKey`: keep the form on the device as you go and bring it back on the
+ * next launch, for profile setup, where nothing is saved to the server yet.
+ */
+export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { draftKey?: string } = {}) {
   const t = useT();
   const { units } = useSettings().settings;
   const [start] = useState(() => ({
@@ -132,6 +152,48 @@ export function useProfileForm(initial: ProfileDetails | null) {
   const [bio, setBio] = useState(initial?.bio ?? '');
   const [genderDetails, setGenderDetails] = useState(initial?.genderDetails ?? '');
   const [sexuality, setSexuality] = useState<Sexuality | null>(asSexuality(initial?.sexuality));
+  // Bring back a draft from an earlier launch, then keep it up to date.
+  const draftRestored = useRef(!draftKey);
+  useEffect(() => {
+    if (!draftKey) return;
+    let live = true;
+    void readJson<SetupDraft>(draftKey).then((draft) => {
+      if (!live) return;
+      if (draft) {
+        setPhotos(draft.photos);
+        setName(draft.name);
+        setCity(draft.city);
+        setTypedHeight(draft.height);
+        setJob(draft.job);
+        setBio(draft.bio);
+        setGenderDetails(draft.genderDetails);
+        setSexuality(draft.sexuality);
+      }
+      draftRestored.current = true;
+    });
+    return () => {
+      live = false;
+    };
+  }, [draftKey]);
+  useEffect(() => {
+    if (!draftKey) return;
+    const timer = setTimeout(() => {
+      if (!draftRestored.current) return;
+      const draft: SetupDraft = {
+        photos,
+        name,
+        city,
+        height: typedHeight,
+        job,
+        bio,
+        genderDetails,
+        sexuality,
+      };
+      void writeJson(draftKey, draft);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [draftKey, photos, name, city, typedHeight, job, bio, genderDetails, sexuality]);
+
   // The picker is open, or iCloud is still handing over the photos you chose.
   const [picking, setPicking] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -151,25 +213,25 @@ export function useProfileForm(initial: ProfileDetails | null) {
       : height.inches.length >= 2 || feetAreHopeless(height.feet);
   const showHeightError = heightTyped && !heightValid && (heightBlurred || heightDone);
 
+  // Height, job and bio are optional; a height you start typing has to make sense.
   const missingDetails = (
     [
       !name.trim() && 'name',
       !city.trim() && 'city',
-      !heightValid && 'height',
-      !job.trim() && 'job',
-      !bio.trim() && 'bio',
+      heightTyped && !heightValid && 'height',
     ] as const
   ).filter((detail) => detail !== false);
   const detailsDone = missingDetails.length === 0;
-  const photosLeft = PHOTO_COUNT - photos.length;
+  /** Photos still needed to play (the minimum, not every slot). */
+  const photosLeft = Math.max(0, MIN_PHOTOS - photos.length);
   const complete = photosLeft === 0 && detailsDone;
+  const savedHeight = heightTyped ? heightCm : null;
 
-  const details: ProfileDetails | null =
-    complete && heightCm !== null
+  const details: ProfileDetails | null = complete
       ? {
           name: name.trim(),
           city: city.trim(),
-          heightCm,
+          heightCm: savedHeight,
           job: job.trim(),
           bio: bio.trim(),
           genderDetails: genderDetails.trim() || undefined,
@@ -184,7 +246,7 @@ export function useProfileForm(initial: ProfileDetails | null) {
     photos.join('\n') !== before.photos.join('\n') ||
     name.trim() !== before.name.trim() ||
     city.trim() !== before.city.trim() ||
-    heightCm !== before.heightCm ||
+    savedHeight !== before.heightCm ||
     job.trim() !== before.job.trim() ||
     bio.trim() !== before.bio.trim() ||
     genderDetails.trim() !== (before.genderDetails ?? '').trim() ||
@@ -501,12 +563,21 @@ export function DetailsSection({ form, style, bare = false }: DetailsSectionProp
   const t = useT();
   const bioLeft = BIO_MAX - form.bio.length;
   const metric = form.height.units === 'metric';
+  // Next on the keyboard walks name, city, height, job, then the bio.
+  const cityRef = useRef<TextInputInstance>(null);
+  const heightRef = useRef<TextInputInstance>(null);
+  const jobRef = useRef<TextInputInstance>(null);
+  const bioRef = useRef<TextInputInstance>(null);
   const job = (
     <TextField
-      label={t('profile.jobOrSchool')}
+      ref={jobRef}
+      label={t('profile.optionalLabel', { label: t('profile.jobOrSchool') })}
       value={form.job}
       onChangeText={form.setJob}
       maxLength={60}
+      returnKeyType="next"
+      submitBehavior="submit"
+      onSubmitEditing={() => bioRef.current?.focus()}
     />
   );
 
@@ -520,14 +591,21 @@ export function DetailsSection({ form, style, bare = false }: DetailsSectionProp
         autoCapitalize="words"
         autoComplete="given-name"
         textContentType="givenName"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => cityRef.current?.focus()}
       />
       <TextField
+        ref={cityRef}
         label={t('profile.city')}
         value={form.city}
         onChangeText={form.setCity}
         maxLength={40}
         autoCapitalize="words"
         textContentType="addressCity"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => (metric ? heightRef : jobRef).current?.focus()}
       />
       {/* Checked inline by the ring, icon and message. No error haptic: that's for the save.
           Centimeters fit beside the job; feet and inches need the whole row. */}
@@ -535,7 +613,8 @@ export function DetailsSection({ form, style, bare = false }: DetailsSectionProp
         <View style={styles.pair}>
           <View style={styles.pairPart}>
             <TextField
-              label={t('profile.height')}
+              ref={heightRef}
+              label={t('profile.optionalLabel', { label: t('profile.height') })}
               accessibilityLabel={t('profile.heightCmLabel')}
               value={form.height.cm}
               onChangeText={(text) => form.changeHeight('cm', text)}
@@ -556,7 +635,8 @@ export function DetailsSection({ form, style, bare = false }: DetailsSectionProp
         </>
       )}
       <TextField
-        label={t('profile.bio')}
+        ref={bioRef}
+        label={t('profile.optionalLabel', { label: t('profile.bio') })}
         value={form.bio}
         onChangeText={form.setBio}
         maxLength={BIO_MAX}

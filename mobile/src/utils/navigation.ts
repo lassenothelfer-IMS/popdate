@@ -1,13 +1,10 @@
 import { router } from 'expo-router';
 
 /**
- * Queue, room and match replace each other on the stack, so home is right
- * below them. After a reload there is nothing below, so replace instead.
+ * Back to Home from anywhere: pops every screen above it (the match, a recap or
+ * chat opened from it), or replaces the screen when Home isn't on the stack,
+ * like after a reload.
  */
 export function goHome() {
-  if (router.canGoBack()) {
-    router.back();
-  } else {
-    router.replace('/home');
-  }
+  router.dismissTo('/home');
 }

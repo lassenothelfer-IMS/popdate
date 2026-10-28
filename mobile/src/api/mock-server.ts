@@ -9,6 +9,7 @@ import type {
   BlockedPerson,
   Contestant,
   Gender,
+  Interest,
   Match,
   Message,
   PopdateApi,
@@ -23,6 +24,7 @@ import type {
   RoomPlayer,
   RoomStatus,
 } from '@/api/types';
+import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { maskProfanity } from '@/utils/profanity';
@@ -32,8 +34,17 @@ const PROFILE_KEY = 'popdate.mockProfile';
 const SETTINGS_KEY = 'popdate.mockSettings';
 
 const LOBBY_SIZE = 6;
+
+/** A bot's side for someone who wants to meet `interest`: either one for everyone. */
+function sideFor(interest: Interest): Gender {
+  return interest === 'everyone' ? pickRandom<Gender>(['woman', 'man']) : interest;
+}
 const ANSWER_MS = 60_000;
 const POP_REMINDER_MS = 30_000;
+/** The popper's time to pick a question before one is picked for them. */
+const PICK_MS = 30_000;
+/** After the reminder, the time until a random balloon pops so the room never stalls. */
+const POP_LIMIT_MS = 30_000;
 const QUESTION_OPTIONS_PER_ROUND = 5;
 
 const QUESTIONS: Question[] = [
@@ -201,7 +212,9 @@ class MockServer implements PopdateApi {
 
   async saveProfile(draft: ProfileDraft) {
     const userId = await this.signIn();
-    if (draft.photos.length !== 6) throw new Error('A profile needs exactly 6 photos.');
+    if (draft.photos.length < MIN_PHOTOS || draft.photos.length > MAX_PHOTOS) {
+      throw new Error('A profile needs 4 to 6 photos.');
+    }
     if (ageFromBirthDate(draft.birthDate) < 18) throw new Error('You need to be 18 or older.');
     this.profile = { ...draft, id: userId };
     await writeJson(PROFILE_KEY, this.profile);
@@ -327,6 +340,29 @@ class MockServer implements PopdateApi {
     this.emit(room);
   }
 
+  watchConnection(onChange: (online: boolean) => void) {
+    // The mock lives on the phone, so only the web can tell it's offline.
+    const target = typeof window !== 'undefined' && 'addEventListener' in window ? window : null;
+    const update = () => onChange(typeof navigator === 'undefined' || navigator.onLine !== false);
+    update();
+    target?.addEventListener('online', update);
+    target?.addEventListener('offline', update);
+    return () => {
+      target?.removeEventListener('online', update);
+      target?.removeEventListener('offline', update);
+    };
+  }
+
+  async getActiveRoom() {
+    for (const room of this.rooms.values()) {
+      if (room.status === 'finished') continue;
+      if (room.popper.id === this.userId) return room.id;
+      const seat = room.seats.find((s) => s.player.id === this.userId);
+      if (seat && isActive(seat)) return room.id;
+    }
+    return null;
+  }
+
   // Matches
 
   async listMatches() {
@@ -335,6 +371,11 @@ class MockServer implements PopdateApi {
 
   async getMatch(matchId: string) {
     return this.matches.find((match) => match.id === matchId) ?? null;
+  }
+
+  async unmatch(matchId: string) {
+    this.matches = this.matches.filter((match) => match.id !== matchId);
+    this.messages.delete(matchId);
   }
 
   // Account
@@ -513,9 +554,9 @@ class MockServer implements PopdateApi {
     let contestants: Player[];
     if (role === 'popper') {
       popper = self;
-      contestants = Array.from({ length: LOBBY_SIZE - 1 }, () => this.makeBot(me.wantsToMeet));
+      contestants = Array.from({ length: LOBBY_SIZE - 1 }, () => this.makeBot(sideFor(me.wantsToMeet)));
     } else {
-      popper = this.makeBot(me.wantsToMeet);
+      popper = this.makeBot(sideFor(me.wantsToMeet));
       const others = Array.from({ length: LOBBY_SIZE - 2 }, () => this.makeBot(me.gender));
       contestants = shuffle([self, ...others]);
     }
@@ -566,17 +607,16 @@ class MockServer implements PopdateApi {
     this.clearTimers(room);
     room.status = 'picking';
     room.question = null;
-    room.deadline = null;
+    room.deadline = Date.now() + PICK_MS;
     room.popReminder = false;
     const unused = QUESTIONS.filter((q) => !room.usedQuestionIds.has(q.id));
     room.questionOptions = shuffle(unused).slice(0, QUESTION_OPTIONS_PER_ROUND);
     this.emit(room);
 
-    if (room.popper.isBot) {
-      this.after(room, randomInt(2000, 3500), () => {
-        this.startAnswering(room, pickRandom(room.questionOptions));
-      });
-    }
+    // A bot picks in a few seconds; an idle person gets one picked for them.
+    this.after(room, room.popper.isBot ? randomInt(2000, 3500) : PICK_MS, () => {
+      this.startAnswering(room, pickRandom(room.questionOptions));
+    });
   }
 
   private startAnswering(room: ServerRoom, question: Question) {
@@ -615,7 +655,12 @@ class MockServer implements PopdateApi {
 
     this.after(room, POP_REMINDER_MS, () => {
       room.popReminder = true;
+      room.deadline = Date.now() + POP_LIMIT_MS;
       this.emit(room);
+      // Past the limit a random balloon pops, so five people never wait forever.
+      this.after(room, POP_LIMIT_MS, () => {
+        if (room.status === 'popping') this.pop(room, pickRandom(room.seats.filter(isActive)));
+      });
     });
     if (room.popper.isBot) {
       this.after(room, randomInt(3500, 6000), () => {

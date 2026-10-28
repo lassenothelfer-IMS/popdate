@@ -1,20 +1,22 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Keyframe } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, type Match } from '@/api';
 import { Button } from '@/components/button';
+import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MaxContentWidth, Space, type Seat } from '@/constants/theme';
+import { Ease, Gutter, MaxContentWidth, MinTouch, Space, type Seat } from '@/constants/theme';
+import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
 import { Aura } from '@/features/match/aura';
 import { PhotoCard } from '@/features/match/photo-card';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
-import { seatAt, seatFor, useSeats, youSeat } from '@/hooks/use-theme';
+import { seatAt, seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
@@ -115,6 +117,9 @@ export function MatchScreen({ matchId }: { matchId: string }) {
 
 function MatchMoment({ match, role }: { match: Match; role: Role }) {
   const t = useT();
+  const theme = useTheme();
+  // Report, block or unmatch them; the last two end the match moment.
+  const actions = usePersonActions({ onGone: goHome });
   const seats = useSeats();
   const insets = useSafeAreaInsets();
   const { profile } = useSession();
@@ -220,6 +225,30 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
         />
       </View>
 
+      {/* Swipe-back is off on the match, so this is the way out besides chat and recap. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t('match.backHome')}
+        onPress={goHome}
+        hitSlop={8}
+        style={({ pressed }) => [styles.close, { top: top - 12 }, pressed && styles.pressed]}>
+        <Icon name="close" size={18} color={theme.text} />
+      </Pressable>
+      <MoreButton
+        label={t('chat.options')}
+        hint={t('chat.optionsHint', { name: match.other.name })}
+        disabled={actions.busy}
+        onPress={() =>
+          void actions.open({
+            id: match.other.id,
+            name: match.other.name,
+            age: match.other.age,
+            matchId: match.id,
+          })
+        }
+        style={[styles.more, { top: top - 12 }]}
+      />
+      {actions.element}
       <ThemedText type="kicker" style={styles.kicker}>
         {t('match.lastBalloon')}
       </ThemedText>
@@ -298,6 +327,23 @@ const styles = StyleSheet.create({
   },
   kicker: {
     textAlign: 'center',
+  },
+  more: {
+    position: 'absolute',
+    right: Gutter - 12,
+    zIndex: 2,
+  },
+  close: {
+    position: 'absolute',
+    left: Gutter - 12,
+    width: MinTouch,
+    height: MinTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  pressed: {
+    opacity: 0.6,
   },
   stage: {
     position: 'relative',

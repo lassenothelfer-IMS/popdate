@@ -23,6 +23,7 @@ import type * as lib_room from "../lib/room.js";
 import type * as lib_uploads from "../lib/uploads.js";
 import type * as matches from "../matches.js";
 import type * as profiles from "../profiles.js";
+import type * as push from "../push.js";
 import type * as queue from "../queue.js";
 import type * as rooms from "../rooms.js";
 import type * as safety from "../safety.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   "lib/uploads": typeof lib_uploads;
   matches: typeof matches;
   profiles: typeof profiles;
+  push: typeof push;
   queue: typeof queue;
   rooms: typeof rooms;
   safety: typeof safety;

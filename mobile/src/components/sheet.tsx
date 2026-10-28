@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion, SlideInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,7 +32,11 @@ export function Sheet({ visible, onClose, title, children }: SheetProps) {
       <Animated.View entering={dimIn} style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
-      <View style={styles.anchor} pointerEvents="box-none">
+      {/* Rides up with the keyboard, so a field in the sheet stays in view. */}
+      <KeyboardAvoidingView
+        style={styles.anchor}
+        pointerEvents="box-none"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Animated.View
           entering={sheetIn}
           accessibilityViewIsModal
@@ -45,7 +49,7 @@ export function Sheet({ visible, onClose, title, children }: SheetProps) {
           ) : null}
           {children}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

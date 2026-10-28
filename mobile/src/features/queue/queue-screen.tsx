@@ -29,6 +29,7 @@ import { useQueueStatus, useRoom } from '@/hooks/use-server';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { haptics } from '@/utils/haptics';
+import { PushPrompt } from '@/features/home/push-prompt';
 import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
 
@@ -361,6 +362,8 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             </ThemedText>
           </Rise>
         )}
+        {/* Asked here, where it's useful: you can leave the app and still hear when the room opens. */}
+        {beat ? null : <PushPrompt />}
       </Pressable>
     </Screen>
   );

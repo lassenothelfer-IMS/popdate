@@ -198,9 +198,12 @@ export class ConvexServer implements PopdateApi {
       gender: draft.gender,
       wantsToMeet: draft.wantsToMeet,
       city: draft.city,
-      heightCm: draft.heightCm,
+      heightCm: draft.heightCm ?? undefined,
       job: draft.job,
       bio: draft.bio,
+      genderIdentity: draft.genderIdentity,
+      genderDetails: draft.genderDetails,
+      sexuality: draft.sexuality,
       photos,
     });
     return this.keepPhotoIds(saved);
@@ -219,6 +222,20 @@ export class ConvexServer implements PopdateApi {
 
   async leaveQueue() {
     await this.mutation(api.queue.leaveQueue, {});
+  }
+
+  watchConnection(onChange: (online: boolean) => void) {
+    // Offline only once it had connected and then lost the socket; a first connect is just loading.
+    const update = () => {
+      const state = this.client.connectionState();
+      onChange(state.isWebSocketConnected || !state.hasEverConnected);
+    };
+    update();
+    return this.client.subscribeToConnectionState(update);
+  }
+
+  async getActiveRoom() {
+    return this.query(api.rooms.active, {});
   }
 
   watchQueue(onChange: (status: QueueStatus) => void) {
@@ -255,6 +272,10 @@ export class ConvexServer implements PopdateApi {
 
   async getMatch(matchId: string): Promise<Match | null> {
     return await this.query(api.matches.get, { matchId });
+  }
+
+  async unmatch(matchId: string) {
+    await this.mutation(api.matches.unmatch, { matchId });
   }
 
   // Settings

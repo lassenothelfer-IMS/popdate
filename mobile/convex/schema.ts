@@ -3,6 +3,8 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 export const gender = v.union(v.literal('woman'), v.literal('man'));
+/** Who someone wants to meet: one side of the room, or either. */
+export const interest = v.union(v.literal('woman'), v.literal('man'), v.literal('everyone'));
 
 export const roomStatus = v.union(
   v.literal('picking'),
@@ -33,12 +35,17 @@ export default defineSchema({
     /** YYYY-MM-DD */
     birthDate: v.string(),
     gender,
-    wantsToMeet: gender,
+    wantsToMeet: interest,
+    /** How they describe their gender, like `nonbinary`; `gender` is their side of the room. */
+    genderIdentity: v.optional(v.string()),
+    genderDetails: v.optional(v.string()),
+    sexuality: v.optional(v.string()),
     city: v.string(),
-    heightCm: v.number(),
+    /** Optional, like job and bio (which are empty strings when left out). */
+    heightCm: v.optional(v.number()),
     job: v.string(),
     bio: v.string(),
-    /** Exactly 6 files, in order (position 1 to 6). */
+    /** 4 to 6 files, in order (position 1 to 6). */
     photos: v.array(v.id('_storage')),
     termsAcceptedAt: v.string(),
   }).index('by_user', ['userId']),
@@ -92,7 +99,7 @@ export default defineSchema({
   queue: defineTable({
     userId: v.id('users'),
     gender,
-    wantsToMeet: gender,
+    wantsToMeet: interest,
     joinedAt: v.number(),
     roomId: v.optional(v.id('rooms')),
   })

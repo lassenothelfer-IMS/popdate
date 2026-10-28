@@ -39,7 +39,7 @@ export const status = query({
       (row) =>
         row.userId !== userId &&
         ((row.gender === mine.gender && row.wantsToMeet === mine.wantsToMeet) ||
-          (row.gender === mine.wantsToMeet && row.wantsToMeet === mine.gender)),
+          (wants(mine, row.gender) && wants(row, mine.gender))),
     );
     return { state: 'searching' as const, found: Math.min(needed, 1 + others.length), needed };
   },
@@ -94,6 +94,11 @@ export async function removeFromQueue(ctx: MutationCtx, userId: Id<'users'>) {
  * blocked anyone else in the lobby. The longest-waiting players go first.
  * It runs inside `joinQueue`, so a lobby forms the moment its last player joins.
  */
+/** Whether someone in the queue wants to meet people of this side. */
+function wants(row: Pick<Doc<'queue'>, 'wantsToMeet'>, side: Doc<'queue'>['gender']) {
+  return row.wantsToMeet === 'everyone' || row.wantsToMeet === side;
+}
+
 async function matchmake(ctx: MutationCtx) {
   const contestantsNeeded = lobbySize() - 1;
   const waiting = await waitingPlayers(ctx);
@@ -104,9 +109,7 @@ async function matchmake(ctx: MutationCtx) {
     const picked: Doc<'queue'>[] = [];
     for (const candidate of waiting) {
       if (candidate.userId === popper.userId) continue;
-      if (candidate.gender !== popper.wantsToMeet || candidate.wantsToMeet !== popper.gender) {
-        continue;
-      }
+      if (!wants(popper, candidate.gender) || !wants(candidate, popper.gender)) continue;
       if ([popper, ...picked].some((member) => clash(member.userId, candidate.userId))) continue;
       picked.push(candidate);
       if (picked.length === contestantsNeeded) break;

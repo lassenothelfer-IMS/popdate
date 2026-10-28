@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
@@ -15,6 +15,8 @@ const MAX_ANSWER_LENGTH = 280;
 const COUNTER_FROM = 240;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */
 const SPOKEN_COUNTS = [0, 10, 20, MAX_ANSWER_LENGTH - COUNTER_FROM];
+/** A typed answer goes out this long before time is up, so it still counts. */
+const AUTO_SEND_BEFORE = 1500;
 /** One line of answer. The field grows from here as the answer wraps. */
 const FIELD_HEIGHT = 52;
 /** About four lines, then the field scrolls. */
@@ -39,6 +41,8 @@ type AnswerComposerProps = {
   onSend: (text: string) => Promise<void>;
   onFocus?: () => void;
   popperName: string;
+  /** When answers close. Whatever you've typed by then is sent for you. */
+  deadline: number | null;
 };
 
 /** The answer field and an ink send button, side by side in the footer bar. */
@@ -48,6 +52,7 @@ export function AnswerComposer({
   onSend,
   onFocus,
   popperName,
+  deadline,
 }: AnswerComposerProps) {
   const theme = useTheme();
   const scheme = useScheme();
@@ -68,6 +73,17 @@ export function AnswerComposer({
     }
     spokenCount.current = reached;
   }
+
+  // Time's nearly up and you typed something but didn't send it: send it, rather than
+  // the room seeing "No answer".
+  const sendBeforeTimeUp = useEffectEvent(() => {
+    void handleSend();
+  });
+  useEffect(() => {
+    if (deadline === null) return;
+    const timer = setTimeout(sendBeforeTimeUp, Math.max(0, deadline - Date.now() - AUTO_SEND_BEFORE));
+    return () => clearTimeout(timer);
+  }, [deadline]);
 
   async function handleSend() {
     if (!text.trim() || sending) return;
