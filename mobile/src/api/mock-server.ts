@@ -210,6 +210,10 @@ class MockServer implements PopdateApi {
     return this.profile;
   }
 
+  preparePhoto() {
+    // Nothing to upload: the mock keeps the photos on the phone.
+  }
+
   async saveProfile(draft: ProfileDraft) {
     const userId = await this.signIn();
     if (draft.photos.length < MIN_PHOTOS || draft.photos.length > MAX_PHOTOS) {

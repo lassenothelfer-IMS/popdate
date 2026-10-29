@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import type { Units } from '@/api';
+import { api, type Units } from '@/api';
 import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
 import { ErrorIcon, ErrorLine, errorEnter } from '@/components/error-line';
 import { Icon } from '@/components/icon';
@@ -299,6 +299,8 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
       });
       if (result.canceled) return;
       const picked = result.assets.map((asset) => asset.uri);
+      // Start the uploads now, so saving the profile has little left to wait for.
+      picked.forEach((uri) => api.preparePhoto(uri));
       setPhotos((current) => [...current, ...picked].slice(0, PHOTO_COUNT));
     } catch {
       const message = t('profile.photosFailed');

@@ -165,6 +165,11 @@ export interface PopdateApi {
   signIn(): Promise<string>;
   getMyProfile(): Promise<Profile | null>;
   saveProfile(draft: ProfileDraft): Promise<Profile>;
+  /**
+   * Starts uploading a photo you just picked, so saving the profile later only
+   * waits for whatever hasn't finished. Fire and forget; failures retry on save.
+   */
+  preparePhoto(uri: string): void;
 
   joinQueue(): Promise<void>;
   leaveQueue(): Promise<void>;

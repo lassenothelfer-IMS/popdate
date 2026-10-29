@@ -1,6 +1,7 @@
 import { ConvexReactClient } from 'convex/react';
 import type { FunctionReference } from 'convex/server';
 import { ConvexError } from 'convex/values';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -60,6 +61,8 @@ export class ConvexServer implements PopdateApi {
   private authListeners = new Set<() => void>();
   /** Photo URL to file id, so editing a profile resends kept photos instead of uploading them again. */
   private photoIds = new Map<string, string>();
+  /** Uploads started as photos were picked, by their local URI. */
+  private pendingUploads = new Map<string, Promise<Id<'_storage'>>>();
 
   constructor(url: string) {
     this.client = new ConvexReactClient(url, { unsavedChangesWarning: false });
@@ -133,10 +136,18 @@ export class ConvexServer implements PopdateApi {
     return unsubscribe;
   }
 
+  preparePhoto(uri: string) {
+    if (this.pendingUploads.has(uri) || this.photoIds.has(uri)) return;
+    const upload = this.upload(uri);
+    this.pendingUploads.set(uri, upload);
+    // A failed early upload is forgotten, and saving tries that photo again.
+    upload.catch(() => this.pendingUploads.delete(uri));
+  }
+
   /** Uploads one local photo to Convex file storage and returns its file id. */
   private async upload(uri: string): Promise<Id<'_storage'>> {
     const uploadUrl = await this.mutation(api.profiles.generateUploadUrl, {});
-    const source = uri.startsWith('mock://') ? PLACEHOLDER_PHOTO : uri;
+    const source = uri.startsWith('mock://') ? PLACEHOLDER_PHOTO : await shrinkPhoto(uri);
     const blob = await (await fetch(source)).blob();
     const response = await fetch(uploadUrl, {
       method: 'POST',
@@ -181,6 +192,7 @@ export class ConvexServer implements PopdateApi {
     await this.actions?.signOut().catch(() => {});
     await this.waitForAuth((auth) => !auth.loading && !auth.authenticated);
     this.photoIds.clear();
+    this.pendingUploads.clear();
   }
 
   async getMyProfile(): Promise<Profile | null> {
@@ -190,7 +202,10 @@ export class ConvexServer implements PopdateApi {
 
   async saveProfile(draft: ProfileDraft): Promise<Profile> {
     const photos = await Promise.all(
-      draft.photos.map(async (uri) => (this.photoIds.get(uri) as Id<'_storage'>) ?? this.upload(uri)),
+      draft.photos.map(
+        async (uri) =>
+          (this.photoIds.get(uri) as Id<'_storage'>) ?? this.pendingUploads.get(uri) ?? this.upload(uri),
+      ),
     );
     const saved = await this.mutation(api.profiles.saveProfile, {
       name: draft.name,
@@ -334,5 +349,27 @@ export class ConvexServer implements PopdateApi {
 
   async sendMessage(matchId: string, text: string): Promise<Message> {
     return await this.mutation(api.chat.send, { matchId, text });
+  }
+}
+
+/** Photos are shown at most this wide, so nothing wider is uploaded. */
+const PHOTO_MAX_WIDTH = 1440;
+
+/**
+ * A picked photo as a JPEG at most 1440 px wide: around 300 KB instead of a
+ * 3 MB HEIC original, so a profile uploads quickly even on mobile data.
+ * Falls back to the original if it can't be read.
+ */
+async function shrinkPhoto(uri: string): Promise<string> {
+  try {
+    const original = await ImageManipulator.manipulate(uri).renderAsync();
+    const image =
+      original.width > PHOTO_MAX_WIDTH
+        ? await ImageManipulator.manipulate(uri).resize({ width: PHOTO_MAX_WIDTH }).renderAsync()
+        : original;
+    const { uri: shrunk } = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 });
+    return shrunk;
+  } catch {
+    return uri;
   }
 }
