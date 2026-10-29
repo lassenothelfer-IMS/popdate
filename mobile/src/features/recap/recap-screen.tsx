@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useId, type ReactNode } from 'react';
+import { useEffect, useId } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -21,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Colors, Ease, Fonts, SeatColors, Space } from '@/constants/theme';
 import { MoreButton, usePersonActions, type Person } from '@/features/chat/person-actions';
 import { BackButton } from '@/features/onboarding/back-button';
+import { useRoomHistory } from '@/features/rooms/use-room-history';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatAt } from '@/hooks/use-theme';
@@ -32,8 +33,10 @@ import { webSafeKeyframe } from '@/utils/web-motion';
 /** The recap card is always drawn in Cream, whatever the app's theme, so it shares the same everywhere. */
 const paper = Colors.light;
 const paperSeats = SeatColors.light;
-/** The card is 320 x 520 on a 390 pt screen. */
-const CARD = { width: 320, height: 520, radius: 24 };
+/** The card is 340 pt wide at most and as tall as what it holds. */
+const CARD = { width: 340, radius: 24, padding: 24 };
+/** Taller than any card, so the sheen always crosses all of it. */
+const SHEEN_HEIGHT = 1200;
 
 /** The card rises 80 pt and unfolds from an 18 degree tilt, over 1 s. */
 const cardIn = webSafeKeyframe(
@@ -49,7 +52,7 @@ const cardIn = webSafeKeyframe(
     .delay(200),
 );
 
-/** The stats fade up 10 pt, 150 ms apart from 800 ms. */
+/** The sections fade up 10 pt, 150 ms apart from 800 ms. */
 function statIn(index: number) {
   return webSafeKeyframe(
     new Keyframe({
@@ -81,14 +84,17 @@ export function RecapScreen({ roomId }: { roomId: string }) {
   return <Recap room={room} />;
 }
 
+type Round = { number: number; question: string | null; popped: string[]; gotMe: boolean };
+
 function Recap({ room }: { room: Room }) {
   const t = useT();
   const locale = useLocale();
   const { profile } = useSession();
   const reduced = useReduceMotion();
+  const { history } = useRoomHistory();
   const { width: windowWidth } = useWindowDimensions();
-  const width = Math.min(CARD.width, windowWidth - 70);
-  const height = (CARD.height / CARD.width) * width;
+  const width = Math.min(CARD.width, windowWidth - 2 * Space.lg);
+  const seatWidth = (width - 2 * CARD.padding) / Math.max(room.contestants.length, 1);
 
   const meId = room.me.id;
   // Report or block anyone from the room; your match comes with Unmatch too.
@@ -117,9 +123,25 @@ function Recap({ room }: { room: Room }) {
   const me = room.contestants.find((c) => c.id === meId) ?? null;
   // Rounds you got through: all of them if you held on, one fewer than the round you popped in.
   const survived = me ? (me.popped && me.poppedInRound ? me.poppedInRound - 1 : room.totalRounds) : null;
-  // The room keeps its last question, so it is the one that got you only if you popped in the last round.
-  const gotYou = me?.popped && me.poppedInRound === room.round && room.question ? room.question.text : null;
   const lastAnswer = me?.answer ?? null;
+
+  // Each round's question comes from your room history; the room itself only keeps the last one.
+  const summary = history?.find((entry) => entry.roomId === room.id) ?? null;
+  const playedRounds = Math.max(
+    summary?.rounds.length ?? 0,
+    ...room.contestants.map((c) => c.poppedInRound ?? 0),
+    room.round,
+  );
+  const rounds: Round[] = Array.from({ length: playedRounds }, (_, i) => {
+    const number = i + 1;
+    const out = room.contestants.filter((c) => c.popped && c.poppedInRound === number);
+    return {
+      number,
+      question: summary?.rounds[i]?.question || (number === room.round ? (room.question?.text ?? null) : null),
+      popped: out.map((c) => (c.id === meId ? t('common.you') : c.name)),
+      gotMe: out.some((c) => c.id === meId),
+    };
+  }).filter((round) => round.question || round.popped.length > 0);
 
   let dateLine = '';
   try {
@@ -129,49 +151,10 @@ function Recap({ room }: { room: Room }) {
   }
   if (profile?.city) dateLine = `${profile.city}, ${dateLine}`;
 
-  const stats: { key: string; label: string; value: ReactNode }[] = [];
-  if (survived !== null) {
-    stats.push({
-      key: 'survived',
-      label: t('match.recapSurvived'),
-      value: (
-        <Text style={[styles.statNumber, { color: paper.text }]}>
-          {t('match.recapOf', { count: survived, total: room.totalRounds })}
-        </Text>
-      ),
-    });
-  }
-  if (gotYou) {
-    stats.push({
-      key: 'gotYou',
-      label: t('match.recapGotYou'),
-      value: (
-        <Text style={[styles.statQuote, { color: paper.text }]} numberOfLines={3}>
-          {`“${gotYou}”`}
-        </Text>
-      ),
-    });
-  }
-  stats.push({
-    key: 'room',
-    label: t('match.recapRoom'),
-    value: (
-      <View style={styles.row} accessible accessibilityLabel={t('match.recapRoomLabel', { count: room.contestants.length })}>
-        {room.contestants.map((c, i) =>
-          c.popped ? (
-            <View key={c.id} style={styles.poppedSeat}>
-              <PoppedMark color={seatAt(paperSeats, i).color} size={12} />
-            </View>
-          ) : (
-            <Balloon key={c.id} color={seatAt(paperSeats, i).color} size={12} string={false} />
-          ),
-        )}
-      </View>
-    ),
-  });
-
+  let section = 0;
   return (
     <Screen
+      scroll
       footerStyle="plain"
       contentStyle={styles.content}
       footer={<Button title={t('match.backHome')} onPress={goHome} />}>
@@ -194,12 +177,11 @@ function Recap({ room }: { room: Room }) {
             styles.card,
             {
               width,
-              height,
               backgroundColor: paper.page,
               boxShadow: `0 40px 80px -30px rgba(0,0,0,0.9), inset 0 0 0 1px ${paper.border}`,
             },
           ]}>
-          <Sheen height={height} reduced={reduced} />
+          <Sheen reduced={reduced} />
           <View style={styles.brand}>
             <Text style={[styles.wordmark, { color: paper.text }]}>P</Text>
             <View style={styles.wordmarkBalloon}>
@@ -214,28 +196,102 @@ function Recap({ room }: { room: Room }) {
             <Text style={[styles.hero, { color: paper.text }]}>{headline}</Text>
           </View>
 
-          <View style={styles.stats}>
-            {stats.map((stat, i) => (
-              <Animated.View
-                key={stat.key}
-                entering={reduced ? undefined : statIn(i)}
-                style={[
-                  styles.stat,
-                  i < stats.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: paper.borderStrong },
-                ]}>
-                <Text style={[styles.statLabel, { color: paper.textSecondary }]}>{stat.label}</Text>
-                {stat.value}
-              </Animated.View>
-            ))}
-          </View>
-
-          {lastAnswer ? (
-            <View style={styles.answer}>
-              <Text style={[styles.answerLabel, { color: paper.textSecondary }]}>{t('match.recapLastAnswer')}</Text>
-              <Text style={[styles.answerText, { color: paper.text }]} numberOfLines={2}>
-                {`“${lastAnswer}”`}
-              </Text>
+          <Animated.View entering={reduced ? undefined : statIn(section++)} style={styles.section}>
+            <Text style={[styles.label, { color: paper.textSecondary }]}>{t('match.recapRoom')}</Text>
+            <View
+              style={styles.seats}
+              accessible
+              accessibilityLabel={t('match.recapRoomLabel', { count: room.contestants.length })}>
+              {room.contestants.map((c, i) => {
+                const color = seatAt(paperSeats, i).color;
+                const isWinner = c.id === room.winnerId;
+                const note = isWinner
+                  ? room.matchId
+                    ? t('match.recapMatch')
+                    : t('match.recapLast')
+                  : c.popped && c.poppedInRound
+                    ? t('match.recapRoundN', { n: c.poppedInRound })
+                    : '';
+                return (
+                  <View key={c.id} style={[styles.seat, { width: seatWidth }]}>
+                    <View style={styles.seatBalloon}>
+                      {c.popped ? (
+                        <PoppedMark color={color} size={26} />
+                      ) : (
+                        <Balloon color={color} size={26} />
+                      )}
+                    </View>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.seatName,
+                        { color: c.popped ? paper.textSecondary : paper.text },
+                        (isWinner || c.id === meId) && styles.seatNameStrong,
+                      ]}>
+                      {c.id === meId ? t('common.you') : c.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.seatNote, { color: isWinner ? paper.accentText : paper.textTertiary }]}>
+                      {note}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
+          </Animated.View>
+
+          {rounds.length > 0 ? (
+            <Animated.View entering={reduced ? undefined : statIn(section++)} style={styles.section}>
+              <Text style={[styles.label, { color: paper.textSecondary }]}>{t('match.recapHowItWent')}</Text>
+              {rounds.map((round, i) => (
+                <View
+                  key={round.number}
+                  style={[
+                    styles.round,
+                    i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: paper.borderStrong },
+                  ]}>
+                  <Text style={[styles.roundNumber, { color: paper.textTertiary }]}>{round.number}</Text>
+                  <View style={styles.roundBody}>
+                    {round.question ? (
+                      <Text style={[styles.roundQuestion, { color: paper.text }]} numberOfLines={3}>
+                        {`“${round.question}”`}
+                      </Text>
+                    ) : null}
+                    {round.popped.length > 0 ? (
+                      <Text style={[styles.roundPopped, { color: round.gotMe ? paper.accentText : paper.textSecondary }]}>
+                        {round.gotMe
+                          ? t('match.recapGotYou')
+                          : t('match.recapPopped', { names: round.popped.join(', ') })}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </Animated.View>
+          ) : null}
+
+          {survived !== null || lastAnswer ? (
+            <Animated.View
+              entering={reduced ? undefined : statIn(section++)}
+              style={[styles.footer, { borderTopColor: paper.borderStrong }]}>
+              {survived !== null ? (
+                <View style={styles.stat}>
+                  <Text style={[styles.statLabel, { color: paper.textSecondary }]}>{t('match.recapSurvived')}</Text>
+                  <Text style={[styles.statNumber, { color: paper.text }]}>
+                    {t('match.recapOf', { count: survived, total: room.totalRounds })}
+                  </Text>
+                </View>
+              ) : null}
+              {lastAnswer ? (
+                <View style={styles.answer}>
+                  <Text style={[styles.statLabel, { color: paper.textSecondary }]}>{t('match.recapLastAnswer')}</Text>
+                  <Text style={[styles.answerText, { color: paper.text }]} numberOfLines={3}>
+                    {`“${lastAnswer}”`}
+                  </Text>
+                </View>
+              ) : null}
+            </Animated.View>
           ) : null}
         </Animated.View>
       </View>
@@ -244,7 +300,7 @@ function Recap({ room }: { room: Room }) {
 }
 
 /** A soft band of light that crosses the card every 6 s. Off under Reduce Motion. */
-function Sheen({ height, reduced }: { height: number; reduced: boolean }) {
+function Sheen({ reduced }: { reduced: boolean }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const t = useSharedValue(0);
   useEffect(() => {
@@ -259,8 +315,8 @@ function Sheen({ height, reduced }: { height: number; reduced: boolean }) {
   }));
   if (reduced) return null;
   return (
-    <Animated.View pointerEvents="none" style={[styles.sheen, { height: height + 80 }, style]}>
-      <Svg width={60} height={height + 80}>
+    <Animated.View pointerEvents="none" style={[styles.sheen, style]}>
+      <Svg width={60} height={SHEEN_HEIGHT}>
         <Defs>
           <LinearGradient id={`sheen${id}`} x1="0" y1="0" x2="1" y2="0">
             <Stop offset={0} stopColor="#FFFFFF" stopOpacity={0} />
@@ -268,7 +324,7 @@ function Sheen({ height, reduced }: { height: number; reduced: boolean }) {
             <Stop offset={1} stopColor="#FFFFFF" stopOpacity={0} />
           </LinearGradient>
         </Defs>
-        <Rect width={60} height={height + 80} fill={`url(#sheen${id})`} />
+        <Rect width={60} height={SHEEN_HEIGHT} fill={`url(#sheen${id})`} />
       </Svg>
     </Animated.View>
   );
@@ -292,22 +348,24 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   stage: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Space.md,
+    paddingVertical: Space.lg,
   },
   card: {
+    alignSelf: 'center',
     borderRadius: CARD.radius,
     borderCurve: 'continuous',
     overflow: 'hidden',
-    padding: 24,
+    padding: CARD.padding,
   },
   sheen: {
     position: 'absolute',
-    top: -40,
+    top: -200,
     left: 0,
     width: 60,
+    height: SHEEN_HEIGHT,
   },
   brand: {
     flexDirection: 'row',
@@ -324,38 +382,101 @@ const styles = StyleSheet.create({
     marginBottom: -2,
   },
   meta: {
-    marginTop: 10,
+    marginTop: 6,
     fontFamily: Fonts.sans,
     fontSize: 12,
     lineHeight: 16,
   },
   headline: {
-    marginTop: 64,
-    gap: 4,
+    marginTop: Space.xl,
+    gap: 6,
   },
   label: {
     fontFamily: Fonts.sans,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: 600,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   hero: {
     fontFamily: Fonts.serif,
     fontWeight: 500,
-    fontSize: 44,
-    lineHeight: 44,
-    letterSpacing: -0.88,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -0.76,
   },
-  stats: {
-    marginTop: 28,
-    gap: 10,
+  section: {
+    marginTop: Space.lg,
+    gap: Space.xs,
+  },
+  seats: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  seat: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  seatBalloon: {
+    height: 44,
+    justifyContent: 'flex-end',
+    marginBottom: 4,
+  },
+  seatName: {
+    maxWidth: '100%',
+    fontFamily: Fonts.sans,
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  seatNameStrong: {
+    fontWeight: 600,
+  },
+  seatNote: {
+    fontFamily: Fonts.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 600,
+  },
+  round: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    paddingVertical: 10,
+  },
+  roundNumber: {
+    width: 14,
+    fontFamily: Fonts.serif,
+    fontSize: 17,
+    lineHeight: 22,
+    fontVariant: ['tabular-nums'],
+  },
+  roundBody: {
+    flex: 1,
+    gap: 2,
+  },
+  roundQuestion: {
+    fontFamily: Fonts.serif,
+    fontStyle: 'italic',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  roundPopped: {
+    fontFamily: Fonts.sans,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: 600,
+  },
+  footer: {
+    marginTop: Space.sm,
+    paddingTop: Space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: Space.sm,
   },
   stat: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: Space.sm,
-    paddingBottom: 10,
   },
   statLabel: {
     fontFamily: Fonts.sans,
@@ -364,44 +485,17 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontFamily: Fonts.serif,
-    fontSize: 26,
-    lineHeight: 30,
+    fontSize: 24,
+    lineHeight: 28,
     fontVariant: ['tabular-nums'],
   },
-  statQuote: {
-    flexShrink: 1,
-    maxWidth: 150,
-    textAlign: 'right',
-    fontFamily: Fonts.serif,
-    fontStyle: 'italic',
-    fontSize: 14,
-    lineHeight: 18,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  poppedSeat: {
-    opacity: 0.3,
-  },
   answer: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    bottom: 22,
     gap: 2,
-  },
-  answerLabel: {
-    fontFamily: Fonts.sans,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: 600,
   },
   answerText: {
     fontFamily: Fonts.serif,
     fontStyle: 'italic',
-    fontSize: 15,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 22,
   },
 });
