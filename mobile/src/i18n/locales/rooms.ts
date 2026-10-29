@@ -104,7 +104,7 @@ export const rooms: Strings = {
 export const you: Strings = {
   en: {
     statRooms: { one: 'room', other: 'rooms' },
-    statLastBalloon: { one: 'last balloon', other: 'last balloons' },
+    statLastBalloon: { one: 'win', other: 'wins' },
     statChooser: { one: 'time choosing', other: 'times choosing' },
     statStreak: { one: 'day streak', other: 'day streak' },
     pinnedTitle: 'Your answers',
@@ -112,7 +112,7 @@ export const you: Strings = {
   },
   de: {
     statRooms: { one: 'Raum', other: 'Räume' },
-    statLastBalloon: { one: 'letzter Ballon', other: 'letzte Ballons' },
+    statLastBalloon: { one: 'Sieg', other: 'Siege' },
     statChooser: { one: 'Mal gewählt', other: 'Mal gewählt' },
     statStreak: { one: 'Tag in Folge', other: 'Tage in Folge' },
     pinnedTitle: 'Deine Antworten',
@@ -120,7 +120,7 @@ export const you: Strings = {
   },
   fr: {
     statRooms: { one: 'salle', other: 'salles' },
-    statLastBalloon: { one: 'dernier ballon', other: 'derniers ballons' },
+    statLastBalloon: { one: 'victoire', other: 'victoires' },
     statChooser: { one: 'fois au choix', other: 'fois au choix' },
     statStreak: { one: 'jour d’affilée', other: 'jours d’affilée' },
     pinnedTitle: 'Tes réponses',
@@ -128,7 +128,7 @@ export const you: Strings = {
   },
   it: {
     statRooms: { one: 'stanza', other: 'stanze' },
-    statLastBalloon: { one: 'ultimo palloncino', other: 'ultimi palloncini' },
+    statLastBalloon: { one: 'vittoria', other: 'vittorie' },
     statChooser: { one: 'volta a scegliere', other: 'volte a scegliere' },
     statStreak: { one: 'giorno di fila', other: 'giorni di fila' },
     pinnedTitle: 'Le tue risposte',
