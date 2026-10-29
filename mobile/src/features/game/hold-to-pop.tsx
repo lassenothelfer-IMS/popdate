@@ -147,7 +147,7 @@ export function HoldToPop({ name, color, title, onPop, onCancel }: HoldToPopProp
             />
           </Svg>
           <Animated.View style={balloon}>
-            <Balloon color={color} size={BALLOON_WIDTH * 0.62} string={false} />
+            <Balloon color={color} size={BALLOON_WIDTH * 0.62} />
           </Animated.View>
         </Pressable>
         {showHints ? (

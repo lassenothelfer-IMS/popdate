@@ -57,7 +57,7 @@ export function RoomArt() {
       <View style={styles.roomSeats}>
         {HOLDERS.map((name, i) => (
           <View key={name} style={styles.roomSeat}>
-            <Balloon color={seatAt(seats, i).color} size={26} string={false} />
+            <Balloon color={seatAt(seats, i).color} size={26} />
             <ThemedText type="railName">{name}</ThemedText>
           </View>
         ))}
@@ -66,9 +66,9 @@ export function RoomArt() {
           <View
             style={[
               styles.ring,
-              { boxShadow: `0 0 0 2px ${theme.field}, 0 0 0 4px ${BrandBalloon.color}` },
+              { boxShadow: `0 0 0 2px ${theme.field}, 0 0 0 4px ${theme.accent}` },
             ]}>
-            <Balloon color={BrandBalloon.color} size={26} string={false} />
+            <Balloon color={BrandBalloon.color} size={26} />
           </View>
           <ThemedText type="captionStrong">{t('common.you')}</ThemedText>
         </View>
@@ -99,7 +99,7 @@ export function RoundsArt() {
         {answers.map((answer) => (
           <View key={answer.name} style={styles.answer}>
             <View style={styles.answerBalloon}>
-              <Balloon color={seatAt(seats, answer.seat).color} size={10} string={false} />
+              <Balloon color={seatAt(seats, answer.seat).color} size={10} />
             </View>
             <ThemedText type="callout" style={styles.flex}>
               <Text style={styles.bold}>{answer.name}</Text>
@@ -110,7 +110,7 @@ export function RoundsArt() {
         ))}
         <View style={styles.answer}>
           <View style={styles.answerBalloon}>
-            <Balloon color={BrandBalloon.color} size={10} string={false} />
+            <Balloon color={BrandBalloon.color} size={10} />
           </View>
           <ThemedText type="callout" style={styles.flex}>
             <Text style={styles.bold}>{t('common.you')}</Text>
@@ -143,12 +143,12 @@ export function LastArt() {
       <View style={styles.deflated}>
         {deflated.map((angle, i) => (
           <View key={angle} style={{ opacity: 0.22, transform: [{ scaleY: 0.45 }, { rotate: `${angle}deg` }] }}>
-            <Balloon color={seatAt(seats, i).color} size={22} string={false} />
+            <Balloon color={seatAt(seats, i).color} size={22} />
           </View>
         ))}
       </View>
       <View style={styles.lastBalloon}>
-        <Balloon color={BrandBalloon.color} size={120} string={false} />
+        <Balloon color={BrandBalloon.color} size={120} />
       </View>
       <View style={[styles.lastString, { backgroundColor: theme.text }]} />
       <ThemedText style={[styles.lastLine, { fontFamily: Fonts.serif }]}>

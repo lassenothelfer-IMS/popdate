@@ -50,7 +50,7 @@ export function SeatMark({ color, state, active = false, risen = false }: SeatMa
           },
         ]}>
         <Animated.View style={[styles.layer, crossfade(state !== 'pop' && !ringed)]}>
-          <Balloon color={color} size={BALLOON_SIZE} string={false} />
+          <Balloon color={color} size={BALLOON_SIZE} />
         </Animated.View>
       </Animated.View>
       <Animated.View style={[styles.layer, crossfade(ringed)]}>
@@ -59,7 +59,7 @@ export function SeatMark({ color, state, active = false, risen = false }: SeatMa
             styles.ring,
             { boxShadow: `0 0 0 2px ${theme.page}, 0 0 0 3.5px ${color}` },
           ]}>
-          <Balloon color={color} size={ACTIVE_SIZE} string={false} />
+          <Balloon color={color} size={ACTIVE_SIZE} />
         </View>
       </Animated.View>
       <Animated.View style={[styles.layer, styles.center, crossfade(state === 'pop', 0.3)]}>

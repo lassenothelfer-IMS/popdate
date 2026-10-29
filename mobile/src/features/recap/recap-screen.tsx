@@ -18,7 +18,8 @@ import { Button } from '@/components/button';
 import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { BrandBalloon, Colors, Ease, Fonts, SeatColors, Space } from '@/constants/theme';
+import { Wordmark } from '@/components/wordmark';
+import { Colors, Ease, Fonts, SeatColors, Space } from '@/constants/theme';
 import { MoreButton, usePersonActions, type Person } from '@/features/chat/person-actions';
 import { BackButton } from '@/features/onboarding/back-button';
 import { useRoomHistory } from '@/features/rooms/use-room-history';
@@ -182,13 +183,7 @@ function Recap({ room }: { room: Room }) {
             },
           ]}>
           <Sheen reduced={reduced} />
-          <View style={styles.brand}>
-            <Text style={[styles.wordmark, { color: paper.text }]}>P</Text>
-            <View style={styles.wordmarkBalloon}>
-              <Balloon color={BrandBalloon.color} size={8} string={false} shine={false} />
-            </View>
-            <Text style={[styles.wordmark, { color: paper.text }]}>pdate</Text>
-          </View>
+          <Wordmark size={16} tone="cream" compact />
           <Text style={[styles.meta, { color: paper.textSecondary }]}>{dateLine}</Text>
 
           <View style={styles.headline}>
@@ -367,22 +362,8 @@ const styles = StyleSheet.create({
     width: 60,
     height: SHEEN_HEIGHT,
   },
-  brand: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-  },
-  wordmark: {
-    fontFamily: Fonts.wordmark,
-    fontSize: 16,
-    lineHeight: 18,
-    letterSpacing: -0.48,
-  },
-  wordmarkBalloon: {
-    marginHorizontal: 0.5,
-    marginBottom: -2,
-  },
   meta: {
-    marginTop: 6,
+    marginTop: 4,
     fontFamily: Fonts.sans,
     fontSize: 12,
     lineHeight: 16,

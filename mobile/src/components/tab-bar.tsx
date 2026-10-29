@@ -64,7 +64,7 @@ export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
               style={styles.item}>
               {tab === 'home' ? (
                 <View style={{ opacity: selected ? 1 : 0.6 }}>
-                  <Balloon color={selected ? BrandBalloon.color : color} size={14} string={false} />
+                  <Balloon color={selected ? BrandBalloon.color : color} size={14} />
                 </View>
               ) : (
                 <Icon name={ICONS[tab]} size={19} color={color} />

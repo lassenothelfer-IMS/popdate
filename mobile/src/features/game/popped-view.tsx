@@ -127,7 +127,7 @@ export function PoppedView({
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
         <Animated.View style={[styles.balloon, balloon]}>
-          <Balloon color={color} size={BALLOON_WIDTH} string={false} />
+          <Balloon color={color} size={BALLOON_WIDTH} />
         </Animated.View>
       </View>
       <Animated.View style={[styles.copy, copy]}>

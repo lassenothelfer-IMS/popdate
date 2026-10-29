@@ -1,25 +1,29 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
-import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
-import { BrandBalloon, BrandLacquer, Ease, lacquerFor, Motion } from '@/constants/theme';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { BrandBalloon, Ease, Motion } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 /**
- * The balloon is drawn in a 24 x 34 box: a teardrop body that tapers into a
- * knot, a slack string, and one soft highlight.
+ * The balloon is drawn flat in a 24 x 34 box: a round body that tapers into a
+ * small knot, and one thin highlight. One color, no gradient, no string, so it
+ * stays crisp from the tab bar up to the role reveal.
  */
 const VIEW_BOX = '0 0 24 34';
-const BODY =
-  'M12 1.5C6.2 1.5 2.5 6 2.5 11.6c0 6.4 5 11.4 8.4 12.3h2.2c3.4-.9 8.4-5.9 8.4-12.3C21.5 6 17.8 1.5 12 1.5z';
-const KNOT = 'M10.4 23.6h3.2l-1.6 2.4z';
-const STRING = 'M12 26c-1.4 1.8 1.4 3.2 0 5.6';
+const BODY = 'M12 2C6.8 2 3.5 6.2 3.5 11.5c0 5.9 4.5 10.9 8.5 11.7 4-.8 8.5-5.8 8.5-11.7C20.5 6.2 17.2 2 12 2z';
+const KNOT = 'M10.6 23.1h2.8l-1.4 1.9z';
+const HIGHLIGHT = 'M7.4 9.5c.4-2.2 1.9-3.8 3.9-4.3';
 /** What a pop leaves at the knot: a ragged collar of rubber. */
-const TORN = 'M8.6 23.8l.7-3.6 1.3 2 .9-3.3 1 3.3 1.3-2 .6 3.6z';
+const TORN = 'M8.8 23.4l.7-3.4 1.2 1.9.9-3.1.9 3.1 1.2-1.9.7 3.4z';
 /** The middle of the body, where a pop bursts from. */
 const BODY_CENTER = { x: 12, y: 12 };
+/** Below this width the highlight is a smudge, so it is left off. */
+const HIGHLIGHT_MIN = 14;
+/** The highlight's width in box units: about 1 pt on a seat, thin on the hero. */
+const HIGHLIGHT_WIDTH = 1.1;
 
 /** Rendered height for a balloon of the given width. */
 export function balloonHeight(size: number) {
@@ -40,28 +44,15 @@ type BalloonProps = {
   size?: number;
   /** An outline for a seat that isn't filled yet. */
   ghost?: boolean;
-  /** The slack string under the knot. Off for the brand mark and the role reveal. */
-  string?: boolean;
-  /** The soft highlight on the body. Off for the brand mark. */
+  /** The thin highlight on the body. Off for the smallest marks. */
   shine?: boolean;
 };
 
-export function Balloon({
-  color,
-  size = 24,
-  ghost = false,
-  string = true,
-  shine = true,
-}: BalloonProps) {
+export function Balloon({ color, size = 24, ghost = false, shine = true }: BalloonProps) {
   const theme = useTheme();
-  const brand = BrandLacquer[useScheme()];
-  const gradientId = `lacquer${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   const height = balloonHeight(size);
-  const line = toUnits(Math.max(1, size / 70), size);
-  // A seat hue is lacquered: a radial gradient lit from the top left, a darker knot.
-  const lacquer = lacquerFor(color);
-  // The brand balloon (and you) wears the theme's rose lacquer instead.
-  const isBrand = color.toLowerCase() === BrandBalloon.color.toLowerCase();
+  // The brand balloon (and you) wears the theme's accent, so it follows the palette.
+  const fill = color.toLowerCase() === BrandBalloon.color.toLowerCase() ? theme.accent : color;
 
   if (ghost) {
     return (
@@ -73,59 +64,24 @@ export function Balloon({
   }
   return (
     <Svg width={size} height={height} viewBox={VIEW_BOX}>
-      {lacquer ? (
-        <Defs>
-          <RadialGradient id={gradientId} cx="34%" cy="26%" r="78%">
-            {(isBrand
-              ? brand.stops
-              : ([
-                  [0, lacquer.hi],
-                  [0.42, lacquer.color],
-                  [1, lacquer.shadow],
-                ] as const)
-            ).map(([offset, stop]) => (
-              <Stop key={offset} offset={offset} stopColor={stop} />
-            ))}
-          </RadialGradient>
-        </Defs>
-      ) : null}
-      {string ? (
-        <Path d={STRING} fill="none" stroke={theme.gold} strokeOpacity={0.75} strokeWidth={line} />
-      ) : null}
-      <Path d={KNOT} fill={isBrand ? brand.knot : (lacquer?.knot ?? color)} />
-      <Path d={BODY} fill={lacquer ? `url(#${gradientId})` : color} />
-      {shine ? (
-        <>
-          {/* The highlight, and a faint rim on the shadow side (brand/balloon-*.svg). */}
-          <Ellipse
-            cx={8}
-            cy={7.2}
-            rx={1.6}
-            ry={3}
-            fill={isBrand ? brand.specular.color : '#FFF3E6'}
-            fillOpacity={isBrand ? brand.specular.opacity : (lacquer?.shine ?? 0.22)}
-            transform="rotate(-28 8 7.2)"
-          />
-          {lacquer ? (
-            <Ellipse
-              cx={17.6}
-              cy={16.8}
-              rx={0.8}
-              ry={2}
-              fill={brand.rim.color}
-              fillOpacity={isBrand ? brand.rim.opacity : 0.22}
-              transform="rotate(30 17.6 16.8)"
-            />
-          ) : null}
-        </>
+      <Path d={KNOT} fill={fill} />
+      <Path d={BODY} fill={fill} />
+      {shine && size >= HIGHLIGHT_MIN ? (
+        <Path
+          d={HIGHLIGHT}
+          fill="none"
+          stroke="#FFFFFF"
+          strokeOpacity={0.4}
+          strokeWidth={Math.max(HIGHLIGHT_WIDTH, toUnits(1, size))}
+          strokeLinecap="round"
+        />
       ) : null}
     </Svg>
   );
 }
 
 /**
- * A popped seat: a dashed ghost of the balloon with torn rubber at the knot and
- * the string still hanging. Never rays at rest, so it can't read as a spinner.
+ * A popped seat: a dashed ghost of the balloon with torn rubber at the knot. Never rays at rest, so it can't read as a spinner.
  */
 export function PoppedMark({ color, size = 24 }: { color: string; size?: number }) {
   const stroke = toUnits(strokePt(size), size);
@@ -141,7 +97,6 @@ export function PoppedMark({ color, size = 24 }: { color: string; size?: number 
       />
       <Path d={TORN} fill={color} />
       <Path d={KNOT} fill={color} />
-      <Path d={STRING} fill="none" stroke={color} strokeOpacity={0.6} strokeWidth={stroke * 0.9} />
     </Svg>
   );
 }
@@ -229,7 +184,7 @@ export function PopBurst({ color, size = 72 }: PopBurstProps) {
   return (
     <View style={{ width: size, height }}>
       <Animated.View entering={swell} style={StyleSheet.absoluteFill}>
-        <Balloon color={color} size={size} string={false} />
+        <Balloon color={color} size={size} />
       </Animated.View>
       <Animated.View
         entering={ringOut}

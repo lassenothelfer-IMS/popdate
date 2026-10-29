@@ -224,7 +224,8 @@ export function OnboardingScreen() {
           </Rise>
         }>
         <Rise index={0}>
-          <View style={styles.logoShadow}>
+          {/* On the web a shadow draws around the box, not the glyphs, so only iOS gets one. */}
+          <View style={Platform.OS === 'ios' ? styles.logoShadow : styles.logo}>
             <Wordmark />
           </View>
         </Rise>
@@ -600,6 +601,9 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.45)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 12,
+  },
+  logo: {
+    alignSelf: 'flex-start',
   },
   logoShadow: {
     alignSelf: 'flex-start',

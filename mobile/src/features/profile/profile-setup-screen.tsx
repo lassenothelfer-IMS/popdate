@@ -299,7 +299,7 @@ function ReadyStep({ profile }: { profile: Profile }) {
           </View>
           <View style={[styles.cardInfo, { backgroundColor: INFO_GLASS }]}>
             <View style={styles.cardName}>
-              <Balloon color={BrandBalloon.color} size={10} string={false} />
+              <Balloon color={BrandBalloon.color} size={10} />
               <Text style={styles.cardNameText}>
                 {t('common.nameAge', { name: profile.name, age })}
                 <Text style={styles.cardCity}>{`  ${profile.city}`}</Text>

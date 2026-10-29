@@ -137,42 +137,6 @@ export const ButtonShadow = {
 } as const;
 
 /**
- * The brand balloon's lacquer (wordmark, hero, pop, you), per theme: a radial
- * gradient lit from the top left, its knot, the specular highlight and the rim.
- */
-export type Lacquer = {
-  stops: readonly (readonly [number, string])[];
-  knot: string;
-  specular: { color: string; opacity: number };
-  rim: { color: string; opacity: number };
-};
-
-export const BrandLacquer: { light: Lacquer; dark: Lacquer } = {
-  light: {
-    stops: [
-      [0, '#E8A3A6'],
-      [0.38, '#9E3E4A'],
-      [0.8, '#6A2632'],
-      [1, '#3E1820'],
-    ],
-    knot: '#3E1820',
-    specular: { color: '#FFFFFF', opacity: 0.55 },
-    rim: { color: '#E6C9A8', opacity: 0.45 },
-  },
-  dark: {
-    stops: [
-      [0, '#F2BDBF'],
-      [0.38, '#C9737B'],
-      [0.8, '#8C3F4A'],
-      [1, '#4A2A31'],
-    ],
-    knot: '#4A2A31',
-    specular: { color: '#FFFFFF', opacity: 0.55 },
-    rim: { color: '#E9CFA9', opacity: 0.45 },
-  },
-};
-
-/**
  * Raw colors for the few places that are the same in both themes: text and
  * glass over photos. Screens use the palette above.
  */

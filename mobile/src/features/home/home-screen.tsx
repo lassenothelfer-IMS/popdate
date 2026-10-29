@@ -173,7 +173,7 @@ export function HomeScreen() {
               pointerEvents="none"
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants">
-              <Balloon color={BrandBalloon.color} size={260} string={false} />
+              <Balloon color={BrandBalloon.color} size={260} />
             </View>
             <View style={styles.cardText}>
               <ThemedText type="kicker">{t('home.cardLabel', { city: profile.city })}</ThemedText>
@@ -235,7 +235,7 @@ export function HomeScreen() {
             onPress={() => router.push('/how-to-play')}
             icon={
               <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
-                <Balloon color={BrandBalloon.color} size={14} string={false} />
+                <Balloon color={BrandBalloon.color} size={14} />
               </View>
             }
           />
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -60,
     top: -40,
-    opacity: 0.9,
+    opacity: 0.22,
   },
   cardText: {
     gap: 6,

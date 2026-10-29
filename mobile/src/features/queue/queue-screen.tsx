@@ -441,7 +441,7 @@ function SeatRow({ found, needed }: { found: number; needed: number }) {
           <Animated.View
             key={`seat-${index}`}
             entering={reduced ? undefined : webSafeKeyframe(seatLands(delay))}>
-            <Balloon color={color} size={mine ? MY_SEAT : SEAT} string={false} />
+            <Balloon color={color} size={mine ? MY_SEAT : SEAT} />
           </Animated.View>
         );
       })}
@@ -491,7 +491,7 @@ function RoomSeats({ room }: { room: Room }) {
         return (
           <View key={contestant.id} style={styles.cardSeat}>
             <View style={styles.cardBalloon}>
-              <Balloon color={seatAt(seats, index).color} size={22} string={false} />
+              <Balloon color={seatAt(seats, index).color} size={22} />
             </View>
             <ThemedText
               type={mine ? 'captionStrong' : 'caption'}

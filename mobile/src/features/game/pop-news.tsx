@@ -245,7 +245,7 @@ function PopSequence({ text, detail, color, fromBurst, announce }: SequenceProps
         <Animated.View style={[styles.ring, { borderColor: theme.inverse }, ring]} />
         <Animated.View style={[styles.string, { backgroundColor: theme.gold }, string]} />
         <Animated.View style={[styles.balloon, balloon]}>
-          <Balloon color={color} size={BALLOON_WIDTH} string={false} />
+          <Balloon color={color} size={BALLOON_WIDTH} />
         </Animated.View>
         {SHARDS.map((shard, i) => (
           <Shard key={i} clock={clock} shard={shard} fill={tones[shard.tone]} />

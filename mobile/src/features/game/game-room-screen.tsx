@@ -972,7 +972,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
         <Button
           variant="coral"
           title={t('game.popBalloon', { name: selected.name })}
-          icon={<Balloon color={seatOf(selected).shadow} size={14} string={false} shine={false} />}
+          icon={<Balloon color={seatOf(selected).shadow} size={14} shine={false} />}
           onPress={() => {
             haptics.light();
             setHoldId(selected.id);

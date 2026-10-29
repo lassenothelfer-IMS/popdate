@@ -278,7 +278,7 @@ function EmptyMatches({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           style={styles.emptyArt}>
-          <Balloon color={BrandBalloon.color} size={120} string={false} />
+          <Balloon color={BrandBalloon.color} size={120} />
           <Svg width={8} height={70} style={styles.emptyString}>
             <Defs>
               <LinearGradient id="matchesEmptyString" x1="0" y1="0" x2="0" y2="1">
