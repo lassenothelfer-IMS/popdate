@@ -19,15 +19,18 @@ const ROUTES: Record<Tab, Href> = {
 type TabBarProps = {
   active: Tab;
   labels: Record<Tab, string>;
+  /** Called instead of navigating, like the phone's pager sliding to that page. */
+  onSelect?: (tab: Tab) => void;
+  /** Tabs that wear a small dot, like Matches while a chat is waiting on you. */
+  dots?: Partial<Record<Tab, boolean>>;
 };
 
 /**
- * The web's tab bar on Home, Matches and Settings (phones use the system tab bar,
- * see `app/(tabs)/_layout.tsx`): a pill on surface 1 with a hairline, 20 pt from
- * the sides and 30 pt from the bottom. Three 44 x 36 items:
+ * The tab bar on Home, Matches and Settings, floating over the pages: a pill on
+ * surface 1 with a hairline, 20 pt from the sides and 30 pt from the bottom. Three 44 x 36 items:
  * the balloon (home), a chat bubble (matches) and a gear (settings).
  */
-export function TabBar({ active, labels }: TabBarProps) {
+export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const tabs: Tab[] = ['home', 'matches', 'settings'];
@@ -50,7 +53,8 @@ export function TabBar({ active, labels }: TabBarProps) {
               onPress={() => {
                 if (selected) return;
                 haptics.selection();
-                router.replace(ROUTES[tab]);
+                if (onSelect) onSelect(tab);
+                else router.replace(ROUTES[tab]);
               }}
               style={styles.item}>
               {tab === 'home' ? (
@@ -60,6 +64,7 @@ export function TabBar({ active, labels }: TabBarProps) {
               ) : (
                 <Icon name={tab === 'matches' ? 'bubble' : 'gear'} size={19} color={color} />
               )}
+              {dots?.[tab] ? <View style={[styles.dot, { backgroundColor: theme.accent }]} /> : null}
             </Pressable>
           );
         })}
@@ -72,6 +77,14 @@ export function TabBar({ active, labels }: TabBarProps) {
 export const TAB_BAR_CLEARANCE = 36 + 12 + 30 + 16;
 
 const styles = StyleSheet.create({
+  dot: {
+    position: 'absolute',
+    top: 6,
+    right: 10,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
   layer: {
     position: 'absolute',
     left: 20,

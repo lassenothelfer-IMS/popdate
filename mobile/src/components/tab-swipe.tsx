@@ -1,6 +1,6 @@
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import type { Tab } from '@/components/tab-bar';
@@ -19,9 +19,9 @@ const DISTANCE = 60;
 const VELOCITY = 500;
 
 /**
- * Swipe left or right on a tab screen to move to the next or previous tab, as
- * on the tab bar. It only takes clearly sideways swipes, so scrolling up and
- * down is untouched.
+ * The web's swipe between tabs: a sideways swipe moves to the next or previous
+ * tab once it ends. Phones page with the finger instead (`app/(tabs)/_layout.tsx`),
+ * so there this passes its children straight through.
  */
 export function TabSwipe({ tab, children }: { tab: Tab; children: ReactNode }) {
   function go(step: 1 | -1) {
@@ -40,6 +40,7 @@ export function TabSwipe({ tab, children }: { tab: Tab; children: ReactNode }) {
       go(translationX < 0 ? 1 : -1);
     });
 
+  if (Platform.OS !== 'web') return children;
   return (
     <GestureHandlerRootView style={styles.fill}>
       <GestureDetector gesture={swipe}>{children}</GestureDetector>
