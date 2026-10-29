@@ -2,7 +2,15 @@ import { Redirect, router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { api, getMockNextRole, isMockServer, setMockNextRole, type Match, type MockRole } from '@/api';
+import {
+  api,
+  getMockNextRole,
+  isMockServer,
+  setMockNextRole,
+  type Match,
+  type MockRole,
+  type QueueStats,
+} from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
@@ -17,6 +25,8 @@ import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
+import { outcomeLine } from '@/features/rooms/rooms-screen';
+import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
@@ -30,9 +40,9 @@ const MOCK_ROLES: { role: MockRole; label: string }[] = [
 ];
 
 /** Home shows your newest matches; the Matches tab has them all. */
+/** How often the live queue line refreshes while Home is open. */
+const LIVE_REFRESH_MS = 20_000;
 const HOME_MATCHES = 2;
-/** Your own profile, shown big. */
-const PROFILE_VIEW = '/profile-view' as Href;
 
 type DayPart = 'Morning' | 'Afternoon' | 'Evening' | 'Night';
 
@@ -71,6 +81,30 @@ export function HomeScreen() {
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [mockRole, setMockRole] = useState(getMockNextRole);
   const { join, joining, error } = useJoinQueue();
+  const [live, setLive] = useState<QueueStats | null>(null);
+  const { history } = useRoomHistory();
+  const lastRoom = history?.[0];
+  const streak = history ? roomStats(history).streak : 0;
+
+  // Who's queuing right now: fetched on every visit, then every 20 s while you're here.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const check = () =>
+        api
+          .getQueueStats()
+          .then((stats) => {
+            if (active) setLive(stats);
+          })
+          .catch(() => {});
+      void check();
+      const timer = setInterval(check, LIVE_REFRESH_MS);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }, []),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -111,7 +145,7 @@ export function HomeScreen() {
           <PressableHighlight
             accessibilityRole="button"
             accessibilityLabel={t('home.yourProfile')}
-            onPress={() => router.push(PROFILE_VIEW)}
+            onPress={() => router.navigate('/you' as Href)}
             background="transparent"
             style={styles.avatarButton}>
             <Avatar name={profile.name} uri={profile.photos[0]} tone={you} size={40} />
@@ -121,7 +155,11 @@ export function HomeScreen() {
         <Rise index={1} style={styles.hello}>
           <View style={styles.liveRow}>
             <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
-            <ThemedText type="kicker">{words.live}</ThemedText>
+            <ThemedText type="kicker">
+              {live
+                ? t('home.liveLine', { count: live.waiting, city: profile.city })
+                : words.live}
+            </ThemedText>
           </View>
           <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
             {words.hero}
@@ -154,9 +192,30 @@ export function HomeScreen() {
             />
           </View>
           {error ? <ErrorLine message={error} /> : null}
+          {live ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.liveNote}>
+              {t('home.roomsLastHour', { count: live.roomsLastHour })}
+            </ThemedText>
+          ) : null}
         </Rise>
 
         <Rise index={3} style={styles.rows}>
+          {lastRoom ? (
+            <LinkRow
+              title={t('home.lastRoom')}
+              subtitle={
+                streak > 1
+                  ? `${outcomeLine(t, lastRoom)} · ${t('home.streak', { count: streak })}`
+                  : outcomeLine(t, lastRoom)
+              }
+              onPress={() => router.navigate('/rooms' as Href)}
+              icon={
+                <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                  <Icon name="rooms" size={16} color={theme.text} />
+                </View>
+              }
+            />
+          ) : null}
           {/* Height, job and bio are optional at sign-up: a nudge until they're in. */}
           {profile.heightCm === null || !profile.job || !profile.bio ? (
             <LinkRow
@@ -286,6 +345,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
+  },
+  liveNote: {
+    marginTop: Space.xs,
+    textAlign: 'center',
   },
   liveDot: {
     width: 8,

@@ -12,6 +12,7 @@ import { gender, interest } from './schema';
 
 const MIN_PHOTOS = 4;
 const MAX_PHOTOS = 6;
+const MAX_PINNED = 3;
 
 /**
  * Your profile in the `Profile` shape, plus `photoIds`: the app keeps those to
@@ -27,6 +28,7 @@ async function profileView(ctx: QueryCtx, profile: Doc<'profiles'>) {
     genderIdentity: profile.genderIdentity,
     genderDetails: profile.genderDetails,
     sexuality: profile.sexuality,
+    pinnedAnswers: profile.pinnedAnswers ?? [],
     city: profile.city,
     heightCm: profile.heightCm ?? null,
     job: profile.job,
@@ -91,6 +93,7 @@ export const saveProfile = mutation({
     genderIdentity: v.optional(v.string()),
     genderDetails: v.optional(v.string()),
     sexuality: v.optional(v.string()),
+    pinnedAnswers: v.optional(v.array(v.object({ question: v.string(), answer: v.string() }))),
     city: v.string(),
     heightCm: v.optional(v.number()),
     job: v.string(),
@@ -106,6 +109,8 @@ export const saveProfile = mutation({
     if (heightCm !== undefined && (!Number.isInteger(heightCm) || heightCm < 100 || heightCm > 250)) {
       fail('Enter a height between 100 and 250 cm.');
     }
+    const pins = args.pinnedAnswers ?? [];
+    if (pins.length > MAX_PINNED) fail(`Pin up to ${MAX_PINNED} answers.`);
     const count = args.photos.length;
     if (count < MIN_PHOTOS || count > MAX_PHOTOS || new Set(args.photos).size !== count) {
       fail('A profile needs 4 to 6 photos.');
@@ -122,6 +127,10 @@ export const saveProfile = mutation({
       genderIdentity: optionalText(args.genderIdentity, 'gender', 40) || undefined,
       genderDetails: optionalText(args.genderDetails, 'gender details', 60) || undefined,
       sexuality: optionalText(args.sexuality, 'sexuality', 40) || undefined,
+      pinnedAnswers: pins.map((pin) => ({
+        question: optionalText(pin.question, 'question', 200),
+        answer: optionalText(pin.answer, 'answer', 300),
+      })),
       city: text(args.city, 'city', 80),
       heightCm,
       job: optionalText(args.job, 'job or school', 80),

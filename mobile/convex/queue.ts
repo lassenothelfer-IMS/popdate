@@ -19,6 +19,27 @@ async function waitingPlayers(ctx: QueryCtx) {
     .take(MAX_WAITING);
 }
 
+/** Who's queuing right now, for Home: the `QueueStats` shape in `src/api/types.ts`. */
+export const stats = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    const profile = userId ? await getProfile(ctx, userId) : null;
+    const waiting = (await waitingPlayers(ctx)).filter(
+      (row) =>
+        row.userId !== userId &&
+        (!profile ||
+          (wants({ wantsToMeet: profile.wantsToMeet }, row.gender) && wants(row, profile.gender))),
+    );
+    const hourAgo = Date.now() - 60 * 60_000;
+    const recent = await ctx.db.query('rooms').order('desc').take(200);
+    return {
+      waiting: waiting.length,
+      roomsLastHour: recent.filter((room) => room.createdAt > hourAgo).length,
+    };
+  },
+});
+
 /** Your place in the queue, live: the `QueueStatus` shape in `src/api/types.ts`. */
 export const status = query({
   args: {},

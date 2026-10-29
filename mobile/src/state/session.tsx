@@ -26,6 +26,8 @@ type Session = {
   onboarding: OnboardingAnswers | null;
   setOnboarding: (answers: OnboardingAnswers | null) => void;
   saveProfile: (details: ProfileDetails, answers?: OnboardingAnswers) => Promise<Profile>;
+  /** Changes part of your saved profile, like your pinned answers. */
+  updateProfile: (patch: Partial<ProfileDraft>) => Promise<Profile>;
   /** Ends the session; the app goes back to the welcome screen. */
   signOut: () => Promise<void>;
   /** Deletes the account for good; the app goes back to the welcome screen. */
@@ -64,11 +66,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function saveProfile(details: ProfileDetails, answers = onboarding) {
     if (!answers) throw new Error('Finish onboarding first.');
-    const saved = await api.saveProfile({ ...answers, ...details });
+    // Pinned answers live on the profile, not in the form: keep them through an edit.
+    const saved = await api.saveProfile({ pinnedAnswers: profile?.pinnedAnswers, ...answers, ...details });
     setProfile(saved);
     // Signed up: nothing left to pick up after a relaunch.
     void removeJson(ONBOARDING_KEY);
     void removeJson(SETUP_DRAFT_KEY);
+    return saved;
+  }
+
+  async function updateProfile(patch: Partial<ProfileDraft>) {
+    if (!profile) throw new Error('Finish your profile first.');
+    const { id: _id, ...draft } = profile;
+    const saved = await api.saveProfile({ ...draft, ...patch });
+    setProfile(saved);
     return saved;
   }
 
@@ -85,7 +96,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   return (
     <SessionContext
-      value={{ ready, profile, onboarding, setOnboarding, saveProfile, signOut, deleteAccount }}>
+      value={{
+        ready,
+        profile,
+        onboarding,
+        setOnboarding,
+        saveProfile,
+        updateProfile,
+        signOut,
+        deleteAccount,
+      }}>
       {children}
     </SessionContext>
   );

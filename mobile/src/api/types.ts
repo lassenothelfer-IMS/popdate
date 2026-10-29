@@ -33,6 +33,8 @@ export type Profile = {
   genderDetails?: string;
   /** Optional: your sexuality, like `bisexual`. Not shown when missing. */
   sexuality?: string;
+  /** Up to three answers from your rooms, pinned to your profile. */
+  pinnedAnswers?: PinnedAnswer[];
   city: string;
   /** Optional: null when you haven't added it. */
   heightCm: number | null;
@@ -46,6 +48,54 @@ export type Profile = {
 };
 
 export type ProfileDraft = Omit<Profile, 'id'>;
+
+/** An answer you gave in a room, pinned to your profile with its question. */
+export type PinnedAnswer = { question: string; answer: string };
+
+/** At most this many answers can be pinned to a profile. */
+export const MAX_PINNED_ANSWERS = 3;
+
+/**
+ * One room you played, for your history and stats. `outcome` from your side:
+ * `won` you were the last balloon, `popped` you were popped, `chose` you were
+ * the chooser and it ended in a match, `left` you left before the end.
+ */
+export type RoomSummary = {
+  roomId: string;
+  endedAt: string;
+  role: 'popper' | 'contestant';
+  outcome: 'won' | 'popped' | 'chose' | 'left';
+  /** The round you were popped in, when you were. */
+  poppedInRound: number | null;
+  totalRounds: number;
+  popperName: string;
+  /** Who the room ended with, when it ended in your match. */
+  matchName: string | null;
+  matchId: string | null;
+  /** Each round's question, and your answer when you gave one. */
+  rounds: { question: string; answer: string | null }[];
+};
+
+/** Who's queuing right now, for Home. */
+export type QueueStats = {
+  /** People in line now who could share a room with you. */
+  waiting: number;
+  /** Rooms that started in the last hour. */
+  roomsLastHour: number;
+};
+
+/**
+ * A second chance after a room. `almost`: the runner-up from a room you chose
+ * in, and you can send them one. `sent`: you did, waiting on them. `incoming`:
+ * the chooser of a room where you were the runner-up sent you one.
+ */
+export type SecondChance = {
+  id: string;
+  roomId: string;
+  person: { id: string; name: string; age: number; photo: string };
+  state: 'almost' | 'sent' | 'incoming';
+  createdAt: string;
+};
 
 export type Question = {
   id: string;
@@ -184,6 +234,14 @@ export interface PopdateApi {
   leaveRoom(roomId: string): Promise<void>;
 
   listMatches(): Promise<Match[]>;
+  /** The rooms you played, newest first. */
+  listRoomHistory(): Promise<RoomSummary[]>;
+  getQueueStats(): Promise<QueueStats>;
+  /** Runner-ups you can give a second chance, the ones you sent, and the ones sent to you. */
+  listSecondChances(): Promise<SecondChance[]>;
+  sendSecondChance(roomId: string, userId: string): Promise<void>;
+  /** Accepting makes a match and resolves with it; declining resolves with null. */
+  answerSecondChance(id: string, accept: boolean): Promise<Match | null>;
   getMatch(matchId: string): Promise<Match | null>;
   /** Ends a match for both of you; the chat goes with it. */
   unmatch(matchId: string): Promise<void>;

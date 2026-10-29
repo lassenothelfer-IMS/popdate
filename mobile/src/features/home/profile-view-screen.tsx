@@ -12,6 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { Button } from '@/components/button';
 import { api, type VerificationStatus } from '@/api';
 import { Icon } from '@/components/icon';
@@ -23,6 +24,7 @@ import { VerifiedCheck } from '@/components/verified-check';
 import { Gutter, MinTouch, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useScheme, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
+import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { identityLine } from '@/features/profile/identity';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
@@ -35,15 +37,19 @@ const HERO = 460;
 
 /**
  * Your profile as others meet it: photo 1 big at the top with your name over
- * it, your bio, and your verification. Edit opens the editor.
+ * it, your bio, the answers you pinned, and your verification. Edit opens the
+ * editor. As the You tab it also shows your numbers, and a gear for Settings
+ * takes the place of Back.
  */
-export function ProfileViewScreen() {
+export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const { profile } = useSession();
   const { settings } = useSettings();
   const theme = useTheme();
   const t = useT();
   const insets = useSafeAreaInsets();
   const [verification, setVerification] = useState<VerificationStatus | null>(null);
+  const { history } = useRoomHistory();
+  const stats = history ? roomStats(history) : null;
 
   useFocusEffect(
     useCallback(() => {
@@ -79,14 +85,21 @@ export function ProfileViewScreen() {
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.page }]}>
-      <Animated.ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + Space.xl }}>
+      <Animated.ScrollView
+        contentContainerStyle={{ paddingBottom: asTab ? TAB_BAR_CLEARANCE : insets.bottom + Space.xl }}>
         <View style={styles.hero}>
           <HeroPhoto uri={profile.photos[0] ?? 'mock://'} name={profile.name} />
           <HeroScrim />
           <View style={[styles.heroTop, { top: insets.top + Space.xs }]}>
-            <GlassButton label={t('common.back')} onPress={back}>
-              <Icon name="back" size={16} color={Velvet.cream} />
-            </GlassButton>
+            {asTab ? (
+              <GlassButton label={t('home.settings')} onPress={() => router.push('/settings' as Href)}>
+                <Icon name="gear" size={17} color={Velvet.cream} />
+              </GlassButton>
+            ) : (
+              <GlassButton label={t('common.back')} onPress={back}>
+                <Icon name="back" size={16} color={Velvet.cream} />
+              </GlassButton>
+            )}
             <GlassButton label={t('home.profileEdit')} onPress={() => router.push('/profile')} pill>
               <ThemedText type="kicker" style={styles.onPhoto}>
                 {t('home.profileEdit')}
@@ -127,6 +140,42 @@ export function ProfileViewScreen() {
             </Rise>
           ) : null}
 
+          {asTab && stats ? (
+            <Rise index={1} style={styles.stats}>
+              <Stat value={stats.played} label={t('you.statRooms', { count: stats.played })} />
+              <Stat value={stats.lastBalloon} label={t('you.statLastBalloon', { count: stats.lastBalloon })} />
+              <Stat value={stats.chooser} label={t('you.statChooser', { count: stats.chooser })} />
+              <Stat value={stats.streak} label={t('you.statStreak', { count: stats.streak })} />
+            </Rise>
+          ) : null}
+
+          {profile.pinnedAnswers?.length ? (
+            <Rise index={1} style={styles.pins}>
+              <ThemedText type="kicker" accessibilityRole="header">
+                {t('you.pinnedTitle')}
+              </ThemedText>
+              {profile.pinnedAnswers.map((pin) => (
+                <View
+                  key={`${pin.question}|${pin.answer}`}
+                  style={[styles.pin, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    {pin.question}
+                  </ThemedText>
+                  <ThemedText type="questionRow">{`“${pin.answer}”`}</ThemedText>
+                </View>
+              ))}
+            </Rise>
+          ) : asTab ? (
+            <Rise index={1} style={styles.pins}>
+              <ThemedText type="kicker" accessibilityRole="header">
+                {t('you.pinnedTitle')}
+              </ThemedText>
+              <ThemedText type="footnote" themeColor="textSecondary">
+                {t('you.pinnedEmpty')}
+              </ThemedText>
+            </Rise>
+          ) : null}
+
           {verification ? (
             <Rise index={1}>
               <PressableHighlight
@@ -155,6 +204,24 @@ export function ProfileViewScreen() {
           ) : null}
         </View>
       </Animated.ScrollView>
+    </View>
+  );
+}
+
+/** One of your numbers: big, with what it counts under it. */
+function Stat({ value, label }: { value: number; label: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${value} ${label}`}
+      style={[styles.stat, { backgroundColor: theme.field, borderColor: theme.border }]}>
+      <ThemedText type="heading" style={styles.statValue}>
+        {String(value)}
+      </ThemedText>
+      <ThemedText type="caption" themeColor="textSecondary" style={styles.statLabel}>
+        {label}
+      </ThemedText>
     </View>
   );
 }
@@ -255,6 +322,34 @@ function GlassButton({
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  stats: {
+    flexDirection: 'row',
+    gap: Space.xs,
+  },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Space.sm,
+    paddingHorizontal: 4,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 2,
+  },
+  statValue: {
+    fontVariant: ['tabular-nums'],
+  },
+  statLabel: {
+    textAlign: 'center',
+  },
+  pins: {
+    gap: Space.xs,
+  },
+  pin: {
+    gap: 4,
+    padding: Space.md,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   hero: {
     height: HERO,

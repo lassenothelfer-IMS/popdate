@@ -16,6 +16,7 @@ import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import { api, type Match, type Message, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
+import { Chip } from '@/components/chip';
 import { ErrorLine } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
@@ -24,6 +25,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, Motion, Space } from '@/constants/theme';
 import { ChatComposer } from '@/features/chat/chat-composer';
 import { MessageList, type Seed } from '@/features/chat/message-list';
+import { CheckInSheet } from '@/features/chat/check-in-sheet';
 import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
@@ -75,6 +77,10 @@ const NEAR_END = 80;
 const contentIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /** Back to wherever the chat was opened from; after a reload, Home. */
+/** Date ideas offered while a chat is young, until this many messages. */
+const DATE_IDEAS_UNTIL = 8;
+const DATE_IDEAS = ['Coffee', 'Walk', 'Drinks', 'Dinner'] as const;
+
 function leave() {
   if (router.canGoBack()) router.back();
   else router.replace('/home');
@@ -151,6 +157,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const room = useRoom(match.roomId);
   // Report, block or unmatch; any of the last two closes the chat.
   const people = usePersonActions({ onGone: leave });
+  const [checkingIn, setCheckingIn] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   /** True while you're at the newest message, so new ones scroll into view. */
   const nearEnd = useRef(true);
@@ -237,8 +244,13 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   }
 
   function openOptions() {
-    void people.open({ id: match.other.id, name, age, matchId: match.id });
+    void people.open({ id: match.other.id, name, age, matchId: match.id }, [
+      { label: t('checkin.title'), onPress: () => setCheckingIn(true) },
+    ]);
   }
+
+  // Early on, a few date ideas sit over the composer; a tap drafts one to edit and send.
+  const showIdeas = messages !== null && messages.length < DATE_IDEAS_UNTIL && !draft;
 
   return (
     <Screen
@@ -246,6 +258,23 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       footer={
         <>
           {error ? <ErrorLine message={error} /> : null}
+          {showIdeas ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.ideas}
+              accessibilityLabel={t('chat.ideasLabel')}>
+              {DATE_IDEAS.map((idea) => (
+                <Chip
+                  key={idea}
+                  label={t(`chat.idea${idea}`)}
+                  selected={false}
+                  onPress={() => setDraft(t(`chat.idea${idea}Message`))}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
           <ChatComposer
             value={draft}
             onChangeText={setDraft}
@@ -333,11 +362,21 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       ) : null}
 
       {people.element}
+      <CheckInSheet
+        visible={checkingIn}
+        name={name}
+        matchId={match.id}
+        onClose={() => setCheckingIn(false)}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  ideas: {
+    gap: Space.xs,
+    paddingBottom: Space.xs,
+  },
   centered: {
     flexGrow: 1,
     alignItems: 'center',

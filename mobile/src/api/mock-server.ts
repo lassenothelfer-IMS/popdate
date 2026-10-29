@@ -19,8 +19,11 @@ import type {
   Profile,
   ProfileDraft,
   Question,
+  QueueStats,
   QueueStatus,
   Room,
+  RoomSummary,
+  SecondChance,
   RoomPlayer,
   RoomStatus,
 } from '@/api/types';
@@ -32,6 +35,10 @@ import { maskProfanity } from '@/utils/profanity';
 /** Your mock profile and settings outlive a reload, so you don't start over each time. */
 const PROFILE_KEY = 'popdate.mockProfile';
 const SETTINGS_KEY = 'popdate.mockSettings';
+const HISTORY_KEY = 'popdate.mockHistory';
+const MATCHES_KEY = 'popdate.mockMatches';
+/** How many past rooms the mock keeps. */
+const HISTORY_LIMIT = 50;
 
 const LOBBY_SIZE = 6;
 
@@ -181,15 +188,23 @@ class MockServer implements PopdateApi {
   private messageListeners = new Map<string, Set<(messages: Message[]) => void>>();
 
   nextRole: MockRole = 'random';
+  /** Rooms you played, newest first, kept on the device. */
+  private history: RoomSummary[] = [];
+  /** Second chances: your runner-ups, the ones you sent, the ones sent to you. */
+  private chances: SecondChance[] = [];
   /** What was kept on the device from the last launch, read once. */
   private restored: Promise<void> | null = null;
 
   private restore() {
     this.restored ??= (async () => {
-      const [profile, settings] = await Promise.all([
+      const [profile, settings, history, matches] = await Promise.all([
         readJson<Profile>(PROFILE_KEY),
         readJson<Settings>(SETTINGS_KEY),
+        readJson<RoomSummary[]>(HISTORY_KEY),
+        readJson<Match[]>(MATCHES_KEY),
       ]);
+      if (history) this.history = history;
+      if (matches) this.matches = matches;
       if (profile) {
         this.profile = profile;
         this.userId = profile.id;
@@ -317,6 +332,7 @@ class MockServer implements PopdateApi {
     const room = this.rooms.get(roomId);
     if (!room || room.status === 'finished') return;
 
+    this.recordHistory(room, { left: true });
     if (room.popper.id === this.userId) {
       // Without a popper the room can't go on.
       this.clearTimers(room);
@@ -380,6 +396,113 @@ class MockServer implements PopdateApi {
   async unmatch(matchId: string) {
     this.matches = this.matches.filter((match) => match.id !== matchId);
     this.messages.delete(matchId);
+    void writeJson(MATCHES_KEY, this.matches);
+  }
+
+  async listRoomHistory() {
+    await this.restore();
+    return structuredClone(this.history);
+  }
+
+  async getQueueStats(): Promise<QueueStats> {
+    // The mock's line is made of bots, so these are a plausible stand-in.
+    return { waiting: randomInt(3, 14), roomsLastHour: randomInt(2, 9) };
+  }
+
+  async listSecondChances() {
+    return structuredClone(this.chances);
+  }
+
+  async sendSecondChance(roomId: string, userId: string) {
+    const chance = this.chances.find(
+      (c) => c.roomId === roomId && c.person.id === userId && c.state === 'almost',
+    );
+    if (!chance) throw new Error('That second chance is no longer open.');
+    chance.state = 'sent';
+    // The bot thinks it over, then says yes.
+    setTimeout(() => {
+      this.chances = this.chances.filter((c) => c.id !== chance.id);
+      this.addMatch(roomId, chance.person);
+    }, randomInt(4000, 9000));
+  }
+
+  async answerSecondChance(id: string, accept: boolean) {
+    const chance = this.chances.find((c) => c.id === id && c.state === 'incoming');
+    if (!chance) throw new Error('That second chance is no longer open.');
+    this.chances = this.chances.filter((c) => c.id !== id);
+    return accept ? this.addMatch(chance.roomId, chance.person) : null;
+  }
+
+  private addMatch(roomId: string, other: Match['other']) {
+    const match: Match = {
+      id: `match-${randomId()}`,
+      roomId,
+      other: { ...other },
+      createdAt: new Date().toISOString(),
+    };
+    this.matches.push(match);
+    void writeJson(MATCHES_KEY, this.matches);
+    return structuredClone(match);
+  }
+
+  /** The room as it ended for you, once: kept for your history and stats. */
+  private recordHistory(room: ServerRoom, { left = false } = {}) {
+    if (!this.userId || this.history.some((entry) => entry.roomId === room.id)) return;
+    const iAmPopper = room.popper.id === this.userId;
+    const seat = room.seats.find((s) => s.player.id === this.userId);
+    if (!iAmPopper && !seat) return;
+    const match = room.matchId ? this.matches.find((m) => m.id === room.matchId) : null;
+    const questions = [...room.usedQuestionIds].map(
+      (id) => QUESTIONS.find((question) => question.id === id)?.text ?? '',
+    );
+    const entry: RoomSummary = {
+      roomId: room.id,
+      endedAt: new Date().toISOString(),
+      role: iAmPopper ? 'popper' : 'contestant',
+      outcome: left ? 'left' : iAmPopper ? 'chose' : room.winnerId === this.userId ? 'won' : 'popped',
+      poppedInRound: seat?.poppedInRound ?? null,
+      totalRounds: room.seats.length - 1,
+      popperName: room.popper.name,
+      matchName: match?.other.name ?? null,
+      matchId: match?.id ?? null,
+      rounds: questions.map((question, i) => ({ question, answer: seat?.answers.get(i + 1) ?? null })),
+    };
+    this.history = [entry, ...this.history].slice(0, HISTORY_LIMIT);
+    void writeJson(HISTORY_KEY, this.history);
+  }
+
+  /** After a room: the chooser's runner-up can get a second chance, either way round. */
+  private offerSecondChance(room: ServerRoom) {
+    const popped = room.seats.filter((s) => s.popped && !s.left);
+    const last = Math.max(0, ...popped.map((s) => s.poppedInRound ?? 0));
+    const runnerUp = popped.find((s) => s.poppedInRound === last);
+    if (!runnerUp || !room.winnerId) return;
+    const card = (player: Player) => ({
+      id: player.id,
+      name: player.name,
+      age: player.age,
+      photo: player.photos[0],
+    });
+    if (room.popper.id === this.userId) {
+      this.chances.push({
+        id: `chance-${randomId()}`,
+        roomId: room.id,
+        person: card(runnerUp.player),
+        state: 'almost',
+        createdAt: new Date().toISOString(),
+      });
+    } else if (runnerUp.player.id === this.userId && Math.random() < 0.5) {
+      // Sometimes the chooser comes back for you.
+      setTimeout(() => {
+        this.chances.push({
+          id: `chance-${randomId()}`,
+          roomId: room.id,
+          person: card(room.popper),
+          state: 'incoming',
+          createdAt: new Date().toISOString(),
+        });
+      }, randomInt(5000, 10000));
+    }
   }
 
   // Account
@@ -407,6 +530,10 @@ class MockServer implements PopdateApi {
     this.settings = { ...DEFAULT_SETTINGS, notifications: { ...DEFAULT_SETTINGS.notifications } };
     void removeJson(PROFILE_KEY);
     void removeJson(SETTINGS_KEY);
+    void removeJson(HISTORY_KEY);
+    void removeJson(MATCHES_KEY);
+    this.history = [];
+    this.chances = [];
   }
 
   // Settings
@@ -703,8 +830,11 @@ class MockServer implements PopdateApi {
         createdAt: new Date().toISOString(),
       };
       this.matches.push(match);
+      void writeJson(MATCHES_KEY, this.matches);
       room.matchId = match.id;
     }
+    this.recordHistory(room);
+    this.offerSecondChance(room);
     this.emit(room);
   }
 

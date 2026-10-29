@@ -8,13 +8,18 @@ import { BrandBalloon, MinTouch, Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/utils/haptics';
 
-export type Tab = 'home' | 'matches' | 'settings';
+export type Tab = 'home' | 'rooms' | 'matches' | 'you';
 
-const ROUTES: Record<Tab, Href> = {
+/** The tabs in the order they sit on the bar, and their routes. */
+export const TABS: Tab[] = ['home', 'rooms', 'matches', 'you'];
+export const TAB_ROUTES: Record<Tab, Href> = {
   home: '/home',
+  rooms: '/rooms' as Href,
   matches: '/matches' as Href,
-  settings: '/settings' as Href,
+  you: '/you' as Href,
 };
+
+const ICONS = { rooms: 'rooms', matches: 'bubble', you: 'person' } as const;
 
 type TabBarProps = {
   active: Tab;
@@ -33,7 +38,7 @@ type TabBarProps = {
 export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const tabs: Tab[] = ['home', 'matches', 'settings'];
+  const tabs = TABS;
   return (
     <View pointerEvents="box-none" style={[styles.layer, { bottom: Math.max(insets.bottom, 30) }]}>
       <View
@@ -54,7 +59,7 @@ export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
                 if (selected) return;
                 haptics.selection();
                 if (onSelect) onSelect(tab);
-                else router.replace(ROUTES[tab]);
+                else router.replace(TAB_ROUTES[tab]);
               }}
               style={styles.item}>
               {tab === 'home' ? (
@@ -62,7 +67,7 @@ export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
                   <Balloon color={selected ? BrandBalloon.color : color} size={14} string={false} />
                 </View>
               ) : (
-                <Icon name={tab === 'matches' ? 'bubble' : 'gear'} size={19} color={color} />
+                <Icon name={ICONS[tab]} size={19} color={color} />
               )}
               {dots?.[tab] ? <View style={[styles.dot, { backgroundColor: theme.accent }]} /> : null}
             </Pressable>

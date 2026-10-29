@@ -13,6 +13,7 @@ const data = v.union(
   v.object({ type: v.literal('room'), roomId: v.string() }),
   v.object({ type: v.literal('match'), matchId: v.string() }),
   v.object({ type: v.literal('chat'), matchId: v.string() }),
+  v.object({ type: v.literal('matches') }),
 );
 
 /** The push tokens of the people who allow this kind of push. */
@@ -57,7 +58,8 @@ type Push = {
   data:
     | { type: 'room'; roomId: string }
     | { type: 'match'; matchId: string }
-    | { type: 'chat'; matchId: string };
+    | { type: 'chat'; matchId: string }
+    | { type: 'matches' };
 };
 
 /** Queues a push from inside a mutation; it goes out once the mutation commits. */

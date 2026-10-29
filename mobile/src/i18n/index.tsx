@@ -11,6 +11,7 @@ import { match } from '@/i18n/locales/match';
 import { onboarding } from '@/i18n/locales/onboarding';
 import { profile } from '@/i18n/locales/profile';
 import { queue } from '@/i18n/locales/queue';
+import { almost, checkin, rooms, you } from '@/i18n/locales/rooms';
 import { settings } from '@/i18n/locales/settings';
 import { LOCALES, type Locale, type Strings } from '@/i18n/types';
 
@@ -28,7 +29,11 @@ const AREAS: Record<string, Strings> = {
   onboarding,
   profile,
   queue,
+  rooms,
   settings,
+  you,
+  almost,
+  checkin,
 };
 
 const i18n = new I18n();

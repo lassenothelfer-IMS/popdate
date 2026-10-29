@@ -7,13 +7,15 @@ import { Platform } from 'react-native';
 type PushData =
   | { type: 'room'; roomId: string }
   | { type: 'match'; matchId: string }
-  | { type: 'chat'; matchId: string };
+  | { type: 'chat'; matchId: string }
+  | { type: 'matches' };
 
 function hrefFor(data: unknown): Href | null {
   const push = data as Partial<PushData> | undefined;
   if (push?.type === 'room' && push.roomId) return `/room/${push.roomId}` as Href;
   if (push?.type === 'match' && push.matchId) return `/match/${push.matchId}` as Href;
   if (push?.type === 'chat' && push.matchId) return `/chat/${push.matchId}` as Href;
+  if (push?.type === 'matches') return '/matches' as Href;
   return null;
 }
 

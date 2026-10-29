@@ -1,18 +1,11 @@
-import { router, type Href } from 'expo-router';
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Platform, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import type { Tab } from '@/components/tab-bar';
+import { TAB_ROUTES, TABS, type Tab } from '@/components/tab-bar';
 import { haptics } from '@/utils/haptics';
 
-/** The tabs in the order they sit on the tab bar. */
-const ORDER: Tab[] = ['home', 'matches', 'settings'];
-const ROUTES: Record<Tab, Href> = {
-  home: '/home',
-  matches: '/matches' as Href,
-  settings: '/settings' as Href,
-};
 
 /** A swipe counts once it travels this far, or is flicked this fast. */
 const DISTANCE = 60;
@@ -25,10 +18,10 @@ const VELOCITY = 500;
  */
 export function TabSwipe({ tab, children }: { tab: Tab; children: ReactNode }) {
   function go(step: 1 | -1) {
-    const next = ORDER[ORDER.indexOf(tab) + step];
+    const next = TABS[TABS.indexOf(tab) + step];
     if (!next) return;
     haptics.selection();
-    router.navigate(ROUTES[next]);
+    router.navigate(TAB_ROUTES[next]);
   }
 
   const swipe = Gesture.Pan()

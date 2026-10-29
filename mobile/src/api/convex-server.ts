@@ -219,6 +219,7 @@ export class ConvexServer implements PopdateApi {
       genderIdentity: draft.genderIdentity,
       genderDetails: draft.genderDetails,
       sexuality: draft.sexuality,
+      pinnedAnswers: draft.pinnedAnswers,
       photos,
     });
     return this.keepPhotoIds(saved);
@@ -291,6 +292,27 @@ export class ConvexServer implements PopdateApi {
 
   async unmatch(matchId: string) {
     await this.mutation(api.matches.unmatch, { matchId });
+  }
+
+  async listRoomHistory() {
+    return await this.query(api.history.list, {});
+  }
+
+  async getQueueStats() {
+    return await this.query(api.queue.stats, {});
+  }
+
+  async listSecondChances() {
+    return await this.query(api.secondChances.list, {});
+  }
+
+  async sendSecondChance(roomId: string, userId: string) {
+    await this.mutation(api.secondChances.send, { roomId, userId });
+  }
+
+  async answerSecondChance(id: string, accept: boolean) {
+    const matchId = await this.mutation(api.secondChances.answer, { id, accept });
+    return matchId ? await this.getMatch(matchId) : null;
   }
 
   // Settings

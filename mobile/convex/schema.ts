@@ -40,6 +40,8 @@ export default defineSchema({
     genderIdentity: v.optional(v.string()),
     genderDetails: v.optional(v.string()),
     sexuality: v.optional(v.string()),
+    /** Up to three answers from their rooms, pinned to the profile. */
+    pinnedAnswers: v.optional(v.array(v.object({ question: v.string(), answer: v.string() }))),
     city: v.string(),
     /** Optional, like job and bio (which are empty strings when left out). */
     heightCm: v.optional(v.number()),
@@ -126,7 +128,21 @@ export default defineSchema({
     winnerId: v.optional(v.id('users')),
     matchId: v.optional(v.id('matches')),
     createdAt: v.number(),
+    /** When the room finished, for your history. */
+    endedAt: v.optional(v.number()),
   }).index('by_popper', ['popperId']),
+
+  /** A chooser's second chance for the runner-up of their room. */
+  secondChances: defineTable({
+    roomId: v.id('rooms'),
+    fromId: v.id('users'),
+    toId: v.id('users'),
+    status: v.union(v.literal('sent'), v.literal('accepted'), v.literal('declined')),
+    createdAt: v.number(),
+  })
+    .index('by_from', ['fromId'])
+    .index('by_to', ['toId'])
+    .index('by_room', ['roomId']),
 
   /** The contestants of a room. The popper is `rooms.popperId`. */
   roomPlayers: defineTable({

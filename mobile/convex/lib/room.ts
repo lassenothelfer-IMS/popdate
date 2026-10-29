@@ -153,6 +153,7 @@ export async function finish(ctx: MutationCtx, roomId: Id<'rooms'>, { withWinner
     popReminder: false,
     winnerId: winner?.userId,
     matchId,
+    endedAt: Date.now(),
   });
 }
 

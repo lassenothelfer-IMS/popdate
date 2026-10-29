@@ -24,7 +24,9 @@ const ICONS = {
   },
   lock: { ios: 'lock.fill', android: 'lock', web: 'lock' },
   people: { ios: 'person.2', android: 'group', web: 'group' },
+  person: { ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' },
   photo: { ios: 'photo.on.rectangle', android: 'photo_library', web: 'photo_library' },
+  rooms: { ios: 'square.stack', android: 'history', web: 'history' },
   send: { ios: 'arrow.up', android: 'arrow_upward', web: 'arrow_upward' },
   timer: { ios: 'timer', android: 'timer', web: 'timer' },
 } as const satisfies Record<string, SymbolViewProps['name']>;

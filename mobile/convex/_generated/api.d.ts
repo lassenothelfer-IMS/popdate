@@ -11,6 +11,7 @@
 import type * as account from "../account.js";
 import type * as auth from "../auth.js";
 import type * as chat from "../chat.js";
+import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_errors from "../lib/errors.js";
@@ -27,6 +28,7 @@ import type * as push from "../push.js";
 import type * as queue from "../queue.js";
 import type * as rooms from "../rooms.js";
 import type * as safety from "../safety.js";
+import type * as secondChances from "../secondChances.js";
 import type * as settings from "../settings.js";
 import type * as testPlayers from "../testPlayers.js";
 import type * as users from "../users.js";
@@ -42,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   account: typeof account;
   auth: typeof auth;
   chat: typeof chat;
+  history: typeof history;
   http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/errors": typeof lib_errors;
@@ -58,6 +61,7 @@ declare const fullApi: ApiFromModules<{
   queue: typeof queue;
   rooms: typeof rooms;
   safety: typeof safety;
+  secondChances: typeof secondChances;
   settings: typeof settings;
   testPlayers: typeof testPlayers;
   users: typeof users;

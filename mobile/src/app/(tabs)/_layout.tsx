@@ -1,22 +1,19 @@
-import { router, Slot, usePathname, type Href } from 'expo-router';
+import { router, Slot, usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
-import { TabBar, type Tab } from '@/components/tab-bar';
-import { useYourTurnCount } from '@/features/matches/use-your-turn';
+import { TAB_ROUTES, TabBar, TABS, type Tab } from '@/components/tab-bar';
 import { HomeScreen } from '@/features/home/home-screen';
+import { ProfileViewScreen } from '@/features/home/profile-view-screen';
 import { MatchesScreen } from '@/features/matches/matches-screen';
-import { SettingsScreen } from '@/features/settings/settings-screen';
+import { useYourTurnCount } from '@/features/matches/use-your-turn';
+import { RoomsScreen } from '@/features/rooms/rooms-screen';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
 
-const ORDER: Tab[] = ['home', 'matches', 'settings'];
-const ROUTES: Record<Tab, Href> = {
-  home: '/home',
-  matches: '/matches' as Href,
-  settings: '/settings' as Href,
-};
+const ORDER = TABS;
+const ROUTES = TAB_ROUTES;
 
 function tabOf(pathname: string): number {
   const index = ORDER.findIndex((tab) => pathname.startsWith(`/${tab}`));
@@ -24,9 +21,9 @@ function tabOf(pathname: string): number {
 }
 
 /**
- * Home, Matches and Settings side by side: swipe and the next page follows the
+ * Play, Rooms, Matches and You side by side: swipe and the next page follows the
  * finger, or tap the floating tab bar. The URL follows the page, so links to
- * /home, /matches or /settings land on the right one. All three stay mounted,
+ * /home, /rooms, /matches or /you land on the right one. All four stay mounted,
  * so a page keeps its scroll and state while you're on another.
  */
 export default function TabsLayout() {
@@ -64,16 +61,24 @@ export default function TabsLayout() {
         <View key="home" style={styles.fill}>
           <HomeScreen />
         </View>
+        <View key="rooms" style={styles.fill}>
+          <RoomsScreen />
+        </View>
         <View key="matches" style={styles.fill}>
           <MatchesScreen />
         </View>
-        <View key="settings" style={styles.fill}>
-          <SettingsScreen />
+        <View key="you" style={styles.fill}>
+          <ProfileViewScreen asTab />
         </View>
       </PagerView>
       <TabBar
         active={ORDER[page]}
-        labels={{ home: t('home.tabHome'), matches: t('home.tabMatches'), settings: t('home.settings') }}
+        labels={{
+          home: t('home.tabHome'),
+          rooms: t('home.tabRooms'),
+          matches: t('home.tabMatches'),
+          you: t('home.tabYou'),
+        }}
         onSelect={select}
         dots={{ matches: yourTurn > 0 }}
       />

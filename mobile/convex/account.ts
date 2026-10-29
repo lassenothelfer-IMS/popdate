@@ -60,6 +60,18 @@ export const deleteAccount = mutation({
       for (const row of rows) await ctx.db.delete(row._id);
     }
 
+    const chances = [
+      ...(await ctx.db
+        .query('secondChances')
+        .withIndex('by_from', (q) => q.eq('fromId', userId))
+        .collect()),
+      ...(await ctx.db
+        .query('secondChances')
+        .withIndex('by_to', (q) => q.eq('toId', userId))
+        .collect()),
+    ];
+    for (const chance of chances) await ctx.db.delete(chance._id);
+
     const blocks = [
       ...(await ctx.db
         .query('blocks')

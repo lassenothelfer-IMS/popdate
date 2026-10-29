@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { useJoinQueue } from '@/features/home/use-join-queue';
+import { SecondChances } from '@/features/matches/second-chances';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
 import { useFilterText } from '@/state/settings';
@@ -102,6 +103,8 @@ export function MatchesScreen() {
             {t('home.matchesTitle')}
           </ThemedText>
         </Rise>
+
+        <SecondChances onMatched={() => void load()} />
 
         {threads === null && failed ? (
           <View style={styles.loading}>

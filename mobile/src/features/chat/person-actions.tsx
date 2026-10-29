@@ -13,6 +13,9 @@ import { haptics } from '@/utils/haptics';
 /** Someone you can report or block, and unmatch when you're matched. */
 export type Person = { id: string; name: string; age?: number; matchId?: string };
 
+/** A choice of the screen's own, listed above Report, Block and Unmatch. */
+export type Extra = { label: string; onPress: () => void };
+
 type Options = {
   /** They're blocked or unmatched: leave whatever screen showed them. */
   onGone?: (person: Person) => void;
@@ -24,7 +27,8 @@ type Options = {
  * do; render `element` once anywhere in the screen.
  */
 export function usePersonActions({ onGone }: Options = {}): {
-  open: (person: Person) => Promise<void>;
+  /** `extras` come first in the list, like the chat's Safety check-in. */
+  open: (person: Person, extras?: Extra[]) => Promise<void>;
   /** For a screen with several people, like the room: asks who first. */
   openAmong: (people: Person[]) => Promise<void>;
   element: ReactNode;
@@ -35,17 +39,27 @@ export function usePersonActions({ onGone }: Options = {}): {
   const [reporting, setReporting] = useState<Person | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function open(person: Person) {
+  async function open(person: Person, extras: Extra[] = []) {
     if (busy) return;
-    const choices = [{ label: t('chat.report') }, { label: t('chat.block'), destructive: true }];
+    const choices = [
+      ...extras.map((extra) => ({ label: extra.label })),
+      { label: t('chat.report') },
+      { label: t('chat.block'), destructive: true },
+    ];
     if (person.matchId) choices.push({ label: t('chat.unmatch'), destructive: true });
     const picked = await choose({
       title: person.age ? t('common.nameAge', { name: person.name, age: person.age }) : person.name,
       choices,
     });
-    if (picked === 0) setReporting(person);
-    if (picked === 1) await block(person);
-    if (picked === 2) await unmatch(person);
+    if (picked === null) return;
+    if (picked < extras.length) {
+      extras[picked].onPress();
+      return;
+    }
+    const action = picked - extras.length;
+    if (action === 0) setReporting(person);
+    if (action === 1) await block(person);
+    if (action === 2) await unmatch(person);
   }
 
   async function openAmong(people: Person[]) {
