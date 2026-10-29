@@ -4,7 +4,6 @@ import {
   InputAccessoryView,
   Keyboard,
   Platform,
-  Pressable,
   StyleSheet,
   TextInput,
   View,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
 import { useRevealField } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -154,15 +154,12 @@ export function TextField({
       {numberPad ? (
         <InputAccessoryView nativeID={padId}>
           <View style={[styles.padBar, { backgroundColor: theme.sheet, borderTopColor: theme.border }]}>
-            <Pressable
-              accessibilityRole="button"
+            <Button
+              title={t('common.done')}
+              variant="plain"
+              fullWidth={false}
               onPress={() => Keyboard.dismiss()}
-              hitSlop={8}
-              style={({ pressed }) => [styles.padDone, pressed && styles.pressed]}>
-              <ThemedText type="headline" themeColor="accentText">
-                {t('common.done')}
-              </ThemedText>
-            </Pressable>
+            />
           </View>
         </InputAccessoryView>
       ) : null}
@@ -221,12 +218,5 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Space.md,
-  },
-  padDone: {
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.6,
   },
 });

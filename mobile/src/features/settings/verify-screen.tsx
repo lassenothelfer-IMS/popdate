@@ -176,14 +176,14 @@ export function VerifyScreen() {
     ) : mode === 'preview' ? (
       <View style={styles.pair}>
         <View style={styles.flex}>
-          <Button variant="secondary" title={t('settings.retake')} disabled={busy} onPress={retake} />
+          <Button variant="tinted" title={t('settings.retake')} disabled={busy} onPress={retake} />
         </View>
         <View style={styles.flex}>
           <Button title={t('settings.usePhoto')} loading={busy} onPress={submit} />
         </View>
       </View>
     ) : status === 'pending' ? (
-      <Button variant="secondary" title={t('settings.checking')} disabled />
+      <Button variant="tinted" title={t('settings.checking')} disabled />
     ) : canTake && !isWeb ? (
       <Button
         title={status === 'rejected' ? t('settings.retakeSelfie') : t('settings.takeSelfie')}
@@ -196,14 +196,7 @@ export function VerifyScreen() {
   return (
     <Screen scroll={mode === 'info'} footer={footer} footerStyle="plain">
       <Rise index={0} style={styles.bar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.cancel')}
-          onPress={close}
-          hitSlop={8}
-          style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}>
-          <ThemedText type="label">{t('common.cancel')}</ThemedText>
-        </Pressable>
+        <Button title={t('common.cancel')} variant="plain" fullWidth={false} onPress={close} />
         <ThemedText type="headline" accessibilityRole="header">
           {t('settings.verifyCheckTitle')}
         </ThemedText>
@@ -273,7 +266,7 @@ export function VerifyScreen() {
               </ThemedText>
               <View style={styles.openSettings}>
                 <Button
-                  variant="secondary"
+                  variant="tinted"
                   title={t('settings.openSettings')}
                   onPress={() => Linking.openSettings()}
                 />
@@ -402,9 +395,6 @@ const styles = StyleSheet.create({
     minHeight: MinTouch,
     minWidth: MinTouch,
     justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.6,
   },
   title: {
     marginTop: Space.lg,

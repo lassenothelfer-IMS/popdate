@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
   StyleSheet,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
 
+import { Button } from '@/components/button';
 import { ProgressSegments } from '@/components/progress-segments';
 import { ThemedText } from '@/components/themed-text';
-import { Gutter, MinTouch, Radius, Space } from '@/constants/theme';
+import { Gutter, MinTouch, Space } from '@/constants/theme';
 import { Pill } from '@/features/game/you-tag';
 import { useTheme } from '@/hooks/use-theme';
 import { MoreButton } from '@/features/chat/person-actions';
@@ -91,28 +90,14 @@ export function RoomBar({
             {timer}
             {onMore ? <MoreButton label={t('game.reportSomeone')} onPress={onMore} /> : null}
             {onLeave ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('game.leaveRoom')}
-                accessibilityState={{ busy: leaving, disabled: leaving }}
-                disabled={leaving}
+              <Button
+                title={t('game.leave')}
+                variant="tinted"
+                size="small"
+                fullWidth={false}
+                loading={leaving}
                 onPress={onLeave}
-                hitSlop={{ right: Space.sm }}
-                style={({ pressed }) => [styles.leave, pressed && styles.pressed]}>
-                {/* A surface 2 pill, 13/600, inside a 44 pt target. */}
-                <View style={[styles.leavePill, { backgroundColor: theme.surface }]}>
-                {leaving ? (
-                  <ActivityIndicator color={theme.textSecondary} />
-                ) : (
-                  <ThemedText
-                    type="footnote"
-                    maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
-                    style={styles.leaveLabel}>
-                    {t('game.leave')}
-                  </ThemedText>
-                )}
-                </View>
-              </Pressable>
+              />
             ) : null}
           </View>
         ) : null}
@@ -167,25 +152,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
-  },
-  leave: {
-    minWidth: MinTouch,
-    minHeight: MinTouch,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leavePill: {
-    minHeight: 32,
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leaveLabel: {
-    fontWeight: 600,
-  },
-  pressed: {
-    opacity: 0.6,
   },
   rounds: {
     marginTop: Space.md,

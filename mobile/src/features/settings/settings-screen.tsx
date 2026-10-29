@@ -270,7 +270,7 @@ export function SettingsScreen() {
                     </ThemedText>
                     <View style={styles.openSettings}>
                       <Button
-                        variant="secondary"
+                        variant="tinted"
                         title={t('settings.openSettings')}
                         onPress={() => Linking.openSettings()}
                       />
@@ -328,7 +328,7 @@ export function SettingsScreen() {
         <View style={styles.end}>
           {errorFor('account')}
           <Button
-            variant="ghost"
+            variant="plain"
             title={t('settings.signOut')}
             loading={ending === 'signOut'}
             disabled={ending !== null}

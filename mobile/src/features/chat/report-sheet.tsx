@@ -120,7 +120,7 @@ export function ReportSheet({ visible, name, sending, onCancel, onReport }: Repo
       </Pressable>
       <View style={styles.actions}>
         <View style={styles.cancel}>
-          <Button title={t('common.cancel')} variant="secondary" disabled={sending} onPress={close} />
+          <Button title={t('common.cancel')} variant="tinted" disabled={sending} onPress={close} />
         </View>
         <View style={styles.report}>
           <Button

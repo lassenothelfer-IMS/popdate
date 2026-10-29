@@ -158,7 +158,7 @@ export function HoldToPop({ name, color, title, onPop, onCancel }: HoldToPopProp
       </View>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Space.md) }]}>
-        <Button variant="ghost" title={t('common.cancel')} onPress={onCancel} />
+        <Button variant="plain" title={t('common.cancel')} onPress={onCancel} />
       </View>
     </Animated.View>
   );

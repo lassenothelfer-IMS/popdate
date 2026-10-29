@@ -146,7 +146,7 @@ function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }
           {__DEV__ && !enough ? (
             <Button
               title={t('profile.useTestPhotos')}
-              variant="ghost"
+              variant="plain"
               onPress={() => form.setPhotos(testPhotos())}
             />
           ) : null}
@@ -256,10 +256,10 @@ function ReadyStep({ profile }: { profile: Profile }) {
       footer={
         <View style={styles.actions}>
           {error ? <ErrorLine message={error} /> : null}
-          <Button title={t('onboarding.joinNext')} variant="coral" loading={joining} onPress={join} />
+          <Button title={t('onboarding.joinNext')} loading={joining} onPress={join} />
           <Button
             title={t('onboarding.editFirst')}
-            variant="ghost"
+            variant="plain"
             onPress={() => {
               router.replace('/home');
               router.push('/profile');

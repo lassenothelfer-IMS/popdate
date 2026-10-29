@@ -1,7 +1,8 @@
 import { Redirect, router, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
@@ -12,7 +13,6 @@ import { GenderSection, resolvedSide, type IdentityChoice } from '@/features/pro
 import { identityOf } from '@/features/profile/identity';
 import { DetailsSection, PhotoSection, useProfileForm } from '@/features/profile/profile-form';
 import { confirmStep } from '@/features/chat/prompts';
-import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
@@ -31,7 +31,6 @@ function goBack() {
  */
 export function EditProfileScreen() {
   const t = useT();
-  const theme = useTheme();
   const { profile, saveProfile } = useSession();
   const { show, toast } = useToast();
   const form = useProfileForm(
@@ -119,34 +118,19 @@ export function EditProfileScreen() {
     <View style={styles.flex}>
       <Screen scroll>
         <Rise index={0} style={styles.bar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.cancel')}
-            onPress={goBack}
-            hitSlop={8}
-            style={({ pressed }) => [styles.barButton, pressed && styles.pressed]}>
-            <ThemedText type="label">{t('common.cancel')}</ThemedText>
-          </Pressable>
+          <Button title={t('common.cancel')} variant="plain" fullWidth={false} onPress={goBack} />
           <ThemedText type="headline" accessibilityRole="header">
             {t('settings.editProfile')}
           </ThemedText>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('common.save')}
-            accessibilityHint={canSave ? undefined : (missing ?? t('profile.noChanges'))}
-            accessibilityState={{ disabled: !canSave, busy: saving }}
+          <Button
+            title={t('common.save')}
+            size="small"
+            fullWidth={false}
             disabled={!canSave}
-            onPress={handleSave}
-            hitSlop={8}
-            style={({ pressed }) => [styles.barButton, styles.save, pressed && styles.pressed]}>
-            {saving ? (
-              <ActivityIndicator color={theme.accentText} />
-            ) : (
-              <ThemedText type="headline" themeColor={canSave ? 'accentText' : 'textTertiary'}>
-                {t('common.save')}
-              </ThemedText>
-            )}
-          </Pressable>
+            loading={saving}
+            accessibilityHint={canSave ? undefined : (missing ?? t('profile.noChanges'))}
+            onPress={() => void handleSave()}
+          />
         </Rise>
 
         {error ? (
@@ -188,17 +172,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: MinTouch,
-  },
-  barButton: {
-    minHeight: MinTouch,
-    minWidth: MinTouch,
-    justifyContent: 'center',
-  },
-  save: {
-    alignItems: 'flex-end',
-  },
-  pressed: {
-    opacity: 0.6,
   },
   note: {
     marginTop: Space.xs,

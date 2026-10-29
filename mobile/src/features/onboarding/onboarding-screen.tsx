@@ -4,7 +4,6 @@ import {
   AccessibilityInfo,
   BackHandler,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -224,7 +223,7 @@ export function OnboardingScreen() {
               }}
             />
             {__DEV__ ? (
-              <Button title={t('onboarding.skipTest')} variant="ghost" onPress={handleTestProfile} />
+              <Button title={t('onboarding.skipTest')} variant="plain" onPress={handleTestProfile} />
             ) : null}
           </Rise>
         }>
@@ -278,15 +277,12 @@ export function OnboardingScreen() {
             active={index}
             label={t('onboarding.introPage', { page: index + 1, total: INTROS.length })}
           />
-          <Pressable
-            accessibilityRole="button"
+          <Button
+            title={t('onboarding.skip')}
+            variant="plain"
+            fullWidth={false}
             onPress={() => goTo('birthday')}
-            hitSlop={{ top: 8, bottom: 8, left: Space.sm, right: Space.sm }}
-            style={({ pressed }) => [styles.skip, pressed && styles.pressed]}>
-            <ThemedText type="label" themeColor="textSecondary">
-              {t('onboarding.skip')}
-            </ThemedText>
-          </Pressable>
+          />
         </Rise>
         <Rise index={1} style={styles.introArt}>
           <Art />
@@ -702,13 +698,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 20,
-  },
-  skip: {
-    minHeight: MinTouch,
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.6,
   },
   introArt: {
     marginTop: 12,

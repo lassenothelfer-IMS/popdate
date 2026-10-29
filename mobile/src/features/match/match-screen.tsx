@@ -196,7 +196,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
           />
           <Button
             title={t('match.recap')}
-            variant="ghost"
+            variant="plain"
             onPress={() => router.push(`/recap/${match.roomId}` as Href)}
           />
         </>

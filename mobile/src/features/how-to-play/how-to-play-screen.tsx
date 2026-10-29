@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { MinTouch, Space } from '@/constants/theme';
+import { Space } from '@/constants/theme';
 import { INTRO } from '@/features/how-to-play/step-art';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -26,17 +26,7 @@ export function HowToPlayScreen() {
   return (
     <Screen scroll footerStyle="plain" footer={<Button title={t('howToPlay.gotIt')} onPress={close} />}>
       <View style={styles.top}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          onPress={close}
-          hitSlop={{ left: Space.sm, right: Space.sm }}
-          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-          <ThemedText type="label" themeColor="textSecondary">
-            {t('common.close')}
-          </ThemedText>
-        </Pressable>
+        <Button title={t('common.close')} variant="plain" fullWidth={false} onPress={close} />
       </View>
 
       <Rise index={0}>
@@ -90,15 +80,6 @@ const styles = StyleSheet.create({
   top: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-  },
-  // A text action in the corner, the mirror of Back.
-  close: {
-    minHeight: MinTouch,
-    justifyContent: 'center',
-    paddingLeft: 6,
-  },
-  pressed: {
-    opacity: 0.6,
   },
   step: {
     marginTop: Space.xl,

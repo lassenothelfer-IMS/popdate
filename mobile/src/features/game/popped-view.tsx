@@ -116,7 +116,7 @@ export function PoppedView({
           <Button title={t('game.playAnother')} loading={replaying} onPress={onPlayAgain} />
           <Button
             title={t('game.stayWatch')}
-            variant="ghost"
+            variant="plain"
             disabled={replaying}
             onPress={onWatch}
           />

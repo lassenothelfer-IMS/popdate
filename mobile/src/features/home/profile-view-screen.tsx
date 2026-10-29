@@ -1,6 +1,6 @@
 import { Redirect, router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,6 +12,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { Button } from '@/components/button';
 import { api, type VerificationStatus } from '@/api';
 import { Icon } from '@/components/icon';
 import { Photo } from '@/components/photo';
@@ -226,7 +227,7 @@ function HeroScrim() {
   );
 }
 
-/** A 40 pt glass circle (or pill) over the photo. */
+/** A glass button over the photo: a circle with an icon, or a pill with its label. */
 function GlassButton({
   label,
   onPress,
@@ -238,21 +239,16 @@ function GlassButton({
   pill?: boolean;
   children: React.ReactNode;
 }) {
-  const theme = useTheme();
-  const glass = useScheme() === 'dark' ? theme.page : theme.text;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
+    <Button
+      title={label}
+      variant="glass"
+      size="small"
+      fullWidth={false}
+      iconOnly={!pill}
+      icon={pill ? undefined : children}
       onPress={onPress}
-      hitSlop={4}
-      style={({ pressed }) => [
-        pill ? styles.glassPill : styles.glassCircle,
-        { backgroundColor: `${glass}73` },
-        pressed && styles.pressed,
-      ]}>
-      {children}
-    </Pressable>
+    />
   );
 }
 
@@ -271,23 +267,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  glassCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  glassPill: {
-    minHeight: 34,
-    paddingHorizontal: 14,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
   },
   dots: {
     position: 'absolute',

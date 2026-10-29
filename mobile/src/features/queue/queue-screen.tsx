@@ -18,7 +18,6 @@ import { api, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
-import { Icon } from '@/components/icon';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -295,16 +294,13 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             </Animated.View>
           ) : (
             <>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('queue.leaveLine')}
+              <Button
+                title={t('queue.leaveLine')}
+                variant="plain"
+                fullWidth={false}
                 disabled={matched}
-                onPress={handleCancel}
-                hitSlop={8}
-                style={({ pressed }) => [styles.leave, pressed && styles.pressed]}>
-                <Icon name="back" size={15} color={theme.text} />
-                <ThemedText type="label">{t('queue.leaveLine')}</ThemedText>
-              </Pressable>
+                onPress={() => void handleCancel()}
+              />
               <View style={[styles.pill, { backgroundColor: theme.surface }]}>
                 <ThemedText type="timer" style={styles.pillText}>
                   {t('queue.waited', { time: waitedLabel(waited) })}
@@ -533,15 +529,6 @@ const styles = StyleSheet.create({
   topLabel: {
     minHeight: MinTouch,
     justifyContent: 'center',
-  },
-  leave: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xxs,
-    minHeight: MinTouch,
-  },
-  pressed: {
-    opacity: 0.6,
   },
   pill: {
     paddingVertical: 7,

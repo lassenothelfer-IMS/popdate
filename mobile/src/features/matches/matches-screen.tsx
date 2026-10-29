@@ -104,7 +104,7 @@ export function MatchesScreen() {
         {threads === null && failed ? (
           <View style={styles.loading}>
             <ErrorLine message={t('home.matchesFailed')} />
-            <Button title={t('common.tryAgain')} variant="secondary" onPress={() => void load()} />
+            <Button title={t('common.tryAgain')} variant="tinted" onPress={() => void load()} />
           </View>
         ) : threads === null ? (
           <View style={styles.loading}>
@@ -247,7 +247,7 @@ function EarnedCard({ onJoin, joining }: { onJoin: () => void; joining: boolean 
         {t('home.earnedBody')}
       </ThemedText>
       <View style={styles.earnedButton}>
-        <Button title={t('home.play')} variant="secondary" loading={joining} onPress={onJoin} />
+        <Button title={t('home.play')} variant="tinted" loading={joining} onPress={onJoin} />
       </View>
     </View>
   );

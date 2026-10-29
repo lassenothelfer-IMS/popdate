@@ -349,7 +349,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               title={t('common.tryAgain')}
               onPress={() => router.replace({ pathname: '/room/[id]', params: { id: roomId } })}
             />
-            <Button title={t('game.backHome')} variant="ghost" onPress={goHome} />
+            <Button title={t('game.backHome')} variant="plain" onPress={goHome} />
           </>
         }>
         <ThemedText type="title" accessibilityRole="header" style={styles.centeredText}>
@@ -907,7 +907,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     footer = climax ? null : !winner && !isPopper ? (
       <>
         <Button title={t('game.nextRoomFirst')} loading={replaying} onPress={() => void playAgain()} />
-        <Button variant="ghost" title={t('game.backHome')} disabled={replaying} onPress={goHome} />
+        <Button variant="plain" title={t('game.backHome')} disabled={replaying} onPress={goHome} />
       </>
     ) : (
       <Button title={t('game.backHome')} onPress={goHome} />
@@ -956,7 +956,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
           </View>
           <View style={styles.flex}>
             <Button
-              variant="secondary"
+              variant="tinted"
               title={t('game.keep', { name: b.contestant.name })}
               accessibilityHint={t('game.popsHint', { name: a.contestant.name })}
               onPress={() => void handlePop(a.contestant)}

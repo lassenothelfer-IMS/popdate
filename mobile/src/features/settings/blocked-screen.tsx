@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { api, type BlockedPerson } from '@/api';
@@ -8,7 +8,7 @@ import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { Ease, Motion, Space } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
 import { confirmAction, goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
@@ -18,7 +18,6 @@ import { haptics } from '@/utils/haptics';
 /** The list arrives once it has loaded, instead of flashing the empty state first. */
 const listIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
-const UNBLOCK_HEIGHT = 36;
 
 export function BlockedScreen() {
   const t = useT();
@@ -79,7 +78,7 @@ export function BlockedScreen() {
       {loadFailed ? (
         <View style={styles.failed}>
           <ErrorLine message={t('common.somethingWrong')} />
-          <Button variant="secondary" title={t('common.tryAgain')} onPress={retry} />
+          <Button variant="tinted" title={t('common.tryAgain')} onPress={retry} />
         </View>
       ) : people ? (
         <Animated.View entering={listIn} style={styles.list}>
@@ -121,7 +120,6 @@ function BlockedRow({ person, last, busy, disabled, onUnblock }: BlockedRowProps
   const t = useT();
   const theme = useTheme();
   const seats = useSeats();
-  const slop = (MinTouch - UNBLOCK_HEIGHT) / 2;
   const nameAge = person.age
     ? t('common.nameAge', { name: person.name, age: person.age })
     : person.name;
@@ -139,23 +137,16 @@ function BlockedRow({ person, last, busy, disabled, onUnblock }: BlockedRowProps
           </>
         ) : null}
       </ThemedText>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('settings.unblockName', { name: person.name })}
-        accessibilityState={{ disabled, busy }}
+      <Button
+        title={t('settings.unblock')}
+        variant="tinted"
+        size="small"
+        fullWidth={false}
         disabled={disabled}
+        loading={busy}
+        accessibilityHint={t('settings.unblockName', { name: person.name })}
         onPress={onUnblock}
-        hitSlop={{ top: slop, bottom: slop }}
-        style={({ pressed }) => [
-          styles.unblock,
-          { backgroundColor: pressed ? theme.surfacePressed : theme.surface },
-        ]}>
-        {busy ? (
-          <ActivityIndicator size="small" color={theme.text} />
-        ) : (
-          <ThemedText type="label">{t('settings.unblock')}</ThemedText>
-        )}
-      </Pressable>
+      />
     </View>
   );
 }
@@ -191,14 +182,5 @@ const styles = StyleSheet.create({
   },
   age: {
     fontWeight: 400,
-  },
-  unblock: {
-    minHeight: UNBLOCK_HEIGHT,
-    minWidth: 88,
-    paddingHorizontal: Space.md,
-    borderRadius: Radius.pill,
-    borderCurve: 'continuous',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

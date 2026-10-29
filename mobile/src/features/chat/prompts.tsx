@@ -229,7 +229,7 @@ function ChoiceSheet({ title, message, choices, cancelLabel, onDone }: ChoiceShe
                 </PressableHighlight>
               ))}
             </View>
-            <Button title={cancelLabel} variant="ghost" onPress={() => onDone(null)} />
+            <Button title={cancelLabel} variant="plain" onPress={() => onDone(null)} />
           </View>
         </Animated.View>
       </View>
