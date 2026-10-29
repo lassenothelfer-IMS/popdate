@@ -1,4 +1,5 @@
 import { router, type Href } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -10,18 +11,9 @@ import {
   type TextInputInstance,
   type ViewInstance,
 } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import Animated from 'react-native-reanimated';
 
 import type { Interest } from '@/api';
-import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
 import { CheckMark, OptionRow } from '@/components/option-row';
@@ -29,17 +21,17 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { ProgressSegments } from '@/components/progress-segments';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
+import { VideoBackground } from '@/components/video-background';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { BrandBalloon, Fonts, HeroGlow, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { Colors, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import { IdentityPicker, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
-import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { ForcedScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
@@ -208,11 +200,15 @@ export function OnboardingScreen() {
   }
 
   if (step === 'welcome') {
+    // Always the dark treatment: light text over the video, whatever the Appearance setting.
     return (
+      <ForcedScheme value="dark">
+      <StatusBar style="light" />
       <Screen
         key="welcome"
         footerStyle="plain"
         contentStyle={styles.welcomeContent}
+        background={<VideoBackground video={WELCOME_VIDEO} poster={WELCOME_POSTER} tint={Colors.dark.page} />}
         footer={
           <Rise index={3} style={styles.welcomeActions}>
             <Button
@@ -228,28 +224,30 @@ export function OnboardingScreen() {
           </Rise>
         }>
         <Rise index={0}>
-          <Wordmark />
+          <View style={styles.logoShadow}>
+            <Wordmark />
+          </View>
         </Rise>
         <View style={styles.welcomeStage}>
           <Rise index={1} style={styles.welcomeHero}>
-            <WelcomeBalloon />
             <View
               ref={headingRef}
               accessible
               accessibilityRole="header"
               accessibilityLabel={t('onboarding.heroLabel')}>
-              <ThemedText type="hero" maxFontSizeMultiplier={1.4} style={styles.heroLine}>
+              <ThemedText type="hero" maxFontSizeMultiplier={1.4} style={[styles.heroLine, styles.onVideo]}>
                 {t('onboarding.hero')}
               </ThemedText>
             </View>
           </Rise>
           <Rise index={2}>
-            <ThemedText themeColor="textSecondary" style={styles.welcomeBody}>
+            <ThemedText themeColor="textSecondary" style={[styles.welcomeBody, styles.onVideo]}>
               {t('onboarding.welcomeBody')}
             </ThemedText>
           </Rise>
         </View>
       </Screen>
+      </ForcedScheme>
     );
   }
 
@@ -432,59 +430,9 @@ export function OnboardingScreen() {
   );
 }
 
-/**
- * The welcome's crimson balloon, 300 pt, right of center with its body above the
- * line and its string hanging behind it. It floats up 9 pt and leans 1.5° over
- * 5.2 s and back, the string swaying between 6° and 3°. Still under Reduce Motion.
- */
-function WelcomeBalloon() {
-  const theme = useTheme();
-  const dark = useScheme() === 'dark';
-  const reduced = useReduceMotion();
-  const float = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) {
-      cancelAnimation(float);
-      float.set(0);
-      return;
-    }
-    float.set(withRepeat(withTiming(1, { duration: 5200, easing: Easing.inOut(Easing.ease) }), -1, true));
-  }, [reduced, float]);
-  const balloon = useAnimatedStyle(() => ({
-    transform: [{ translateY: -9 * float.get() }, { rotate: `${-1.5 * float.get()}deg` }],
-  }));
-  const string = useAnimatedStyle(() => ({
-    transform: [{ translateY: -9 * float.get() }, { rotate: `${6 - 3 * float.get()}deg` }],
-  }));
-  return (
-    <View
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={styles.welcomeArt}>
-      {/* Dark only: a soft rose glow behind the balloon, like a blur of the surface tone. */}
-      {dark ? (
-        <Svg style={styles.welcomeGlow} width={GLOW} height={GLOW}>
-          <Defs>
-            <RadialGradient id="heroGlow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={HeroGlow.color} stopOpacity={HeroGlow.opacity} />
-              <Stop offset="0.6" stopColor={HeroGlow.color} stopOpacity={HeroGlow.opacity * 0.5} />
-              <Stop offset="1" stopColor={HeroGlow.color} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx={GLOW / 2} cy={GLOW / 2} r={GLOW / 2} fill="url(#heroGlow)" />
-        </Svg>
-      ) : null}
-      <Animated.View style={[styles.welcomeString, { backgroundColor: theme.gold }, string]} />
-      <Animated.View style={[styles.welcomeBalloon, balloon]}>
-        <Balloon color={BrandBalloon.color} size={300} string={false} />
-      </Animated.View>
-    </View>
-  );
-}
-
-/** The hero glow's square, centered on the balloon's body. */
-const GLOW = 420;
+/** The welcome's looping background and its first frame (see VideoBackground). */
+const WELCOME_VIDEO = require('../../../assets/video/popdate_welcome_loop.mp4');
+const WELCOME_POSTER = require('../../../assets/images/popdate_welcome_poster.jpg');
 
 /** AutoFill hints for the three birthday fields. */
 const CONTENT_TYPES = { day: 'birthdateDay', month: 'birthdateMonth', year: 'birthdateYear' } as const;
@@ -644,35 +592,21 @@ const styles = StyleSheet.create({
   welcomeHero: {
     zIndex: 1,
   },
-  // Placed from the line's top: the mockup's balloon starts 342 pt above it, 130 pt in.
-  welcomeArt: {
-    position: 'absolute',
-    left: 130,
-    top: -342,
-    width: 300,
-    height: 440,
-  },
-  welcomeBalloon: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
-  // Centered on the body: 300 wide and about 190 down the box.
-  welcomeGlow: {
-    position: 'absolute',
-    left: 150 - GLOW / 2,
-    top: 190 - GLOW / 2,
-  },
-  welcomeString: {
-    position: 'absolute',
-    left: 149,
-    top: 388,
-    width: 2,
-    height: 90,
-    transformOrigin: 'top',
-  },
   heroLine: {
     maxWidth: 260,
+  },
+  // A soft shadow lifts the logo and the copy off the video.
+  onVideo: {
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 12,
+  },
+  logoShadow: {
+    alignSelf: 'flex-start',
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 1 },
   },
   welcomeBody: {
     lineHeight: 23,

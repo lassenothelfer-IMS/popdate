@@ -193,6 +193,8 @@ type ScreenProps = {
   footerStyle?: 'bar' | 'plain';
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Drawn full bleed behind the content, like the welcome screen's video. */
+  background?: ReactNode;
 };
 
 export function Screen({
@@ -201,6 +203,7 @@ export function Screen({
   footerStyle = 'bar',
   scroll = false,
   contentStyle,
+  background,
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -211,6 +214,7 @@ export function Screen({
   return (
     <View style={[styles.root, { backgroundColor: theme.page }]}>
       <Grain />
+      {background}
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.fill}
