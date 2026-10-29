@@ -28,7 +28,7 @@ import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { outcomeLine } from '@/features/rooms/rooms-screen';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { useJoinQueue } from '@/features/home/use-join-queue';
-import { seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
+import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 
@@ -134,7 +134,6 @@ export function HomeScreen() {
   const newest = [...(matches ?? [])]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, HOME_MATCHES);
-  const you = youSeat(seats);
 
   return (
     <TabSwipe tab="home">
@@ -142,14 +141,6 @@ export function HomeScreen() {
       <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
         <Rise index={0} style={styles.top}>
           <Wordmark />
-          <PressableHighlight
-            accessibilityRole="button"
-            accessibilityLabel={t('home.yourProfile')}
-            onPress={() => router.navigate('/you' as Href)}
-            background="transparent"
-            style={styles.avatarButton}>
-            <Avatar name={profile.name} uri={profile.photos[0]} tone={you} size={40} />
-          </PressableHighlight>
         </Rise>
 
         <Rise index={1} style={styles.hello}>
@@ -332,10 +323,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  avatarButton: {
-    borderRadius: 22,
-    padding: 2,
   },
   hello: {
     gap: Space.xs,
