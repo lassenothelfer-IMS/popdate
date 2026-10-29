@@ -289,7 +289,10 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
         allowsMultipleSelection: true,
         selectionLimit: PHOTO_COUNT - photos.length,
         orderedSelection: true,
-        quality: 0.8,
+        // Hand back each photo as stored, without decoding and re-saving it as a JPEG:
+        // the picker then only copies the files, which is what makes picking six fast.
+        quality: 1,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
         // Most iPhone photos are Live Photos, often kept in iCloud only. Without this
         // the first pick of one fails, and only a second try finds it downloaded.
         shouldDownloadFromNetwork: true,
