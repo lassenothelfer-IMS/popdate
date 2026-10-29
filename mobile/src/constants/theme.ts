@@ -1,7 +1,8 @@
 /**
- * The Popdate design handoff (design/DESIGN.md). Two themes: romantic mauve
- * (dark, the default; still called Velvet in code) and dusty rose (light;
- * Cream in code). Rose is the accent in both; coral is for destructive only.
+ * The Popdate design handoff (design/DESIGN.md), recolored "wine and sand": a
+ * warm charcoal dark theme (the default; still called Velvet in code) and a
+ * sand light theme (Cream in code). Wine is the one accent; coral is for
+ * destructive only.
  * New York for display, SF Pro for text, Gloock only in the wordmark.
  */
 
@@ -12,103 +13,103 @@ import { cubicBezier, Easing } from 'react-native-reanimated';
 
 const velvet = {
   /** Canvas: the screen background, flat. */
-  page: '#30262F',
+  page: '#2B2527',
   /** Surface 2, a soft rose: chips, the timer pill, slots, inactive buttons. */
-  surface: '#49323D',
+  surface: '#40373A',
   /** Surface 3: pressed surface 2, the toggle track when on. */
-  surfacePressed: '#5C4653',
+  surfacePressed: '#4B4145',
   /** Surface 1: cards, list cells, inputs, option rows, sheets, their chat bubbles. */
-  field: '#382C36',
-  text: '#F8EDEB',
-  textSecondary: '#CDBCC3',
+  field: '#352E31',
+  text: '#F3EDE7',
+  textSecondary: '#C9BDB8',
   /** Hints, timestamps, placeholders. */
-  textTertiary: '#CDBCC3',
+  textTertiary: '#C9BDB8',
   /** Placeholders and decoration. Same as tertiary. */
-  textFaint: '#CDBCC3',
+  textFaint: '#C9BDB8',
   /** Hairline: card borders, list separators. */
-  border: 'rgba(255, 255, 255, 0.08)',
+  border: 'rgba(255, 255, 255, 0.09)',
   /** The edge of cards and option rows. */
-  outline: 'rgba(255, 255, 255, 0.08)',
+  outline: 'rgba(255, 255, 255, 0.09)',
   /** Input border: interactive borders, input borders, a ghost seat. */
-  borderStrong: 'rgba(217, 154, 163, 0.35)',
+  borderStrong: 'rgba(208, 130, 138, 0.35)',
   /** The empty ring of a radio or checkbox. */
-  control: '#CDBCC3',
+  control: '#C9BDB8',
   /** Ink: selected chips, radios and checkboxes, the You tag. Primary buttons use the accent. */
-  inverse: '#F8EDEB',
-  onInverse: '#30262F',
+  inverse: '#F3EDE7',
+  onInverse: '#2B2527',
   /** A light edge for fills that want one. */
   highlight: 'rgba(255, 255, 255, 0.25)',
   /** Accent: primary buttons, Pop and Match, active progress, the toggle on, the unread dot. */
-  accent: '#D99AA3',
-  onAccent: '#30262F',
+  accent: '#D0828A',
+  onAccent: '#2B2527',
   /** Accent as text, sparingly: Save, "Write your own". Links and text buttons use the text tones. */
-  accentText: '#D99AA3',
+  accentText: '#D0828A',
   /** Accent soft: error cards, the selected question row. */
-  accentWash: '#49323D',
+  accentWash: '#43343A',
   /** Accent pressed: balloon strings, the caret in answers. */
-  gold: '#C5828D',
+  gold: '#B86C74',
   /** Inactive: progress segments, the toggle track when off. */
-  track: '#5C4653',
+  track: '#4B4145',
   /** Cards that read like paper: the recap card and print mats. */
-  paper: '#F8EDEB',
-  onPaper: '#30262F',
+  paper: '#F3EDE7',
+  onPaper: '#2B2527',
   /** Coral, for destructive actions and errors only, always with an icon. */
   danger: '#FF9A8C',
   /** Checks for "answered", online status. Never a dot on its own. */
   success: '#7FC9A0',
   successFill: '#7FC9A0',
   /** The dim behind sheets. */
-  scrim: 'rgba(48, 38, 47, 0.6)',
+  scrim: 'rgba(20, 16, 18, 0.6)',
   /** Sheets, the tab bar. */
-  sheet: '#382C36',
+  sheet: '#352E31',
   /** Peach: secondary buttons. */
-  secondary: '#F0B5A1',
-  onSecondary: '#30262F',
+  secondary: '#40373A',
+  onSecondary: '#F3EDE7',
 } as const;
 
 const cream: Palette = {
-  page: '#FFF9F6',
-  surface: '#F2E8E3',
-  surfacePressed: '#EADDD7',
-  field: '#FBF4F1',
-  text: '#3A2A2A',
-  textSecondary: '#7A6262',
-  textTertiary: '#7A6262',
-  textFaint: '#7A6262',
-  border: 'rgba(184, 117, 125, 0.18)',
-  outline: 'rgba(184, 117, 125, 0.18)',
-  borderStrong: 'rgba(184, 117, 125, 0.35)',
-  control: '#7A6262',
-  inverse: '#3A2A2A',
-  onInverse: '#FFF9F6',
+  page: '#F6F1EA',
+  surface: '#EFE7DC',
+  surfacePressed: '#E6DCCE',
+  field: '#FFFDF9',
+  text: '#2A2222',
+  textSecondary: '#6E625E',
+  textTertiary: '#6E625E',
+  textFaint: '#6E625E',
+  border: 'rgba(42, 34, 34, 0.1)',
+  outline: 'rgba(42, 34, 34, 0.1)',
+  borderStrong: 'rgba(42, 34, 34, 0.18)',
+  control: '#6E625E',
+  inverse: '#2A2222',
+  onInverse: '#FFFDF9',
   highlight: 'rgba(255, 255, 255, 0.25)',
-  accent: '#B8757D',
-  onAccent: '#FFF9F6',
-  accentText: '#8F5A60',
-  accentWash: '#FCEDEE',
-  gold: '#8F5A60',
-  track: '#EADDD7',
-  paper: '#FBF4F1',
-  onPaper: '#3A2A2A',
-  danger: '#CF3A2F',
+  accent: '#7A2E3A',
+  onAccent: '#FFFDF9',
+  accentText: '#7A2E3A',
+  accentWash: '#F3E4E1',
+  gold: '#5E2230',
+  track: '#E6DCCE',
+  paper: '#FFFDF9',
+  onPaper: '#2A2222',
+  danger: '#B23A2E',
   success: '#1F7A4C',
   successFill: '#1F7A4C',
-  scrim: 'rgba(58, 42, 42, 0.35)',
-  sheet: '#FBF4F1',
-  secondary: '#F7D7C9',
-  onSecondary: '#3A2A2A',
+  scrim: 'rgba(42, 34, 34, 0.35)',
+  sheet: '#FFFDF9',
+  secondary: '#EADFD2',
+  onSecondary: '#2A2222',
 };
 
 export type Palette = { [K in keyof typeof velvet]: string };
 
-/** `dark` is the romantic mauve theme, `light` the dusty rose one. */
+/** `dark` is warm charcoal with rose-wine, `light` is sand with deep wine. */
 export const Colors: { light: Palette; dark: Palette } = { light: cream, dark: velvet };
 
 export type ThemeColor = keyof Palette;
 
 /** Both canvases are flat: the glow and the lamp draw in the canvas color, so they don't show. */
 export const CanvasGlow = {
-  stops: ['#30262F', '#30262F', '#30262F'],
+  stops: ['#2B2527', '#2B2527', '#2B2527'],
   offsets: [0, 0.45, 1],
   /** The ellipse: 100% x 45% of the screen, centered at 50% x 62%. */
   rx: 1,
@@ -117,7 +118,7 @@ export const CanvasGlow = {
 } as const;
 
 export const Lamp = {
-  color: '#30262F',
+  color: '#2B2527',
   opacity: 0,
   /** 60% x 40% of the screen, centered at 50% x 62%, fading out by 70%. */
   rx: 0.6,
@@ -127,12 +128,12 @@ export const Lamp = {
 } as const;
 
 /** The dark theme's soft glow behind the hero balloon on the welcome screen. */
-export const HeroGlow = { color: '#49323D', opacity: 0.9 } as const;
+export const HeroGlow = { color: '#40373A', opacity: 0.9 } as const;
 
 /** The soft glow under the primary and accent buttons. */
 export const ButtonShadow = {
-  light: '0 10px 24px -10px rgba(184, 117, 125, 0.55)',
-  dark: '0 10px 24px -10px rgba(217, 154, 163, 0.45)',
+  light: '0 10px 24px -10px rgba(122, 46, 58, 0.45)',
+  dark: '0 10px 24px -10px rgba(208, 130, 138, 0.35)',
 } as const;
 
 /**
@@ -149,25 +150,25 @@ export type Lacquer = {
 export const BrandLacquer: { light: Lacquer; dark: Lacquer } = {
   light: {
     stops: [
-      [0, '#F2B8B3'],
-      [0.38, '#C47F88'],
-      [0.8, '#8F5A60'],
-      [1, '#5A3238'],
+      [0, '#E8A3A6'],
+      [0.38, '#9E3E4A'],
+      [0.8, '#6A2632'],
+      [1, '#3E1820'],
     ],
-    knot: '#5A3238',
+    knot: '#3E1820',
     specular: { color: '#FFFFFF', opacity: 0.55 },
-    rim: { color: '#F4C4AE', opacity: 0.45 },
+    rim: { color: '#E6C9A8', opacity: 0.45 },
   },
   dark: {
     stops: [
-      [0, '#F6C9CB'],
-      [0.38, '#D99AA3'],
-      [0.8, '#9E5F6C'],
-      [1, '#49323D'],
+      [0, '#F2BDBF'],
+      [0.38, '#C9737B'],
+      [0.8, '#8C3F4A'],
+      [1, '#4A2A31'],
     ],
-    knot: '#49323D',
+    knot: '#4A2A31',
     specular: { color: '#FFFFFF', opacity: 0.55 },
-    rim: { color: '#F0B5A1', opacity: 0.45 },
+    rim: { color: '#E9CFA9', opacity: 0.45 },
   },
 };
 
@@ -176,23 +177,23 @@ export const BrandLacquer: { light: Lacquer; dark: Lacquer } = {
  * glass over photos. Screens use the palette above.
  */
 export const Velvet = {
-  deep: '#30262F',
-  base: '#382C36',
-  lift: '#49323D',
-  plush: '#5C4653',
-  cream: '#F8EDEB',
-  gold: '#C5828D',
-  goldOnPaper: '#8F5A60',
-  paper: '#F8EDEB',
-  faint: '#CDBCC3',
+  deep: '#2B2527',
+  base: '#352E31',
+  lift: '#40373A',
+  plush: '#4B4145',
+  cream: '#F3EDE7',
+  gold: '#B86C74',
+  goldOnPaper: '#5E2230',
+  paper: '#F3EDE7',
+  faint: '#C9BDB8',
 } as const;
 
 /** Dark glass over photos: the "Photo n" tag, the info panel, the page dots. */
 export const PhotoGlass = {
-  tag: 'rgba(48, 38, 47, 0.55)',
-  info: 'rgba(48, 38, 47, 0.85)',
-  scrim: 'rgba(48, 38, 47, 0.8)',
-  dot: 'rgba(248, 237, 235, 0.4)',
+  tag: 'rgba(30, 24, 26, 0.55)',
+  info: 'rgba(30, 24, 26, 0.85)',
+  scrim: 'rgba(30, 24, 26, 0.8)',
+  dot: 'rgba(243, 237, 231, 0.4)',
 } as const;
 
 /**
