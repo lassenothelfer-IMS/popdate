@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, getMockNextRole, isMockServer, setMockNextRole, type Match, type MockRole } from '@/api';
+import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
@@ -102,6 +103,7 @@ export function HomeScreen() {
   const you = youSeat(seats);
 
   return (
+    <TabSwipe tab="home">
     <View style={styles.flex}>
       <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
         <Rise index={0} style={styles.top}>
@@ -225,6 +227,7 @@ export function HomeScreen() {
         ) : null}
       </Screen>
     </View>
+    </TabSwipe>
   );
 }
 

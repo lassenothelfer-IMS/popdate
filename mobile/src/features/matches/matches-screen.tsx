@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { api, type Match, type Message } from '@/api';
+import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
@@ -93,6 +94,7 @@ export function MatchesScreen() {
   const empty = threads !== null && threads.length === 0;
 
   return (
+    <TabSwipe tab="matches">
     <View style={styles.flex}>
       <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
         <Rise index={0}>
@@ -156,6 +158,7 @@ export function MatchesScreen() {
         {people.element}
       </Screen>
     </View>
+    </TabSwipe>
   );
 }
 

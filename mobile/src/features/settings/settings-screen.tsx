@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { api, type Settings, type VerificationStatus } from '@/api';
+import { TabSwipe } from '@/components/tab-swipe';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
@@ -199,6 +200,7 @@ export function SettingsScreen() {
   ];
 
   return (
+    <TabSwipe tab="settings">
     <View style={styles.flex}>
       <Screen scroll contentStyle={{ paddingBottom: TAB_BAR_CLEARANCE }}>
         {/* Opened from a row there is a screen to go back to; from the tab bar there isn't. */}
@@ -349,6 +351,7 @@ export function SettingsScreen() {
         </View>
       </Screen>
     </View>
+    </TabSwipe>
   );
 }
 
