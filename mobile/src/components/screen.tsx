@@ -56,7 +56,7 @@ export function Grain() {
             rx={`${CanvasGlow.rx * 100}%`}
             ry={`${CanvasGlow.ry * 100}%`}>
             {CanvasGlow.stops.map((color, i) => (
-              <Stop key={color} offset={CanvasGlow.offsets[i]} stopColor={color} />
+              <Stop key={i} offset={CanvasGlow.offsets[i]} stopColor={color} />
             ))}
           </RadialGradient>
         </Defs>

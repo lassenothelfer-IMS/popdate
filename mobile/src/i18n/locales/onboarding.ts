@@ -14,9 +14,9 @@ export const onboarding: Strings = {
     skip: 'Skip',
     next: 'Next',
     gotIt: 'Got it',
-    roomsKicker: "Tonight's room",
+    roomsKicker: 'A room',
     roomsChooser: 'Mia, 27',
-    roomsChoosing: 'is choosing tonight',
+    roomsChoosing: 'is choosing',
     roomsQuote: 'Six people. One choosing, five holding balloons.',
     roomsTitle: 'A room is six people.',
     roomsBody:
@@ -81,7 +81,7 @@ export const onboarding: Strings = {
     notifyBody:
       "Rounds are live. We'll only ping you when a room is about to start and when someone matches with you. Nothing else, ever.",
     notifyNow: 'now',
-    notifyPreview: 'Your room is about to open. Mia is choosing tonight.',
+    notifyPreview: 'Your room is full. Mia is choosing.',
     notifyRoom: 'Room starting',
     notifyRoomNote: 'Just before it opens',
     notifyMatch: 'New match',
@@ -113,9 +113,9 @@ export const onboarding: Strings = {
     skip: 'Überspringen',
     next: 'Weiter',
     gotIt: 'Alles klar',
-    roomsKicker: 'Der Raum heute Abend',
+    roomsKicker: 'Ein Raum',
     roomsChooser: 'Mia, 27',
-    roomsChoosing: 'wählt heute Abend',
+    roomsChoosing: 'wählt',
     roomsQuote: 'Sechs Leute. Eine wählt, fünf halten Ballons.',
     roomsTitle: 'Ein Raum sind sechs Leute.',
     roomsBody:
@@ -184,7 +184,7 @@ export const onboarding: Strings = {
     notifyBody:
       'Runden sind live. Wir melden uns nur, wenn ein Raum gleich beginnt und wenn jemand ein Match mit dir hat. Sonst nie.',
     notifyNow: 'jetzt',
-    notifyPreview: 'Dein Raum öffnet gleich. Mia wählt heute Abend.',
+    notifyPreview: 'Dein Raum ist voll. Mia wählt.',
     notifyRoom: 'Raum beginnt',
     notifyRoomNote: 'Kurz bevor er öffnet',
     notifyMatch: 'Neues Match',
@@ -216,9 +216,9 @@ export const onboarding: Strings = {
     skip: 'Passer',
     next: 'Suivant',
     gotIt: 'Compris',
-    roomsKicker: 'La salle de ce soir',
+    roomsKicker: 'Une salle',
     roomsChooser: 'Mia, 27',
-    roomsChoosing: 'choisit ce soir',
+    roomsChoosing: 'choisit',
     roomsQuote: 'Six personnes. Une qui choisit, cinq qui tiennent un ballon.',
     roomsTitle: 'Une salle, c’est six personnes.',
     roomsBody:
@@ -287,7 +287,7 @@ export const onboarding: Strings = {
     notifyBody:
       'Les manches sont en direct. Nous ne te prévenons que quand une salle va commencer et quand tu as un match. Rien d’autre, jamais.',
     notifyNow: 'maintenant',
-    notifyPreview: 'Ta salle va s’ouvrir. Mia choisit ce soir.',
+    notifyPreview: 'Ta salle est complète. Mia choisit.',
     notifyRoom: 'Une salle commence',
     notifyRoomNote: 'Juste avant l’ouverture',
     notifyMatch: 'Nouveau match',
@@ -319,9 +319,9 @@ export const onboarding: Strings = {
     skip: 'Salta',
     next: 'Avanti',
     gotIt: 'Capito',
-    roomsKicker: 'La stanza di stasera',
+    roomsKicker: 'Una stanza',
     roomsChooser: 'Mia, 27',
-    roomsChoosing: 'sceglie stasera',
+    roomsChoosing: 'sceglie',
     roomsQuote: 'Sei persone. Una sceglie, cinque tengono un palloncino.',
     roomsTitle: 'Una stanza sono sei persone.',
     roomsBody:
@@ -389,7 +389,7 @@ export const onboarding: Strings = {
     notifyBody:
       'I round sono dal vivo. Ti avvisiamo solo quando una stanza sta per iniziare e quando hai un match. Nient’altro, mai.',
     notifyNow: 'ora',
-    notifyPreview: 'La tua stanza sta per aprirsi. Mia sceglie stasera.',
+    notifyPreview: 'La tua stanza è piena. Mia sceglie.',
     notifyRoom: 'Stanza in partenza',
     notifyRoomNote: 'Poco prima che si apra',
     notifyMatch: 'Nuovo match',

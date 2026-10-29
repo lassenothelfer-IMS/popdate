@@ -118,7 +118,7 @@ function useScreenReader() {
 }
 
 type RoleBeat = {
-  /** "Tonight you're holding", over the big word. */
+  /** "This time you're holding", over the big word. */
   lead: string;
   /** "a balloon", in the count style. */
   word: string;

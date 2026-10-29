@@ -34,7 +34,7 @@ function ArtCard({ children, padded }: { children: ReactNode; padded?: boolean }
   );
 }
 
-/** S02: Mia is choosing tonight, over the five balloons, yours ringed. */
+/** S02: Mia is choosing, over the five balloons, yours ringed. */
 export function RoomArt() {
   const theme = useTheme();
   const seats = useSeats();

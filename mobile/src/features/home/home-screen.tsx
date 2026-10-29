@@ -157,7 +157,7 @@ export function HomeScreen() {
             <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
             <ThemedText type="kicker">
               {live
-                ? t('home.liveLine', { count: live.waiting, city: profile.city })
+                ? t('home.liveQueue', { count: live.waiting, city: profile.city })
                 : words.live}
             </ThemedText>
           </View>

@@ -96,7 +96,7 @@ export const game: Strings = {
     noMatch: 'No match this time.',
     chooserLeft: '{{name}} left the room.',
     chooserLeftBody:
-      "No chooser, no game. Nobody's balloon popped tonight and this room won't count. You're first in line for the next one.",
+      "No chooser, no game. Nobody's balloon popped and this room won't count. You're first in line for the next one.",
     holderLeavesNote: 'If a holder leaves instead, their balloon pops and the room goes on.',
     nextRoomFirst: "Next room, you're first",
     resultYouChose: 'You chose %{name}',
@@ -325,7 +325,7 @@ export const game: Strings = {
     noMatch: 'Pas de match cette fois.',
     chooserLeft: '{{name}} a quitté la salle.',
     chooserLeftBody:
-      "Pas de personne qui choisit, pas de partie. Aucun ballon n'a éclaté ce soir et cette salle ne compte pas. Tu passes en tête de file pour la prochaine.",
+      "Pas de personne qui choisit, pas de partie. Aucun ballon n'a éclaté et cette salle ne compte pas. Tu passes en tête de file pour la prochaine.",
     holderLeavesNote: "Si quelqu'un avec un ballon part, son ballon éclate et la salle continue.",
     nextRoomFirst: 'Prochaine salle, tu passes en premier',
     resultYouChose: 'Tu as choisi %{name}',
@@ -441,7 +441,7 @@ export const game: Strings = {
     noMatch: 'Nessun match stavolta.',
     chooserLeft: '{{name}} ha lasciato la stanza.',
     chooserLeftBody:
-      'Senza chi sceglie, niente partita. Stasera non è scoppiato nessun palloncino e questa stanza non conta. Sei primo in fila per la prossima.',
+      'Senza chi sceglie, niente partita. Non è scoppiato nessun palloncino e questa stanza non conta. Sei primo in fila per la prossima.',
     holderLeavesNote: 'Se invece esce qualcuno con un palloncino, il suo palloncino scoppia e la stanza continua.',
     nextRoomFirst: 'Prossima stanza, sei il primo',
     resultYouChose: 'Hai scelto %{name}',
