@@ -1,7 +1,9 @@
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useEffectEvent, useRef } from 'react';
+import { StyleSheet, View, type StyleProp, type ViewInstance, type ViewStyle } from 'react-native';
 
 import type { Gender, Interest } from '@/api';
 import { Chip } from '@/components/chip';
+import { useRevealView } from '@/components/screen';
 import { OptionRow } from '@/components/option-row';
 import { Section } from '@/components/section';
 import { TextField } from '@/components/text-field';
@@ -17,6 +19,7 @@ import {
   type Identity,
 } from '@/features/profile/identity';
 import type { ProfileForm } from '@/features/profile/profile-form';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
 
 /** What you picked for your gender, and the side of the room it plays on. */
@@ -33,17 +36,28 @@ type IdentityPickerProps = {
   onChange: (next: IdentityChoice) => void;
   /** Names the radio group for VoiceOver, like the step's title. */
   label: string;
+  /** Called with the side question as it appears, so the screen can scroll it into view. */
+  onSideShown?: (side: ViewInstance) => void;
 };
 
 /**
  * Woman, man and non-binary as rows, then more genders as chips. An identity
  * that doesn't settle the side of the room asks for one below it.
  */
-export function IdentityPicker({ value, onChange, label }: IdentityPickerProps) {
+export function IdentityPicker({ value, onChange, label, onSideShown }: IdentityPickerProps) {
   const t = useT();
   const main = IDENTITIES.slice(0, MAIN_IDENTITIES);
   const more = IDENTITIES.slice(MAIN_IDENTITIES);
   const asksSide = value.identity !== null && sideOf(value.identity) === null;
+  const sideRef = useRef<ViewInstance>(null);
+
+  const showSide = useEffectEvent(() => {
+    if (sideRef.current) onSideShown?.(sideRef.current);
+  });
+  // Only as the question appears: switching between identities that both ask it doesn't scroll again.
+  useEffect(() => {
+    if (asksSide) showSide();
+  }, [asksSide]);
 
   function pick(identity: Identity) {
     onChange({ identity, side: value.side });
@@ -75,7 +89,7 @@ export function IdentityPicker({ value, onChange, label }: IdentityPickerProps) 
         </View>
       </View>
       {asksSide && value.identity ? (
-        <View style={styles.side}>
+        <View ref={sideRef} style={styles.side}>
           <ThemedText type="headline">{t('profile.sideTitle')}</ThemedText>
           <ThemedText type="callout" themeColor="textSecondary">
             {t('profile.sideBody', { identity: identityLabel(t, value.identity) })}
@@ -133,11 +147,18 @@ type GenderSectionProps = {
  * pronouns, and your sexuality. Both are optional; tap a picked chip to clear it.
  */
 export function GenderSection({ form, identity, style }: GenderSectionProps) {
+  const revealView = useRevealView();
+  const reduced = useReduceMotion();
   const t = useT();
   return (
     <Section title={t('profile.genderAndSexuality')} style={[styles.section, style]}>
       {identity ? (
-        <IdentityPicker value={identity.value} onChange={identity.onChange} label={t('profile.gender')} />
+        <IdentityPicker
+          value={identity.value}
+          onChange={identity.onChange}
+          label={t('profile.gender')}
+          onSideShown={(side) => revealView?.(side, !reduced)}
+        />
       ) : null}
       <TextField
         label={t('profile.genderDetails')}

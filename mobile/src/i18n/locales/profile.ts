@@ -58,7 +58,7 @@ export const profile: Strings = {
     roundTag: 'Round %{round}',
     firstPhoto: 'Your first photo',
     roundSees: 'Round %{round} sees this',
-    photosTitle: 'Six photos, one per round.',
+    photosTitle: 'Four to six photos. One more each round.',
     photosIntro:
       'People meet you one photo at a time, in this order. Lead with the one that looks like you on a good day.',
     photosIntroFull: 'This is the order the room sees them in. The big one is what Round 1 sees.',
@@ -165,7 +165,7 @@ export const profile: Strings = {
     roundTag: 'Runde %{round}',
     firstPhoto: 'Dein erstes Foto',
     roundSees: 'Runde %{round} sieht dieses',
-    photosTitle: 'Sechs Fotos, eins pro Runde.',
+    photosTitle: 'Vier bis sechs Fotos. Jede Runde eins mehr.',
     photosIntro:
       'Man lernt dich Foto für Foto kennen, in dieser Reihenfolge. Fang mit dem an, das dich an einem guten Tag zeigt.',
     photosIntroFull: 'In dieser Reihenfolge sieht der Raum sie. Das grosse sieht Runde 1.',
@@ -273,7 +273,7 @@ export const profile: Strings = {
     roundTag: 'Manche %{round}',
     firstPhoto: 'Ta première photo',
     roundSees: 'La manche %{round} voit celle-ci',
-    photosTitle: 'Six photos, une par manche.',
+    photosTitle: 'De quatre à six photos. Une de plus à chaque manche.',
     photosIntro:
       'On te découvre une photo à la fois, dans cet ordre. Commence par celle où tu es toi un bon jour.',
     photosIntroFull: 'La salle les voit dans cet ordre. La grande, c’est celle de la manche 1.',
@@ -381,7 +381,7 @@ export const profile: Strings = {
     roundTag: 'Round %{round}',
     firstPhoto: 'La tua prima foto',
     roundSees: 'Il round %{round} vede questa',
-    photosTitle: 'Sei foto, una per round.',
+    photosTitle: 'Da quattro a sei foto. Una in più a ogni round.',
     photosIntro:
       'Ti conoscono una foto alla volta, in quest’ordine. Inizia con quella in cui sei te stesso in una bella giornata.',
     photosIntroFull: 'La stanza le vede in quest’ordine. Quella grande la vede il round 1.',

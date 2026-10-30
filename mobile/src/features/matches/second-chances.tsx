@@ -13,11 +13,15 @@ import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
 
+/** How often a sent second chance is checked for an answer while Matches is on screen. */
+const PENDING_POLL_MS = 3000;
+
 /**
  * "Almost": the runner-ups from rooms you chose in, whom you can give a second
  * chance, the ones you sent, and choosers who came back for you. Accepting one
  * makes a match and opens the chat. Renders nothing when there are none.
  * Reloads on every visit, and whenever `refreshes` changes (a pull to refresh).
+ * `onMatched` runs when one becomes a match: you accepted, or they did.
  */
 export function SecondChances({ onMatched, refreshes = 0 }: { onMatched?: () => void; refreshes?: number }) {
   const t = useT();
@@ -41,6 +45,35 @@ export function SecondChances({ onMatched, refreshes = 0 }: { onMatched?: () => 
     };
   }, [refreshes]);
   useTabFocus(load);
+
+  // While a chance you sent waits on an answer, check every few seconds, so a
+  // yes shows up as a match without leaving the page. Only while it's on screen.
+  const sentIds = chances
+    .filter((c) => c.state === 'sent')
+    .map((c) => c.id)
+    .join(',');
+  useTabFocus(
+    useCallback(() => {
+      if (!sentIds) return undefined;
+      let active = true;
+      const waiting = sentIds.split(',');
+      const timer = setInterval(() => {
+        api
+          .listSecondChances()
+          .then((list) => {
+            if (!active) return;
+            setChances(list);
+            // A sent one that's gone was answered: a yes made a match.
+            if (waiting.some((id) => !list.some((c) => c.id === id))) onMatched?.();
+          })
+          .catch(() => {});
+      }, PENDING_POLL_MS);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }, [sentIds, onMatched]),
+  );
 
   async function send(chance: SecondChance) {
     setBusy(chance.id);

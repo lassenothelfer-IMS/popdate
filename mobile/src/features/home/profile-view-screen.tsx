@@ -15,12 +15,13 @@ import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-nat
 
 import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-bar';
 import { Button } from '@/components/button';
-import { api, type VerificationStatus } from '@/api';
+import { api, type PinnedAnswer, type VerificationStatus } from '@/api';
 import { Icon } from '@/components/icon';
 import { Photo } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { ThemedText } from '@/components/themed-text';
+import { useToast } from '@/components/toast';
 import { VerifiedCheck } from '@/components/verified-check';
 import { Gutter, MinTouch, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
@@ -31,6 +32,7 @@ import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { ageFromBirthDate } from '@/utils/birth-date';
+import { haptics } from '@/utils/haptics';
 import { formatHeight } from '@/utils/units';
 
 /** The hero photo's height on a 844 pt phone. It grows when the name and lines under it need more. */
@@ -43,8 +45,10 @@ const HERO = 460;
  * takes the place of Back.
  */
 export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
-  const { profile } = useSession();
+  const { profile, updateProfile } = useSession();
   const { settings } = useSettings();
+  const { show, toast } = useToast();
+  const [unpinning, setUnpinning] = useState(false);
   const theme = useTheme();
   const t = useT();
   const insets = useSafeAreaInsets();
@@ -73,6 +77,26 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
       };
     }, [loadVerification]),
   );
+
+  /** Takes a pinned answer off your profile, right here instead of from Rooms. */
+  async function unpin(pin: PinnedAnswer) {
+    if (!profile || unpinning) return;
+    haptics.light();
+    setUnpinning(true);
+    try {
+      await updateProfile({
+        pinnedAnswers: (profile.pinnedAnswers ?? []).filter(
+          (p) => p.question !== pin.question || p.answer !== pin.answer,
+        ),
+      });
+      show(t('rooms.unpinned'));
+    } catch {
+      haptics.error();
+      show(t('rooms.pinFailed'));
+    } finally {
+      setUnpinning(false);
+    }
+  }
 
   function refresh() {
     setRefreshing(true);
@@ -186,9 +210,23 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
                 <View
                   key={`${pin.question}|${pin.answer}`}
                   style={[styles.pin, { backgroundColor: theme.field, borderColor: theme.border }]}>
-                  <ThemedText type="footnote" themeColor="textSecondary">
-                    {pin.question}
-                  </ThemedText>
+                  <View style={styles.pinTop}>
+                    <ThemedText type="footnote" themeColor="textSecondary" style={styles.pinQuestion}>
+                      {pin.question}
+                    </ThemedText>
+                    {asTab ? (
+                      <Button
+                        title={t('home.unpin')}
+                        variant="plain"
+                        size="small"
+                        fullWidth={false}
+                        disabled={unpinning}
+                        accessibilityHint={t('home.unpinHint')}
+                        onPress={() => void unpin(pin)}
+                        style={styles.unpin}
+                      />
+                    ) : null}
+                  </View>
                   <ThemedText type="questionRow">{`“${pin.answer}”`}</ThemedText>
                 </View>
               ))}
@@ -232,6 +270,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
           ) : null}
         </View>
       </Animated.ScrollView>
+      {toast}
     </View>
   );
 }
@@ -395,6 +434,19 @@ const styles = StyleSheet.create({
     padding: Space.md,
     borderRadius: Radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  pinTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
+  pinQuestion: {
+    flex: 1,
+  },
+  // Keeps the 44 pt target without pushing the card taller.
+  unpin: {
+    marginVertical: -Space.sm,
+    marginRight: -Space.xs,
   },
   hero: {
     minHeight: HERO,

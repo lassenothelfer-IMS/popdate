@@ -24,7 +24,6 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api, type Contestant, type Room, type RoomStatus } from '@/api';
-import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { LoadingScreen } from '@/components/loading-screen';
@@ -46,10 +45,9 @@ import {
   cardPhotoBox,
   cardWidthFor,
   ROOMY_CARD_WIDTH,
-  type AnswerCarouselHandle,
 } from '@/features/game/answer-carousel';
 import { BalloonRail } from '@/features/game/balloon-rail';
-import { HoldToPop } from '@/features/game/hold-to-pop';
+import { HoldToPopButton } from '@/features/game/hold-to-pop';
 import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { LeaveSheet } from '@/features/game/leave-sheet';
 import { LiveRow, PoppedRow } from '@/features/game/player-row';
@@ -84,6 +82,8 @@ const KEEPER_GAP = Space.xs;
 /** How long a room may take to load before the screen offers a retry. */
 const ROOM_LOAD_TIMEOUT = 12_000;
 const KEEPER_LINE = 18;
+/** In your first rooms, "Hold to pop" over the Pop button: the footer's gap, then one footnote line. */
+const HOLD_HINT_LINE = 18;
 /**
  * Until they are measured, at the default text size: the room bar, and the
  * question block (kicker and two lines of question).
@@ -175,6 +175,11 @@ const phaseOut = FadeOut.duration(Motion.exit).easing(Ease.out).reduceMotion(Red
  */
 const listOut = nativeOnly(phaseOut);
 /**
+ * "Nico is picking a question…" fades as the question arrives. Native only: on web
+ * the exit left the line, live region and all, in the page through the answering phase.
+ */
+const pickingOut = nativeOnly(phaseOut);
+/**
  * The question waits until the picking phase has gone and the rows below have
  * moved into place, so it never lands on top of either.
  */
@@ -213,8 +218,6 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   }, [room]);
   // Report or block anyone in the room; nothing to leave on, the room carries on.
   const people = usePersonActions();
-  /** The balloon the chooser is holding to pop, while the hold stage is open. */
-  const [holdId, setHoldId] = useState<string | null>(null);
   // Selections are derived from the room below, so a stale id never shows.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [questionId, setQuestionId] = useState<string | null>(null);
@@ -248,7 +251,6 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   /** The answer cards at least half in view, per round. The rail dims the others. */
   const [inView, setInView] = useState<{ round: number; ids: string[] } | null>(null);
   const scrollRef = useRef<ScrollViewInstance>(null);
-  const carouselRef = useRef<AnswerCarouselHandle>(null);
   const questionY = useRef(0);
   // Where things are in the scroll, for the photo reveal.
   // Written and read in effects and event handlers only.
@@ -264,13 +266,12 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     setDeveloped(new Set(shownPhotoKeys(room)));
   }
 
-  // The marked balloon and the hold belong to one phase. When the server pops for
-  // the chooser, or the round moves on, they go, so the next pop starts fresh.
+  // The marked balloon belongs to one phase. When the server pops for the chooser,
+  // or the round moves on, it goes, so the next pop starts fresh.
   const phaseKey = room ? `${room.round}:${room.status}` : null;
   const [markedIn, setMarkedIn] = useState(phaseKey);
   if (phaseKey !== markedIn) {
     setMarkedIn(phaseKey);
-    setHoldId(null);
     setSelectedId(null);
   }
 
@@ -546,6 +547,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     (barHeight || BAR_ESTIMATE) -
     POP_BAR -
     (up.length === 2 ? KEEPER_GAP + KEEPER_LINE * textScale : 0) -
+    (showHints && up.length > 2 ? Space.sm + HOLD_HINT_LINE * textScale : 0) -
     Math.max(insets.bottom, Space.md);
   const questionHeight =
     questionBox?.round === room.round ? questionBox.height : QUESTION_ESTIMATE;
@@ -661,21 +663,23 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     announce(t('game.sent', { name: popperName }));
   }
 
+  /**
+   * Marks a balloon, from its card or its seat in the room bar. The carousel brings
+   * the marked card into view; if the page is scrolled past the cards, it comes back up to them.
+   */
   function selectBalloon(id: string) {
     if (!canSelect) return;
     if (id !== selected?.id) haptics.selection();
     setSelectedId(id);
-  }
-
-  /** A seat tapped in the room bar marks it and brings its card into view. */
-  function selectFromRail(id: string) {
-    selectBalloon(id);
-    carouselRef.current?.scrollToCard(id);
+    const top = cardsY.current;
+    if (top !== null && scrollY.current > top) {
+      scrollY.current = top;
+      scrollRef.current?.scrollTo({ y: top, animated: !reduced });
+    }
   }
 
   async function handlePop(target: Contestant | undefined = selected) {
     if (!target || sendingPop) return;
-    setHoldId(null);
     // Only the popper pops, so this is the popper's own pop line.
     const announcement = t('game.youPopped', { name: target.name });
     // The pop is seen the moment it goes out (its haptic plays with the burst), and
@@ -914,9 +918,25 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   if (finished) {
     // While the last pop holds the room, nothing should pull you off this moment.
     // When the chooser left, the room didn't count: you can get back in line right away.
+    // Popped and stayed to watch: no match opens for you, so the room offers its recap and the next room.
     footer = climax ? null : !winner && !isPopper ? (
       <>
         <Button title={t('game.nextRoomLine')} loading={replaying} onPress={() => void playAgain()} />
+        <Button variant="plain" title={t('game.backHome')} disabled={replaying} onPress={goHome} />
+      </>
+    ) : viewer === 'other' ? (
+      <>
+        <Button
+          title={t('match.recap')}
+          disabled={replaying}
+          onPress={() => router.push({ pathname: '/recap/[id]', params: { id: roomId } })}
+        />
+        <Button
+          variant="tinted"
+          title={t('game.playAnother')}
+          loading={replaying}
+          onPress={() => void playAgain()}
+        />
         <Button variant="plain" title={t('game.backHome')} disabled={replaying} onPress={goHome} />
       </>
     ) : (
@@ -976,22 +996,24 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
       </Animated.View>
     );
   } else if (isPopper && isPopping && selected && !pending) {
-    // Opens the hold: the pop only goes out once the ring is full.
+    // Held on the button itself: the pop only goes out once the fill is full.
+    // Keyed by the balloon, so marking someone else starts a fresh hold.
     footer = (
       <Animated.View entering={reduced ? popButtonFade : popButtonIn} style={styles.popFooter}>
-        <Button
-          variant="coral"
-          title={t('game.popBalloon', { name: selected.name })}
-          icon={<Balloon color={seatOf(selected).shadow} size={14} shine={false} />}
-          onPress={() => {
-            haptics.light();
-            setHoldId(selected.id);
-          }}
+        {showHints ? (
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.centerText}>
+            {t('game.holdToPop')}
+          </ThemedText>
+        ) : null}
+        <HoldToPopButton
+          key={selected.id}
+          name={selected.name}
+          balloonColor={seatOf(selected).shadow}
+          onPop={() => void handlePop(selected)}
         />
       </Animated.View>
     );
   }
-  const holdTarget = holdId ? up.find((p) => p.contestant.id === holdId) : undefined;
   const hasFooter = !!footer || !!shownError;
 
   const subtitle = finished
@@ -1057,7 +1079,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                   poppingId={pending?.id ?? null}
                   risenId={finished ? room.winnerId : null}
                   inView={revealing && inView?.round === room.round ? inView.ids : null}
-                  onSelect={canSelect && revealing ? selectFromRail : undefined}
+                  onSelect={canSelect && revealing ? selectBalloon : undefined}
                 />
               }
               onLayout={(event) => {
@@ -1126,7 +1148,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                   <Animated.View
                     key="picking"
                     entering={pickingIn}
-                    exiting={phaseOut}
+                    exiting={pickingOut}
                     style={styles.pickingLine}>
                     <ThemedText
                       type="footnote"
@@ -1193,7 +1215,6 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                   onLayout={measureCards}>
                   <Animated.View entering={questionIn}>
                     <AnswerCarousel
-                      ref={carouselRef}
                       cards={up.map(({ contestant, seat }) => ({
                         contestant,
                         seat,
@@ -1224,19 +1245,6 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               ) : null}
             </ScrollView>
           </Screen>
-          {/* The chooser holds the balloon to pop it. */}
-          {holdTarget && isPopper && isPopping ? (
-            <>
-              <BackAsksToLeave onBack={() => setHoldId(null)} />
-              <HoldToPop
-                name={holdTarget.contestant.name}
-                color={holdTarget.seat.color}
-                title={title}
-                onPop={() => void handlePop(holdTarget.contestant)}
-                onCancel={() => setHoldId(null)}
-              />
-            </>
-          ) : null}
           {/* The web's leave confirmation, over the whole room. iOS and Android use Alert. */}
           {Platform.OS === 'web' && confirmingLeave && !finished ? (
             <LeaveSheet

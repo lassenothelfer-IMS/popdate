@@ -8,6 +8,7 @@ import {
   isMockServer,
   setMockNextRole,
   type MockRole,
+  type Profile,
   type QueueStats,
 } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
@@ -70,6 +71,27 @@ function greeting(t: Translate, locale: string, name: string, city: string) {
     hero: t(`home.greet${hello}`, { name }),
     live: t('home.liveLine', { city, day: t(`home.part${part}`, { weekday }) }),
   };
+}
+
+/**
+ * What Complete your profile asks for: only the optional parts still missing,
+ * like "Add your job". Null once height, job and bio are all in.
+ */
+function missingNote(t: Translate, profile: Pick<Profile, 'heightCm' | 'job' | 'bio'>) {
+  const items = [
+    profile.heightCm === null ? t('home.completeHeight') : null,
+    profile.job.trim() ? null : t('home.completeJob'),
+    profile.bio.trim() ? null : t('home.completeBio'),
+  ].filter((item): item is string => item !== null);
+  if (items.length === 0) return null;
+  const [a, b, c] = items;
+  const list =
+    items.length === 1
+      ? a
+      : items.length === 2
+        ? t('home.completeTwo', { a, b })
+        : t('home.completeThree', { a, b, c });
+  return t('home.completeProfileNote', { items: list });
 }
 
 export function HomeScreen() {
@@ -156,6 +178,7 @@ export function HomeScreen() {
   }
 
   const words = greeting(t, locale, profile.name, profile.city);
+  const missing = missingNote(t, profile);
 
   return (
     <TabSwipe tab="home">
@@ -234,10 +257,10 @@ export function HomeScreen() {
             />
           ) : null}
           {/* Height, job and bio are optional at sign-up: a nudge until they're in. */}
-          {profile.heightCm === null || !profile.job || !profile.bio ? (
+          {missing ? (
             <LinkRow
               title={t('home.completeProfile')}
-              subtitle={t('home.completeProfileNote')}
+              subtitle={missing}
               onPress={() => router.push('/profile')}
               icon={
                 <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>

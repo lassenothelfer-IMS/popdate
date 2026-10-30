@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import {
   Platform,
   ScrollView,
@@ -138,11 +138,6 @@ const webTrack =
 const webCard =
   Platform.OS === 'web' ? ({ scrollSnapAlign: 'start' } as unknown as ViewStyle) : undefined;
 
-export type AnswerCarouselHandle = {
-  /** Brings a card into view, as when its seat is tapped in the room bar. */
-  scrollToCard: (contestantId: string) => void;
-};
-
 type AnswerCardData = {
   contestant: Contestant;
   seat: Seat;
@@ -160,7 +155,6 @@ type AnswerCarouselProps = {
   onVisibleChange: (contestantIds: string[]) => void;
   /** The final two: both cards side by side, tilted toward each other, the favorite breathing. */
   pair?: boolean;
-  ref?: Ref<AnswerCarouselHandle>;
 };
 
 /** The popper's reveal: one answer card per balloon still up, side by side, snapping per card. */
@@ -171,7 +165,6 @@ export function AnswerCarousel({
   onSelect,
   onVisibleChange,
   pair = false,
-  ref,
 }: AnswerCarouselProps) {
   const reduced = useReduceMotion();
   const { width: windowWidth } = useWindowDimensions();
@@ -215,14 +208,18 @@ export function AnswerCarousel({
     report();
   });
 
-  useImperativeHandle(ref, () => ({
-    scrollToCard(contestantId: string) {
-      const index = cards.findIndex((card) => card.contestant.id === contestantId);
-      if (index < 0) return;
-      // Clamped too: iOS would leave an offset past the end where it was put.
-      scrollRef.current?.scrollTo({ x: offsetOf(index), animated: !reduced });
-    },
-  }));
+  // A balloon marked from its card or its seat in the room bar brings its card into
+  // view, so you see who you are about to pop. Under Reduce Motion it jumps. An effect
+  // event reads the cards, so only a new mark scrolls.
+  const showMarked = useEffectEvent((contestantId: string) => {
+    const index = cards.findIndex((card) => card.contestant.id === contestantId);
+    if (index < 0) return;
+    // Clamped too: iOS would leave an offset past the end where it was put.
+    scrollRef.current?.scrollTo({ x: offsetOf(index), animated: !reduced });
+  });
+  useEffect(() => {
+    if (markedId) showMarked(markedId);
+  }, [markedId]);
 
   function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     scrollX.current = event.nativeEvent.contentOffset.x;

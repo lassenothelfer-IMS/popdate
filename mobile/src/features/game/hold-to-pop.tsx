@@ -1,67 +1,52 @@
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
-  FadeIn,
-  ReduceMotion,
-  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
 
 import { Balloon } from '@/components/balloon';
-import { Button } from '@/components/button';
-import { Grain } from '@/components/screen';
-import { ThemedText } from '@/components/themed-text';
-import { Gutter, Motion, Space } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { MinTouch } from '@/constants/theme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
-import { useShowHints } from '@/utils/rooms-played';
 
-/** The ring around the balloon, and how long it takes to fill while you hold. */
-const RING_SIZE = 180;
-const RING_STROKE = 5.4;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2 - 6;
-const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+/** How long you hold before the pop goes out. */
 const HOLD_MS = 2200;
-/** Letting go early drains the ring. */
+/** Letting go early drains the fill. */
 const DRAIN_MS = 300;
-const BALLOON_WIDTH = 90;
+const HEIGHT = 52;
+/** The Pop action's own coral, as on the coral Button. */
+const CORAL = '#F0695C';
+const CORAL_FINISH = 'inset 0 1px 0 rgba(255,255,255,0.3), 0 10px 28px -10px rgba(240,105,92,0.55)';
+/** The hold fills the capsule from the left in a lighter coral. */
+const FILL = 'rgba(255,255,255,0.28)';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const stageIn = FadeIn.duration(Motion.state).reduceMotion(ReduceMotion.Never);
-
-type HoldToPopProps = {
-  /** The balloon's owner, for "Hold to pop Sara". */
+type HoldToPopButtonProps = {
+  /** The balloon's owner, for "Pop Sara's balloon". */
   name: string;
-  /** Their balloon color. */
-  color: string;
-  /** "Round 1 of 4". */
-  title: string;
+  /** The small balloon in the label, in their seat's shadow color. */
+  balloonColor: string;
   /** Held to full: the pop goes out. */
   onPop: () => void;
-  /** Cancel, or Android's back button: back to the cards. */
-  onCancel: () => void;
 };
 
 /**
- * The chooser's pop: hold the balloon and a 180 pt ring fills coral over
- * 2.2 s. Let go before it is full and nothing happens. At full the pop goes
- * out and the burst plays in the room. VoiceOver pops with one activate action.
+ * The chooser's pop, right on the coral button: hold it and a lighter coral fills
+ * the capsule over 2.2 s. Let go before it is full and it drains, nothing happens.
+ * At full the pop goes out and the burst plays in the room. VoiceOver and TalkBack
+ * pop with one activate action, a double-tap.
  */
-export function HoldToPop({ name, color, title, onPop, onCancel }: HoldToPopProps) {
-  const theme = useTheme();
+export function HoldToPopButton({ name, balloonColor, onPop }: HoldToPopButtonProps) {
   const t = useT();
-  const insets = useSafeAreaInsets();
-  const showHints = useShowHints();
+  const reduced = useReduceMotion();
   const progress = useSharedValue(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const done = useRef(false);
+  const title = t('game.popBalloon', { name });
 
   useEffect(
     () => () => {
@@ -81,8 +66,9 @@ export function HoldToPop({ name, color, title, onPop, onCancel }: HoldToPopProp
     if (done.current) return;
     haptics.selection();
     cancelAnimation(progress);
-    progress.set(withTiming(1, { duration: HOLD_MS * (1 - progress.get()), easing: Easing.linear }));
-    timer.current = setTimeout(pop, HOLD_MS * (1 - progress.get()));
+    const rest = HOLD_MS * (1 - progress.get());
+    progress.set(withTiming(1, { duration: rest, easing: Easing.linear }));
+    timer.current = setTimeout(pop, rest);
   }
 
   function pressOut() {
@@ -92,104 +78,81 @@ export function HoldToPop({ name, color, title, onPop, onCancel }: HoldToPopProp
     progress.set(withTiming(0, { duration: DRAIN_MS, easing: Easing.out(Easing.ease) }));
   }
 
-  const ring = useAnimatedProps(() => ({
-    strokeDashoffset: CIRCUMFERENCE * (1 - progress.get()),
-  }));
-  const balloon = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + 0.08 * progress.get() }],
+  function accessibilityAction(event: AccessibilityActionEvent) {
+    if (event.nativeEvent.actionName === 'activate') pop();
+  }
+
+  // The fill is the hold's progress, so it shows under Reduce Motion too; only the grow goes.
+  const fill = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.get() }] }));
+  const grow = useAnimatedStyle(() => ({
+    transform: [{ scale: reduced ? 1 : 1 + 0.02 * Math.min(1, progress.get() * 8) }],
   }));
 
   return (
-    <Animated.View
-      entering={stageIn}
-      accessibilityViewIsModal
-      style={[StyleSheet.absoluteFill, styles.stage, { backgroundColor: theme.page, paddingTop: insets.top }]}>
-      <Grain />
-      <View style={styles.header}>
-        <ThemedText type="headline" accessibilityRole="header">
-          {title}
-        </ThemedText>
-        <ThemedText type="caption" themeColor="textSecondary">
-          {t('game.holdToPop')}
-        </ThemedText>
-      </View>
-
-      <View style={styles.middle}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('game.holdToPopName', { name })}
-          accessibilityHint={t('game.holdHint')}
-          accessibilityActions={[{ name: 'activate' }]}
-          onAccessibilityAction={pop}
-          onPressIn={pressIn}
-          onPressOut={pressOut}
-          style={styles.target}>
-          <Svg width={RING_SIZE} height={RING_SIZE} style={StyleSheet.absoluteFill}>
-            <Circle
-              cx={RING_SIZE / 2}
-              cy={RING_SIZE / 2}
-              r={RING_RADIUS}
-              fill="none"
-              stroke={theme.surface}
-              strokeWidth={RING_STROKE}
-            />
-            <AnimatedCircle
-              cx={RING_SIZE / 2}
-              cy={RING_SIZE / 2}
-              r={RING_RADIUS}
-              fill="none"
-              stroke={theme.accent}
-              strokeWidth={RING_STROKE}
-              strokeLinecap="round"
-              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-              animatedProps={ring}
-              transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-            />
-          </Svg>
-          <Animated.View style={balloon}>
-            <Balloon color={color} size={BALLOON_WIDTH * 0.62} />
-          </Animated.View>
-        </Pressable>
-        {showHints ? (
-          <ThemedText type="callout" themeColor="textSecondary" style={styles.center}>
-            {t('game.holdHint')}
-          </ThemedText>
-        ) : null}
-      </View>
-
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Space.md) }]}>
-        <Button variant="plain" title={t('common.cancel')} onPress={onCancel} />
-      </View>
-    </Animated.View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={t('game.holdHint')}
+      accessibilityActions={[{ name: 'activate' }]}
+      onAccessibilityAction={accessibilityAction}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
+      style={styles.target}>
+      <Animated.View style={[styles.capsule, { boxShadow: CORAL_FINISH }, grow]}>
+        <View pointerEvents="none" style={styles.clip}>
+          <Animated.View style={[styles.fill, fill]} />
+        </View>
+        <View style={styles.content}>
+          <Balloon color={balloonColor} size={14} shine={false} />
+          <Text numberOfLines={1} style={styles.label}>
+            {title}
+          </Text>
+        </View>
+      </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  stage: {
-    zIndex: 10,
-  },
-  header: {
-    paddingHorizontal: Gutter,
-    paddingTop: Space.xs,
-    gap: 1,
-  },
-  middle: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Space.lg,
-    paddingHorizontal: Gutter,
-  },
   target: {
-    width: RING_SIZE,
-    height: RING_SIZE,
+    minHeight: MinTouch,
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+  },
+  capsule: {
+    minHeight: HEIGHT,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: CORAL,
   },
-  center: {
+  // Keeps the fill inside the capsule's round ends, while the shadow stays outside.
+  clip: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 999,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  fill: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: FILL,
+    transformOrigin: 'left',
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  // The Button's label: SF Pro 17 semibold, white on coral.
+  label: {
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: 600,
+    letterSpacing: -0.2,
     textAlign: 'center',
-  },
-  footer: {
-    paddingHorizontal: Gutter,
+    color: '#FFFFFF',
   },
 });

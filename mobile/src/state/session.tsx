@@ -4,6 +4,7 @@ import { api, type Gender, type Interest, type Profile, type ProfileDraft } from
 import { removeUnusedPhotos } from '@/features/profile/photo-files';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { registerPushIfAllowed } from '@/utils/push';
+import { resetRoomsPlayed } from '@/utils/rooms-played';
 
 /** Onboarding's answers, kept until the profile is saved, so a relaunch picks up there. */
 const ONBOARDING_KEY = 'popdate.onboarding';
@@ -135,6 +136,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await action();
     setProfile(null);
     setOnboarding(null);
+    // Hints such as "Swipe through the five" belong to the account, not the phone.
+    void resetRoomsPlayed();
     // Start a fresh session, so the welcome screen works as on a first launch.
     try {
       await withTimeout(api.signIn(), SIGN_IN_TIMEOUT);

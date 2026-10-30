@@ -85,6 +85,9 @@ export function MatchesScreen() {
     }, [loadThreads]),
   );
 
+  // A second chance became a match: the new chat joins the list.
+  const reloadThreads = useCallback(() => void loadThreads(), [loadThreads]);
+
   function refresh() {
     setRefreshes((count) => count + 1);
     return loadThreads();
@@ -112,7 +115,7 @@ export function MatchesScreen() {
           </ThemedText>
         </Rise>
 
-        <SecondChances refreshes={refreshes} onMatched={() => void loadThreads()} />
+        <SecondChances refreshes={refreshes} onMatched={reloadThreads} />
 
         {threads === null && failed ? (
           <View style={styles.loading}>

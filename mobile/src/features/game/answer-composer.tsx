@@ -117,7 +117,14 @@ export function AnswerComposer({
             onChangeText={changeText}
             onFocus={onFocus}
             maxLength={MAX_ANSWER_LENGTH}
+            // One answer, no line breaks: it wraps as it grows, and Return sends it.
+            // Submit keeps the keyboard up, so a send that fails can be tried again.
             multiline
+            returnKeyType="send"
+            submitBehavior="submit"
+            // The web's textarea only sends on Enter with this set; native reads submitBehavior.
+            blurOnSubmit={Platform.OS === 'web' ? true : undefined}
+            onSubmitEditing={() => void handleSend()}
             // A web textarea opens two rows tall; start at one, like the field on the canvas.
             rows={Platform.OS === 'web' ? 1 : undefined}
             editable={!sending}

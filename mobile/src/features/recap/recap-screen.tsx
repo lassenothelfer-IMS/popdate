@@ -70,6 +70,7 @@ export function RecapScreen({ roomId }: { roomId: string }) {
   const room = useRoom(roomId);
   if (room === undefined) return <LoadingScreen label={t('match.recapLoading')} />;
   if (room === null || room.status !== 'finished') {
+    // Still being played: its recap comes once it ends. Gone: nothing to show.
     return (
       <Screen
         scroll
@@ -77,7 +78,7 @@ export function RecapScreen({ roomId }: { roomId: string }) {
         footerStyle="plain"
         footer={<Button title={t('match.backHome')} onPress={goHome} />}>
         <ThemedText themeColor="textSecondary" style={styles.centeredText}>
-          {t('match.recapGone')}
+          {room === null ? t('match.recapGone') : t('rooms.recapInProgress')}
         </ThemedText>
       </Screen>
     );
@@ -216,7 +217,8 @@ function Recap({ room }: { room: Room }) {
                   <View key={c.id} style={[styles.seat, { width: seatWidth }]}>
                     <View style={styles.seatBalloon}>
                       {c.popped ? (
-                        <PoppedMark color={color} size={26} />
+                        // In paper ink: the light seat colors barely show on Cream.
+                        <PoppedMark color={paper.textSecondary} size={26} />
                       ) : (
                         <Balloon color={color} size={26} />
                       )}

@@ -38,6 +38,17 @@ export function outcomeLine(t: Translate, room: RoomSummary) {
   }
 }
 
+/**
+ * The rounds you were there for: all of them as the chooser or the last balloon,
+ * up to the one you were popped or left in, or else just the ones you answered.
+ */
+function roundsYouSaw(room: RoomSummary) {
+  const asked = room.rounds.filter((round) => round.question);
+  if (room.role === 'popper' || room.outcome === 'won' || room.outcome === 'chose') return asked;
+  if (room.poppedInRound !== null) return room.rounds.slice(0, room.poppedInRound).filter((round) => round.question);
+  return asked.filter((round) => round.answer);
+}
+
 function samePin(a: PinnedAnswer, b: PinnedAnswer) {
   return a.question === b.question && a.answer === b.answer;
 }
@@ -92,7 +103,10 @@ export function RoomsScreen() {
             </ThemedText>
             {stats && stats.played > 0 ? (
               <ThemedText type="callout" themeColor="textSecondary" style={styles.summary}>
-                {t('rooms.summary', { count: stats.played, won: stats.lastBalloon })}
+                {t('rooms.summary', {
+                  count: stats.played,
+                  wins: t('rooms.summaryWins', { count: stats.lastBalloon }),
+                })}
               </ThemedText>
             ) : null}
           </Rise>
@@ -151,7 +165,9 @@ function RoomCard({ room, pins, pinning, onPin }: RoomCardProps) {
     day: 'numeric',
     month: 'short',
   });
-  const answered = room.rounds.filter((round) => round.question);
+  const answered = roundsYouSaw(room);
+  // A room you left may still be playing, so there's no recap to see.
+  const showRecap = room.outcome !== 'left';
   return (
     <View style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}>
       <View style={styles.cardTop}>
@@ -195,23 +211,27 @@ function RoomCard({ room, pins, pinning, onPin }: RoomCardProps) {
       })}
 
       {/* Wraps, so a long name or a longer language puts Chat under the recap instead of cutting it. */}
-      <View style={styles.actions}>
-        <Button
-          title={t('rooms.recap')}
-          variant="plain"
-          fullWidth={false}
-          onPress={() => router.push(`/recap/${room.roomId}` as Href)}
-        />
-        {room.matchId ? (
-          <Button
-            title={t('rooms.openChat', { name: room.matchName ?? '' })}
-            variant="tinted"
-            size="small"
-            fullWidth={false}
-            onPress={() => router.push({ pathname: '/chat/[id]', params: { id: room.matchId! } })}
-          />
-        ) : null}
-      </View>
+      {showRecap || room.matchId ? (
+        <View style={styles.actions}>
+          {showRecap ? (
+            <Button
+              title={t('rooms.recap')}
+              variant="plain"
+              fullWidth={false}
+              onPress={() => router.push(`/recap/${room.roomId}` as Href)}
+            />
+          ) : null}
+          {room.matchId ? (
+            <Button
+              title={t('rooms.openChat', { name: room.matchName ?? '' })}
+              variant="tinted"
+              size="small"
+              fullWidth={false}
+              onPress={() => router.push({ pathname: '/chat/[id]', params: { id: room.matchId! } })}
+            />
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -135,6 +135,7 @@ const REVEAL_MARGIN = Space.md;
 const REVEAL_DELAY = 60;
 
 const RevealContext = createContext<((input: TextInputInstance | null) => void) | null>(null);
+const RevealViewContext = createContext<((view: ViewInstance, animated: boolean) => void) | null>(null);
 
 /**
  * Inside a scrolling Screen: call it with a field as it gains focus (or grows
@@ -143,6 +144,36 @@ const RevealContext = createContext<((input: TextInputInstance | null) => void) 
  */
 export function useRevealField() {
   return use(RevealContext);
+}
+
+/**
+ * Inside a scrolling Screen: call it with a view that just appeared, like a
+ * question below the fold, and the screen scrolls it into view. Null outside one.
+ */
+export function useRevealView() {
+  return use(RevealViewContext);
+}
+
+/** Scrolls `scroller` so `view` sits inside `viewport`, by the least it takes. */
+function bringIntoView(
+  viewport: ViewInstance | null,
+  scroller: ScrollViewInstance | null,
+  scrollY: number,
+  view: ViewInstance | TextInputInstance,
+  animated: boolean,
+) {
+  if (!viewport || !scroller) return;
+  viewport.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
+    view.measureInWindow((_x, top, _w, height) => {
+      const visibleTop = viewTop + REVEAL_MARGIN;
+      const visibleBottom = viewTop + viewHeight - REVEAL_MARGIN;
+      // Below the fold: bring its bottom up, where the caret of a growing bio is.
+      const below = top + height - visibleBottom;
+      const delta = below > 0 ? below : top < visibleTop ? top - visibleTop : 0;
+      if (delta === 0) return;
+      scroller.scrollTo({ y: Math.max(0, scrollY + delta), animated });
+    });
+  });
 }
 
 /**
@@ -158,19 +189,8 @@ function useFieldReveal(enabled: boolean) {
 
   function scrollIntoView() {
     const input = target.current;
-    const viewport = viewportRef.current;
-    if (!input || !viewport || !input.isFocused()) return;
-    viewport.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
-      input.measureInWindow((_x, top, _w, height) => {
-        const visibleTop = viewTop + REVEAL_MARGIN;
-        const visibleBottom = viewTop + viewHeight - REVEAL_MARGIN;
-        // Below the fold: bring its bottom up, where the caret of a growing bio is.
-        const below = top + height - visibleBottom;
-        const delta = below > 0 ? below : top < visibleTop ? top - visibleTop : 0;
-        if (delta === 0) return;
-        scrollRef.current?.scrollTo({ y: Math.max(0, scrollY.current + delta), animated: true });
-      });
-    });
+    if (!input || !input.isFocused()) return;
+    bringIntoView(viewportRef.current, scrollRef.current, scrollY.current, input, true);
   }
 
   useEffect(() => {
@@ -197,7 +217,12 @@ function useFieldReveal(enabled: boolean) {
     scrollY.current = event.nativeEvent.contentOffset.y;
   }
 
-  return { viewportRef, scrollRef, onScroll, reveal };
+  /** A view that just appeared: scrolled to once it has laid out. */
+  function revealView(view: ViewInstance, animated: boolean) {
+    setTimeout(() => bringIntoView(viewportRef.current, scrollRef.current, scrollY.current, view, animated), REVEAL_DELAY);
+  }
+
+  return { viewportRef, scrollRef, onScroll, reveal, revealView };
 }
 
 type ScreenProps = {
@@ -229,7 +254,7 @@ export function Screen({
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { viewportRef, scrollRef, onScroll, reveal } = useFieldReveal(scroll);
+  const { viewportRef, scrollRef, onScroll, reveal, revealView } = useFieldReveal(scroll);
   const [refreshing, setRefreshing] = useState(false);
   // The bottom inset belongs to whatever sits lowest: the footer, or the content.
   const bottom = Math.max(insets.bottom, Space.md);
@@ -254,6 +279,7 @@ export function Screen({
           keyboardVerticalOffset={footer ? -(bottom - Space.sm) : 0}>
           {scroll ? (
             <RevealContext value={reveal}>
+            <RevealViewContext value={revealView}>
               <View ref={viewportRef} style={styles.fill}>
                 <ScrollView
                   ref={scrollRef}
@@ -288,6 +314,7 @@ export function Screen({
                   {children}
                 </ScrollView>
               </View>
+            </RevealViewContext>
             </RevealContext>
           ) : (
             <View

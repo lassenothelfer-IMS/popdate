@@ -30,10 +30,11 @@ export function PopperPresence({ popper }: { popper: RoomPlayer }) {
       accessible
       accessibilityLabel={t('game.isChoosingLabel', { name: popper.name, age: popper.age })}>
       <Avatar name={popper.name} uri={popper.photos[0]} tone={tone} size={AVATAR_SIZE} />
+      {/* "Alina, 32" over "is choosing", like the contestants' "Sam, 28". */}
       <View style={styles.copy}>
-        <ThemedText type="task">{t('game.isChoosing', { name: popper.name })}</ThemedText>
+        <ThemedText type="task">{t('common.nameAge', { name: popper.name, age: popper.age })}</ThemedText>
         <ThemedText type="footnote" themeColor="textTertiary">
-          {popper.age}
+          {t('game.isChoosingLine')}
         </ThemedText>
       </View>
     </View>

@@ -5,9 +5,13 @@ import {
   AccessibilityInfo,
   BackHandler,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
   type TextInputInstance,
   type ViewInstance,
 } from 'react-native';
@@ -25,7 +29,7 @@ import { VideoBackground } from '@/components/video-background';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { Colors, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { Colors, Fonts, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
@@ -36,6 +40,7 @@ import {
   type IdentityChoice,
 } from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { ForcedScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
@@ -111,6 +116,7 @@ export function OnboardingScreen() {
   const { failed, setOnboarding, saveProfile } = useSession();
   const theme = useTheme();
   const t = useT();
+  const reduced = useReduceMotion();
   const [step, setStep] = useState<Step>('welcome');
   // The step you came from: the screen entrance only plays on a change.
   const [from, setFrom] = useState<Step | null>(null);
@@ -120,6 +126,9 @@ export function OnboardingScreen() {
   const gender = resolvedSide(identity);
   const [wantsToMeet, setWantsToMeet] = useState<Interest | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // The gender step scrolls itself, so it can bring the side question into view.
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollY = useRef(0);
 
   const birthCheck = checkBirthday(birth);
   const birthdayError = 'error' in birthCheck ? t(birthCheck.error) : null;
@@ -199,6 +208,30 @@ export function OnboardingScreen() {
     setOnboarding(answers);
     await saveProfile(testProfileDetails(), answers);
     router.replace('/home');
+  }
+
+  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    scrollY.current = event.nativeEvent.contentOffset.y;
+  }
+
+  /**
+   * "Which side of the room?" appears under the identities, often below the
+   * fold. Scroll until it sits above Continue, or its top does if it's taller.
+   */
+  function revealSide(side: ViewInstance) {
+    // A frame later, once the new rows are laid out.
+    requestAnimationFrame(() => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      scroller.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
+        side.measureInWindow((_x, top, _w, height) => {
+          const below = top + height - (viewTop + viewHeight - Space.md);
+          if (below <= 0) return;
+          const delta = Math.min(below, top - (viewTop + Space.md));
+          scroller.scrollTo({ y: Math.max(0, scrollY.current + delta), animated: !reduced });
+        });
+      });
+    });
   }
 
   function toggleTerms() {
@@ -324,19 +357,10 @@ export function OnboardingScreen() {
   const title = t(TITLES[question]);
   const previous = STEPS[STEPS.indexOf(question) - 1];
 
-  return (
-    <Screen
-      key={question}
-      scroll
-      footerStyle="plain"
-      footer={
-        <Button
-          title={question === 'rules' ? t('onboarding.agree') : t('common.continue')}
-          disabled={!canContinue}
-          onPress={handleContinue}
-          accessibilityHint={canContinue ? undefined : t(CONTINUE_HINTS[question])}
-        />
-      }>
+  // The gender step scrolls in a view of its own, which revealSide can move.
+  const ownScroll = question === 'gender';
+  const body = (
+    <>
       {/* The bar and Back stay put from question to question: they only rise in from the intro. */}
       <Rise index={0}>
         <View style={styles.progress}>
@@ -359,7 +383,9 @@ export function OnboardingScreen() {
           <Birthday birth={birth} onChange={setBirth} check={birthCheck} error={birthdayError} />
         ) : null}
 
-        {question === 'gender' ? <IdentityPicker value={identity} onChange={setIdentity} label={title} /> : null}
+        {question === 'gender' ? (
+          <IdentityPicker value={identity} onChange={setIdentity} label={title} onSideShown={revealSide} />
+        ) : null}
 
         {question === 'meet' ? <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={title} /> : null}
 
@@ -421,6 +447,35 @@ export function OnboardingScreen() {
           </View>
         ) : null}
       </Rise>
+    </>
+  );
+
+  return (
+    <Screen
+      key={question}
+      scroll={!ownScroll}
+      contentStyle={ownScroll ? styles.bare : undefined}
+      footerStyle="plain"
+      footer={
+        <Button
+          title={question === 'rules' ? t('onboarding.agree') : t('common.continue')}
+          disabled={!canContinue}
+          onPress={handleContinue}
+          accessibilityHint={canContinue ? undefined : t(CONTINUE_HINTS[question])}
+        />
+      }>
+      {ownScroll ? (
+        <ScrollView
+          ref={scrollRef}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.flex}
+          contentContainerStyle={styles.ownScroll}>
+          {body}
+        </ScrollView>
+      ) : (
+        body
+      )}
     </Screen>
   );
 }
@@ -729,5 +784,17 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  /** The Screen's own padding moves inside the gender step's scroll view. */
+  bare: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  ownScroll: {
+    paddingHorizontal: Gutter,
+    paddingTop: Space.sm,
+    // Room under the last side option, so it never ends flush on Continue.
+    paddingBottom: Space.xl,
   },
 });

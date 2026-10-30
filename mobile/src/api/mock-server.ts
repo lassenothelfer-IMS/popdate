@@ -83,6 +83,157 @@ const QUESTIONS: Question[] = [
   'What are you irrationally scared of?',
 ].map((text, index) => ({ id: `q${index + 1}`, text }));
 
+/** What bots say to each question, so their answers fit what was asked. */
+const BOT_ANSWERS_BY_QUESTION: Record<string, string[]> = {
+  // What would your friends say is your worst habit?
+  q1: [
+    'Honestly? My snooze button addiction.',
+    'Always late, but worth the wait.',
+    'Overthinking every text before I send it.',
+    'Sending memes instead of replying properly.',
+    'Leaving ten browser tabs open. Forever.',
+    'Saying "five more minutes" and meaning an hour.',
+    'Eating their fries when they look away.',
+  ],
+  // What's the most spontaneous thing you've ever done?
+  q2: [
+    'I once booked a flight the same morning. No regrets.',
+    'Took a night train to Vienna on a Tuesday.',
+    'Dyed my hair blue after one glass of wine.',
+    'Said yes to a road trip with people I met that day.',
+    'Quit my job and went to Portugal for a month.',
+    'Jumped into the lake in October. Very cold.',
+    'Adopted a cat I only went to look at.',
+  ],
+  // What does your perfect Sunday look like?
+  q3: [
+    'A long walk, a good coffee and zero plans.',
+    'Brunch that turns into dinner.',
+    'Pancakes, a book and nowhere to be.',
+    'Hiking early, napping late.',
+    'Farmers market, then cooking way too much food.',
+    'Rain outside, a movie marathon inside.',
+  ],
+  // What's a red flag you secretly have?
+  q4: [
+    'I reply to texts three days later.',
+    "I have strong opinions about other people's playlists.",
+    'I keep every receipt. Every single one.',
+    'I narrate my life to my plants.',
+    'I judge people by how they load a dishwasher.',
+    'I never finish a series. Never.',
+  ],
+  // What's the last thing that made you laugh really hard?
+  q5: [
+    'My dad trying to send a voice message.',
+    'A dog in a raincoat refusing to walk.',
+    'My friend falling off a paddleboard in slow motion.',
+    "A typo in my boss's email. I still laugh.",
+    "My little sister's impression of me.",
+    'A pigeon stealing a whole croissant at the station.',
+  ],
+  // Which song plays when you walk into a room?
+  q6: [
+    'Something by ABBA, obviously.',
+    'The Rocky theme, but slightly off-key.',
+    'Mr. Brightside. Every time.',
+    'Lo-fi beats, I am very chill.',
+    'Dancing Queen, no discussion.',
+    'Eye of the Tiger, but I trip on the doorframe.',
+  ],
+  // What's your most controversial food opinion?
+  q7: [
+    "Pineapple on pizza, and I'll die on that hill.",
+    'Fondue is overrated. Please stay.',
+    'Cereal is a soup.',
+    'Ketchup on pasta is fine, actually.',
+    'Avocado toast is just salad on bread.',
+    'Cold pizza beats warm pizza.',
+  ],
+  // What would you do with a free week and no money?
+  q8: [
+    'Hike every trail around here I have never done.',
+    'Finally read the pile of books by my bed.',
+    "Couch surf at every friend's place in Switzerland.",
+    'A road trip with no destination, if someone has a car.',
+    'Learn to cook something properly, like bread.',
+    'Swim in the lake every single day.',
+  ],
+  // What's something you're weirdly good at?
+  q9: [
+    "I'm weirdly good at parallel parking.",
+    'Guessing the ending of every movie.',
+    'Remembering birthdays. All of them.',
+    'Folding fitted sheets. Yes, really.',
+    'Finding four-leaf clovers.',
+    'Packing a suitcase like it is Tetris.',
+  ],
+  // What's your go-to karaoke song?
+  q10: [
+    'Bohemian Rhapsody, all the parts.',
+    "I Will Survive. I'm dramatic.",
+    'Wonderwall, sorry in advance.',
+    'Total Eclipse of the Heart, with full emotions.',
+    'Anything by Queen, I know every word.',
+    'I hide behind a friend and do the backing vocals.',
+  ],
+  // What's the best date you've ever been on?
+  q11: [
+    'Street food and a sunset by the river.',
+    'Got lost on a hike and found a tiny restaurant.',
+    'A cooking class where we burned everything.',
+    'Board games until the café kicked us out.',
+    'A picnic that turned into a thunderstorm. Still great.',
+    'Ice skating, badly, then hot chocolate.',
+  ],
+  // Cats or dogs? Defend your answer.
+  q12: [
+    'Dogs. They are always happy to see you.',
+    'Cats. They respect my need for alone time.',
+    'Dogs, because I talk to them more than to people.',
+    'Cats, they judge me and I deserve it.',
+    'Both. I refuse to choose.',
+    'Dogs. Hiking with a dog is the best thing ever.',
+  ],
+  // What's a dealbreaker for you?
+  q13: [
+    'Being rude to waiters.',
+    'Not liking music. Any music.',
+    'Someone who never asks a question back.',
+    'Always on the phone at dinner.',
+    'No sense of humor about themselves.',
+    'Hating dogs. Sorry.',
+  ],
+  // What would your ex say about you?
+  q14: [
+    'That I was always late, but worth the wait.',
+    'Probably that I talk too much. Fair.',
+    'That I made great pasta. At least that.',
+    'That I hog the blanket.',
+    'Too adventurous for them, I guess.',
+    'That I was nice, just not the one.',
+  ],
+  // What's your biggest ick?
+  q15: [
+    'Clapping when the plane lands.',
+    'Chewing with their mouth open.',
+    'Calling the waiter "boss".',
+    'Wet socks. On anyone.',
+    'People who walk slowly in a group of four.',
+    'Saying "I am not like other people".',
+  ],
+  // What are you irrationally scared of?
+  q16: [
+    'Pigeons. Do not ask.',
+    'Deep water where I cannot see the bottom.',
+    'Escalators that stop suddenly.',
+    'Butterflies. Too unpredictable.',
+    'The phone ringing with an unknown number.',
+    'Balloons, which is awkward here.',
+  ],
+};
+
+/** For a question without its own set. */
 const BOT_ANSWERS = [
   'Honestly? My snooze button addiction.',
   "Pineapple on pizza, and I'll die on that hill.",
@@ -218,6 +369,8 @@ class MockServer implements PopdateApi {
   private queue: QueueStatus = { state: 'idle' };
   private queueListeners = new Set<(status: QueueStatus) => void>();
   private queueTimer: ReturnType<typeof setInterval> | null = null;
+  /** Bots in line right now, besides you. Home shows it, and your queue starts from it. */
+  private lineWaiting = randomInt(1, LOBBY_SIZE - 2);
   private rooms = new Map<string, ServerRoom>();
   private matches: Match[] = [];
   private usedBotNames = new Set<string>();
@@ -312,7 +465,9 @@ class MockServer implements PopdateApi {
   async joinQueue() {
     if (!this.profile) throw new Error('Finish your profile before you play.');
     this.clearQueueTimer();
-    this.setQueue({ state: 'searching', found: 1, needed: LOBBY_SIZE });
+    // The people Home said were waiting are already there, with you on top.
+    const waiting = Math.min(this.lineWaiting, LOBBY_SIZE - 2);
+    this.setQueue({ state: 'searching', found: 1 + waiting, needed: LOBBY_SIZE });
     this.queueTimer = setInterval(() => {
       if (this.queue.state !== 'searching') return;
       const found = this.queue.found + 1;
@@ -321,6 +476,8 @@ class MockServer implements PopdateApi {
         return;
       }
       this.clearQueueTimer();
+      // Your room took the line, so only a few new people are waiting.
+      this.lineWaiting = randomInt(1, 2);
       const room = this.createRoom();
       this.setQueue({ state: 'matched', roomId: room.id });
     }, 700);
@@ -517,8 +674,10 @@ class MockServer implements PopdateApi {
   }
 
   async getQueueStats(): Promise<QueueStats> {
-    // The mock's line is made of bots, so these are a plausible stand-in.
-    return { waiting: randomInt(3, 14), roomsLastHour: randomInt(2, 9) };
+    // The mock's line is made of bots: it drifts a little each time you look,
+    // and stays short of a full room so joining still has a seat to fill.
+    this.lineWaiting = Math.min(LOBBY_SIZE - 2, Math.max(1, this.lineWaiting + randomInt(-1, 1)));
+    return { waiting: this.lineWaiting, roomsLastHour: randomInt(2, 9) };
   }
 
   async listSecondChances() {
@@ -920,15 +1079,17 @@ class MockServer implements PopdateApi {
     this.emit(room);
 
     this.after(room, ANSWER_MS, () => this.startPopping(room));
-    for (const seat of room.seats) {
-      if (!seat.player.isBot || !isActive(seat)) continue;
+    // Each bot takes a different answer that fits this question.
+    const answers = shuffle(BOT_ANSWERS_BY_QUESTION[question.id] ?? BOT_ANSWERS);
+    room.seats.filter((seat) => seat.player.isBot && isActive(seat)).forEach((seat, i) => {
+      const answer = answers[i % answers.length];
       this.after(room, randomInt(3000, 15000), () => {
         if (room.status !== 'answering' || !isActive(seat)) return;
-        seat.answers.set(room.round, pickRandom(BOT_ANSWERS));
+        seat.answers.set(room.round, answer);
         this.emit(room);
         this.endAnsweringIfEveryoneAnswered(room);
       });
-    }
+    });
   }
 
   private endAnsweringIfEveryoneAnswered(room: ServerRoom) {

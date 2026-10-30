@@ -56,6 +56,18 @@ export async function countRoomPlayed() {
   await write(count);
 }
 
+/** Forgets the count when you sign out or delete your account, so the next account gets the hints again. */
+export async function resetRoomsPlayed() {
+  count = 0;
+  emit();
+  try {
+    if (Platform.OS === 'web') globalThis.localStorage?.removeItem(KEY);
+    else await SecureStore.deleteItemAsync(KEY);
+  } catch {
+    // A count left behind only means the hints stay hidden a little sooner.
+  }
+}
+
 /** Whether first-rooms hints should show. True until the count has loaded, then false from room 4. */
 export function useShowHints(): boolean {
   const value = useSyncExternalStore(subscribe, () => count, () => count);

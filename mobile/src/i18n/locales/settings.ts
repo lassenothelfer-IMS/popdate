@@ -43,7 +43,7 @@ export const settings: Strings = {
     appearanceDark: 'Velvet',
 
     notifications: 'Notifications',
-    notifyRoomLive: 'A room is about to start',
+    notifyRoomLive: 'When your room is ready',
     notifyNewMatch: 'New matches',
     notifyMessages: 'Messages',
     notificationsDeniedIos:
@@ -176,7 +176,7 @@ export const settings: Strings = {
     appearanceDark: 'Velvet',
 
     notifications: 'Mitteilungen',
-    notifyRoomLive: 'Ein Raum startet gleich',
+    notifyRoomLive: 'Wenn dein Raum bereit ist',
     notifyNewMatch: 'Neue Matches',
     notifyMessages: 'Nachrichten',
     notificationsDeniedIos:
@@ -314,7 +314,7 @@ export const settings: Strings = {
     appearanceDark: 'Velvet',
 
     notifications: 'Notifications',
-    notifyRoomLive: 'Une salle va commencer',
+    notifyRoomLive: 'Quand ta salle est prête',
     notifyNewMatch: 'Nouveaux matchs',
     notifyMessages: 'Messages',
     notificationsDeniedIos:
@@ -453,7 +453,7 @@ export const settings: Strings = {
     appearanceDark: 'Velvet',
 
     notifications: 'Notifiche',
-    notifyRoomLive: 'Una stanza sta per iniziare',
+    notifyRoomLive: 'Quando la tua stanza è pronta',
     notifyNewMatch: 'Nuovi match',
     notifyMessages: 'Messaggi',
     notificationsDeniedIos:

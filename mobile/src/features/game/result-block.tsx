@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import type { Contestant, RoomPlayer } from '@/api';
 import { Photo, PhotoBadge, type PhotoTone } from '@/components/photo';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MaxContentWidth, Motion, Space } from '@/constants/theme';
+import { Ease, Fonts, Gutter, MaxContentWidth, Motion, Space } from '@/constants/theme';
 import { useNeutralTone } from '@/features/game/popper-presence';
 import { useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
@@ -31,8 +31,13 @@ const DESIGN_HEIGHT = 338;
 const COMPOSITION_TOP = 50;
 /** On a wide screen the pair grows a little, then stays put. */
 const MAX_SCALE = 1.2;
-/** Someone with no photo out yet: Photo draws their initial for mock URIs. */
+/** Someone with no photo out yet: Photo draws a plain tile, and the print sets their initial on it. */
 const NO_PHOTO = 'mock://none';
+
+/** No real photo to show: none out yet, or the mock server's stand-in. */
+function noPhoto(uri: string | undefined) {
+  return !uri || uri.startsWith('mock://');
+}
 
 const resultIn = FadeIn.duration(Motion.enter).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
@@ -166,6 +171,9 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
             accessibilityLabel={winnerLabel}
             style={styles.winnerPhoto}
           />
+          {noPhoto(winnerPhoto) ? (
+            <Initial name={winner.name} size={pt(WINNER.initial)} color={theme.text} />
+          ) : null}
           {winnerPhoto ? (
             <PhotoBadge
               label={
@@ -202,6 +210,10 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
             accessibilityLabel={popperLabel}
             style={styles.portraitPhoto}
           />
+          {/* Without a photo the neutral tile is blank, so their initial stands in. */}
+          {noPhoto(popperPhoto) ? (
+            <Initial name={popper.name} size={pt(PORTRAIT.initial)} color={theme.text} />
+          ) : null}
           <View
             pointerEvents="none"
             style={[styles.ring, { borderRadius: MAT_RADIUS + 1, borderColor: theme.border }]}
@@ -212,7 +224,32 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
   );
 }
 
+/** A person's initial in Gloock, centered over a print that has no photo. Hidden: the photo's label says who it is. */
+function Initial({ name, size, color }: { name: string; size: number; color: string }) {
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.initialBox}>
+      <Text style={[styles.initial, { color, fontSize: size }]} maxFontSizeMultiplier={1}>
+        {name.charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  initialBox: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initial: {
+    fontFamily: Fonts.serif,
+    fontWeight: 400,
+    includeFontPadding: false,
+  },
   copy: {
     gap: Space.xs,
   },
