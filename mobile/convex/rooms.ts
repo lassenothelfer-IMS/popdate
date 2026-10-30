@@ -5,17 +5,19 @@ import { internal } from './_generated/api';
 import { internalMutation, mutation, query } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { fail } from './lib/errors';
-import { MAX_ANSWER_LENGTH, POP_LIMIT_MS } from './lib/game';
+import { ANSWER_GRACE_MS, MAX_ANSWER_LENGTH, POP_LIMIT_MS } from './lib/game';
 import { maskProfanity } from './lib/profanity';
 import { rateLimit } from './lib/rateLimit';
 import {
   endAnsweringIfEveryoneAnswered,
+  finish,
   leave,
   pop,
   roomView,
   seatsOf,
   startAnswering,
   startPopping,
+  unusedQuestions,
 } from './lib/room';
 
 /** The room as you may see it, live. Null when it doesn't exist or you aren't in it. */
@@ -84,7 +86,8 @@ export const postAnswer = mutation({
     const room = await requireRoom(ctx, roomId);
     const seat = (await seatsOf(ctx, room._id)).find((s) => s.userId === userId);
     if (!seat || seat.popped) fail("You can't answer in this round.");
-    if (room.status !== 'answering' || Date.now() > (room.deadline ?? 0)) {
+    // The grace covers clock skew and latency for answers sent right at the deadline.
+    if (room.status !== 'answering' || Date.now() > (room.deadline ?? 0) + ANSWER_GRACE_MS) {
       fail('Answer time is over.');
     }
     const existing = await ctx.db
@@ -131,7 +134,7 @@ export const leaveRoom = mutation({
   },
 });
 
-/** The 60-second answer timer. Does nothing if the round already moved on. */
+/** The answer timer, run after the grace. Does nothing if the round already moved on. */
 export const answerTimeUp = internalMutation({
   args: { roomId: v.id('rooms'), round: v.number() },
   handler: async (ctx, { roomId, round }) => {
@@ -140,14 +143,24 @@ export const answerTimeUp = internalMutation({
   },
 });
 
-/** The pick timer: an idle popper gets one of the options picked for them. */
+/**
+ * The pick timer: an idle popper gets one of the options picked for them. Without
+ * options it falls back to any question the room hasn't asked, and with none left
+ * the room ends, so it never stays stuck in picking.
+ */
 export const pickTimeUp = internalMutation({
   args: { roomId: v.id('rooms'), round: v.number() },
   handler: async (ctx, { roomId, round }) => {
     const room = await ctx.db.get(roomId);
     if (room?.status !== 'picking' || room.round !== round) return;
-    const options = room.questionOptionIds;
-    if (options.length === 0) return;
+    const options =
+      room.questionOptionIds.length > 0
+        ? room.questionOptionIds
+        : (await unusedQuestions(ctx, room)).map((question) => question._id);
+    if (options.length === 0) {
+      await finish(ctx, roomId, { withWinner: false });
+      return;
+    }
     await startAnswering(ctx, room, options[Math.floor(Math.random() * options.length)]);
   },
 });

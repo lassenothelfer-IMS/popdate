@@ -1,7 +1,14 @@
 import { internal } from '../_generated/api';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
-import { ANSWER_MS, PICK_MS, POP_REMINDER_MS, QUESTION_OPTIONS_PER_ROUND, shuffle } from './game';
+import {
+  ANSWER_GRACE_MS,
+  ANSWER_MS,
+  PICK_MS,
+  POP_REMINDER_MS,
+  QUESTION_OPTIONS_PER_ROUND,
+  shuffle,
+} from './game';
 import { ageFromBirthDate, getProfile, personCard, photoUrls } from './people';
 import { schedulePush } from '../push';
 import { questionPool } from './questions';
@@ -54,11 +61,25 @@ export async function createRoom(
   return roomId;
 }
 
+/**
+ * Questions this room hasn't asked yet: the active ones, or, once those run out,
+ * retired ones too. Empty only when the room has used every question there is.
+ */
+export async function unusedQuestions(ctx: MutationCtx, room: Doc<'rooms'>) {
+  const unasked = (question: Doc<'questions'>) => !room.usedQuestionIds.includes(question._id);
+  const active = (await questionPool(ctx)).filter(unasked);
+  if (active.length > 0) return active;
+  return (await ctx.db.query('questions').collect()).filter(unasked);
+}
+
 async function startRound(ctx: MutationCtx, roomId: Id<'rooms'>) {
   const room = (await ctx.db.get(roomId))!;
-  const unused = (await questionPool(ctx)).filter(
-    (question) => !room.usedQuestionIds.includes(question._id),
-  );
+  const unused = await unusedQuestions(ctx, room);
+  // Nothing left to ask: end the room instead of leaving it stuck in picking.
+  if (unused.length === 0) {
+    await finish(ctx, roomId, { withWinner: false });
+    return;
+  }
   // The popper gets PICK_MS to choose; then one of the options is picked for them.
   const deadline = Date.now() + PICK_MS;
   await ctx.db.patch(roomId, {
@@ -86,7 +107,8 @@ export async function startAnswering(
     usedQuestionIds: [...room.usedQuestionIds, questionId],
     deadline,
   });
-  await ctx.scheduler.runAt(deadline, internal.rooms.answerTimeUp, {
+  // Players see `deadline`; the round only moves on after the grace, so late answers still land.
+  await ctx.scheduler.runAt(deadline + ANSWER_GRACE_MS, internal.rooms.answerTimeUp, {
     roomId: room._id,
     round: room.round,
   });
@@ -175,7 +197,12 @@ export async function leave(ctx: MutationCtx, room: Doc<'rooms'>, userId: Id<'us
     await ctx.db.patch(seat._id, { left: true });
     return;
   }
-  await ctx.db.patch(seat._id, { left: true, popped: true, poppedInRound: room.round });
+  await ctx.db.patch(seat._id, {
+    left: true,
+    leftInRound: room.round,
+    popped: true,
+    poppedInRound: room.round,
+  });
   const seats = await seatsOf(ctx, room._id);
   if (seats.filter(stillIn).length <= 1) {
     await finish(ctx, room._id);

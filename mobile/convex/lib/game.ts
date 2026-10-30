@@ -1,4 +1,9 @@
 export const ANSWER_MS = 60_000;
+/**
+ * Answers still land this long after the deadline players see, so clock skew or a
+ * slow connection doesn't lose one sent right at the end.
+ */
+export const ANSWER_GRACE_MS = 3_000;
 export const POP_REMINDER_MS = 30_000;
 /** How long the popper has to pick a question before one is picked for them. */
 export const PICK_MS = 30_000;

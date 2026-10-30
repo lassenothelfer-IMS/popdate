@@ -15,7 +15,9 @@ async function summary(
   seat: Doc<'roomPlayers'> | undefined,
 ) {
   const iAmPopper = room.popperId === userId;
-  const match = room.matchId ? await ctx.db.get(room.matchId) : null;
+  const iWon = !iAmPopper && room.winnerId === userId;
+  // The match belongs to the popper and the winner, as in `ownsMatch`; it's gone once they unmatch.
+  const match = (iAmPopper || iWon) && room.matchId ? await ctx.db.get(room.matchId) : null;
   const otherId = match ? (match.popperId === userId ? match.winnerId : match.popperId) : null;
   const [popper, other] = await Promise.all([
     getProfile(ctx, room.popperId),
@@ -32,21 +34,30 @@ async function summary(
       return { question: question?.text ?? '', answer: mine?.text ?? null };
     }),
   );
+  /*
+   * The chooser "chose" when the room ended with a winner (unmatching later doesn't
+   * change that), else they "left". A contestant "won", "left" while still holding a
+   * balloon, or was "popped" in their round, even if they left after the pop. When
+   * the room ended without a winner while they were still in (the chooser left),
+   * they count as popped in the round the room stopped in, never in no round.
+   */
   const outcome = iAmPopper
-    ? match
+    ? room.winnerId
       ? ('chose' as const)
       : ('left' as const)
-    : seat?.left
-      ? ('left' as const)
-      : room.winnerId === userId
-        ? ('won' as const)
+    : iWon
+      ? ('won' as const)
+      : seat?.leftInRound !== undefined
+        ? ('left' as const)
         : ('popped' as const);
+  const poppedInRound =
+    iAmPopper || iWon ? null : (seat?.leftInRound ?? seat?.poppedInRound ?? room.round);
   return {
     roomId: room._id as string,
     endedAt: new Date(room.endedAt ?? room.createdAt).toISOString(),
     role: iAmPopper ? ('popper' as const) : ('contestant' as const),
     outcome,
-    poppedInRound: seat?.poppedInRound ?? null,
+    poppedInRound,
     totalRounds: room.totalRounds,
     popperName: popper?.name ?? 'Someone',
     matchName: match && match.popperId !== match.winnerId ? (other?.name ?? 'Someone') : null,

@@ -152,6 +152,8 @@ export default defineSchema({
     popped: v.boolean(),
     poppedInRound: v.optional(v.number()),
     left: v.boolean(),
+    /** Set when they left while still holding a balloon; leaving after a pop doesn't set it. */
+    leftInRound: v.optional(v.number()),
   })
     .index('by_room', ['roomId'])
     .index('by_user', ['userId']),

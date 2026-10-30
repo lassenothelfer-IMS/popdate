@@ -31,16 +31,20 @@ function messageView(message: Doc<'messages'>) {
   };
 }
 
-/** The chat, oldest first, live. */
+/** How many of the newest messages the chat loads. */
+const CHAT_LIMIT = 200;
+
+/** The newest messages of the chat, oldest first, live. */
 export const list = query({
   args: { matchId: v.string() },
   handler: async (ctx, { matchId }) => {
     const { match } = await requireMyMatch(ctx, matchId);
-    const messages = await ctx.db
+    const newest = await ctx.db
       .query('messages')
       .withIndex('by_match', (q) => q.eq('matchId', match._id))
-      .collect();
-    return messages.map(messageView);
+      .order('desc')
+      .take(CHAT_LIMIT);
+    return newest.reverse().map(messageView);
   },
 });
 

@@ -120,6 +120,9 @@ export const answer = mutation({
     const rowId = ctx.db.normalizeId('secondChances', id);
     const row = rowId ? await ctx.db.get(rowId) : null;
     if (!row || row.toId !== userId || row.status !== 'sent') fail('That second chance is no longer open.');
+    // Same window and blocks as `list`: an expired or blocked one is gone.
+    if (row.createdAt < Date.now() - WINDOW_MS) fail('That second chance has passed.');
+    if (await isBlockedEitherWay(ctx, userId, row.fromId)) fail('That second chance is no longer open.');
     await ctx.db.patch(row._id, { status: accept ? 'accepted' : 'declined' });
     if (!accept) return null;
     const matchId = await ctx.db.insert('matches', {
