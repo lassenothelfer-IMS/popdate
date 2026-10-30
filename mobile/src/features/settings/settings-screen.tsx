@@ -54,7 +54,6 @@ export function SettingsScreen() {
   const [askedPush, setAskedPush] = useState(false);
   const [error, setError] = useState<{ section: SectionKey; message: string } | null>(null);
   const [ending, setEnding] = useState<'signOut' | 'delete' | null>(null);
-  const [canGoBack] = useState(() => router.canGoBack());
   const deniedMessage =
     Platform.OS === 'ios' ? t('settings.notificationsDeniedIos') : t('settings.notificationsDenied');
 
@@ -200,13 +199,13 @@ export function SettingsScreen() {
   return (
     <View style={styles.flex}>
       <Screen scroll>
-        {/* Opened from a row there is a screen to go back to; from the tab bar there isn't. */}
-        {canGoBack ? <BackButton onPress={() => goBackOr('/home')} /> : null}
+        {/* Back to the screen that opened it; from a link or a reload, to Home. */}
+        <BackButton onPress={() => goBackOr('/home')} />
         <ThemedText
           type="title"
           accessibilityRole="header"
           maxFontSizeMultiplier={1.3}
-          style={canGoBack ? styles.title : styles.titleAlone}>
+          style={styles.title}>
           {t('settings.title')}
         </ThemedText>
 
@@ -357,9 +356,6 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: Space.xs,
-  },
-  titleAlone: {
-    marginTop: Space.sm,
   },
   denied: {
     gap: Space.sm,

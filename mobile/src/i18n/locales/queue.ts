@@ -5,6 +5,7 @@ export const queue: Strings = {
   en: {
     seatsReady: '%{found} of %{needed} ready.',
     leaveLine: 'Leave line',
+    leaveFailed: "Couldn't leave the line. Try again.",
     waited: '%{time} waited',
     seatsTaken: 'Seats taken',
     countLine: 'of %{needed}. A room opens when %{people} are ready.',
@@ -44,6 +45,7 @@ export const queue: Strings = {
   de: {
     seatsReady: '%{found} von %{needed} bereit.',
     leaveLine: 'Warteschlange verlassen',
+    leaveFailed: 'Verlassen hat nicht geklappt. Versuch es nochmals.',
     waited: '%{time} gewartet',
     seatsTaken: 'Besetzte Plätze',
     countLine: 'von %{needed}. Ein Raum öffnet, sobald %{people} bereit sind.',
@@ -83,6 +85,7 @@ export const queue: Strings = {
   fr: {
     seatsReady: '%{found} sur %{needed} prêts.',
     leaveLine: 'Quitter la file',
+    leaveFailed: 'Impossible de quitter la file. Réessaie.',
     waited: '%{time} d’attente',
     seatsTaken: 'Places prises',
     countLine: 'sur %{needed}. Une salle ouvre quand %{people} sont prêts.',
@@ -122,6 +125,7 @@ export const queue: Strings = {
   it: {
     seatsReady: '%{found} su %{needed} pronti.',
     leaveLine: 'Esci dalla coda',
+    leaveFailed: 'Non è stato possibile uscire dalla coda. Riprova.',
     waited: '%{time} di attesa',
     seatsTaken: 'Posti presi',
     countLine: 'su %{needed}. Una stanza apre quando %{people} sono pronti.',

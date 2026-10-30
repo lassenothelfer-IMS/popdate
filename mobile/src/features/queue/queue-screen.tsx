@@ -18,6 +18,7 @@ import { api, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
+import { ErrorLine } from '@/components/error-line';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
@@ -202,6 +203,8 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   const screenReader = useScreenReader();
   const holdMs = screenReader ? ROLE_BEAT_SCREEN_READER_MS : ROLE_BEAT_MS;
   const [waited, setWaited] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   const matched = roomId !== null;
   const beat = matched && room ? roleBeat(room, t) : null;
@@ -266,9 +269,24 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
 
   async function handleCancel() {
     // Once the room is full you are in it.
-    if (matched) return;
-    await api.leaveQueue();
-    goHome();
+    if (matched || leaving) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      // A room can fill in the moment you leave. You stay seated, so you go to it.
+      const formed = await api.leaveQueue();
+      if (formed) {
+        if (entered.current) return;
+        entered.current = true;
+        openRoom(formed);
+        return;
+      }
+      goHome();
+    } catch {
+      haptics.error();
+      setLeaveError(t('queue.leaveFailed'));
+      setLeaving(false);
+    }
   }
 
   function skipBeat() {
@@ -299,6 +317,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
                 variant="plain"
                 fullWidth={false}
                 disabled={matched}
+                loading={leaving}
                 onPress={() => void handleCancel()}
               />
               <View style={[styles.pill, { backgroundColor: theme.surface }]}>
@@ -309,6 +328,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             </>
           )}
         </Rise>
+        {leaveError && !beat ? <ErrorLine message={leaveError} /> : null}
 
         {beat ? (
           <Animated.View key="beat" entering={beatIn} style={styles.headline}>

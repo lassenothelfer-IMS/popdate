@@ -37,8 +37,18 @@ const PROFILE_KEY = 'popdate.mockProfile';
 const SETTINGS_KEY = 'popdate.mockSettings';
 const HISTORY_KEY = 'popdate.mockHistory';
 const MATCHES_KEY = 'popdate.mockMatches';
+const BLOCKED_KEY = 'popdate.mockBlocked';
+const ROOMS_KEY = 'popdate.mockRooms';
+/** Each chat is kept under its own key, so a new message only rewrites that one chat. */
+const messagesKey = (matchId: string) => `popdate.mockMessages.${matchId}`;
 /** How many past rooms the mock keeps. */
 const HISTORY_LIMIT = 50;
+/** How many messages of each chat the mock keeps, newest last. */
+const MESSAGES_LIMIT = 200;
+/** A runner-up can get a second chance this long after the room ends, like on the server. */
+const SECOND_CHANCE_MS = 7 * 24 * 60 * 60_000;
+/** The server still takes an answer this long after the deadline, for slow connections. */
+const ANSWER_GRACE_MS = 3_000;
 
 const LOBBY_SIZE = 6;
 
@@ -140,12 +150,42 @@ type ServerRoom = {
   questionOptions: Question[];
   usedQuestionIds: Set<string>;
   deadline: number | null;
+  /** When this round's answers were due, so one sent right at the end still counts. */
+  answerDeadline: number | null;
   popReminder: boolean;
   winnerId: string | null;
   matchId: string | null;
   timers: ReturnType<typeof setTimeout>[];
   listeners: Set<(room: Room | null) => void>;
 };
+
+/** A finished room as kept on the device, so its recap still opens after a restart. */
+type SavedRoom = Omit<ServerRoom, 'seats' | 'usedQuestionIds' | 'timers' | 'listeners'> & {
+  seats: (Omit<Seat, 'answers'> & { answers: [number, string][] })[];
+  usedQuestionIds: string[];
+};
+
+function saveRoom(room: ServerRoom): SavedRoom {
+  const { seats, usedQuestionIds, timers, listeners, ...rest } = room;
+  void timers;
+  void listeners;
+  return {
+    ...rest,
+    seats: seats.map((seat) => ({ ...seat, answers: [...seat.answers] })),
+    usedQuestionIds: [...usedQuestionIds],
+  };
+}
+
+function loadRoom(saved: SavedRoom): ServerRoom {
+  return {
+    ...saved,
+    answerDeadline: saved.answerDeadline ?? null,
+    seats: saved.seats.map((seat) => ({ ...seat, answers: new Map(seat.answers) })),
+    usedQuestionIds: new Set(saved.usedQuestionIds),
+    timers: [],
+    listeners: new Set(),
+  };
+}
 
 function randomId() {
   return Math.random().toString(36).slice(2, 10);
@@ -192,19 +232,37 @@ class MockServer implements PopdateApi {
   private history: RoomSummary[] = [];
   /** Second chances: your runner-ups, the ones you sent, the ones sent to you. */
   private chances: SecondChance[] = [];
+  /** Finished rooms you played, newest first, kept so their recap outlives a restart. */
+  private finishedRooms: SavedRoom[] = [];
+  /** Timers outside a room (second chances, the selfie review, bot replies), cleared on sign-out. */
+  private timers = new Set<ReturnType<typeof setTimeout>>();
   /** What was kept on the device from the last launch, read once. */
   private restored: Promise<void> | null = null;
 
   private restore() {
     this.restored ??= (async () => {
-      const [profile, settings, history, matches] = await Promise.all([
+      const [profile, settings, history, matches, blocked, rooms] = await Promise.all([
         readJson<Profile>(PROFILE_KEY),
         readJson<Settings>(SETTINGS_KEY),
         readJson<RoomSummary[]>(HISTORY_KEY),
         readJson<Match[]>(MATCHES_KEY),
+        readJson<BlockedPerson[]>(BLOCKED_KEY),
+        readJson<SavedRoom[]>(ROOMS_KEY),
       ]);
       if (history) this.history = history;
       if (matches) this.matches = matches;
+      if (blocked) this.blocked = blocked;
+      if (rooms) {
+        this.finishedRooms = rooms;
+        for (const saved of rooms) {
+          if (!this.rooms.has(saved.id)) this.rooms.set(saved.id, loadRoom(saved));
+        }
+      }
+      const chats = await Promise.all(this.matches.map((match) => readJson<Message[]>(messagesKey(match.id))));
+      this.matches.forEach((match, i) => {
+        const saved = chats[i];
+        if (saved && !this.messages.has(match.id)) this.messages.set(match.id, saved);
+      });
       if (profile) {
         this.profile = profile;
         this.userId = profile.id;
@@ -212,6 +270,15 @@ class MockServer implements PopdateApi {
       if (settings) this.settings = { ...this.settings, ...settings };
     })();
     return this.restored;
+  }
+
+  /** Like setTimeout, but sign-out clears it, so nothing lands in the next account. */
+  private later(ms: number, run: () => void) {
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      run();
+    }, ms);
+    this.timers.add(timer);
   }
 
   async signIn() {
@@ -260,8 +327,14 @@ class MockServer implements PopdateApi {
   }
 
   async leaveQueue() {
+    // Too late once your room formed: you keep your seat and the app takes you there.
+    if (this.queue.state === 'matched') {
+      const room = this.rooms.get(this.queue.roomId);
+      if (room && this.isPlaying(room)) return room.id;
+    }
     this.clearQueueTimer();
     this.setQueue({ state: 'idle' });
+    return null;
   }
 
   watchQueue(onChange: (status: QueueStatus) => void) {
@@ -285,15 +358,26 @@ class MockServer implements PopdateApi {
   // Rooms
 
   watchRoom(roomId: string, onChange: (room: Room | null) => void) {
-    const room = this.rooms.get(roomId);
-    if (!room) {
-      onChange(null);
-      return () => {};
+    let room = this.rooms.get(roomId);
+    let stopped = false;
+    const attach = (found: ServerRoom) => {
+      room = found;
+      found.listeners.add(onChange);
+      onChange(this.toView(found));
+    };
+    if (room) attach(room);
+    else {
+      // Right after a restart, a finished room may still be loading from the device.
+      void this.restore().then(() => {
+        if (stopped) return;
+        const found = this.rooms.get(roomId);
+        if (found) attach(found);
+        else onChange(null);
+      });
     }
-    room.listeners.add(onChange);
-    onChange(this.toView(room));
     return () => {
-      room.listeners.delete(onChange);
+      stopped = true;
+      room?.listeners.delete(onChange);
     };
   }
 
@@ -311,10 +395,15 @@ class MockServer implements PopdateApi {
     const seat = room.seats.find((s) => s.player.id === this.userId);
     const answer = text.trim();
     if (!seat || !isActive(seat)) throw new Error("You can't answer in this round.");
-    if (room.status !== 'answering') throw new Error('Answer time is over.');
+    // Like the server, an answer sent just as time runs out still counts.
+    const justLate =
+      room.status === 'popping' &&
+      room.answerDeadline !== null &&
+      Date.now() <= room.answerDeadline + ANSWER_GRACE_MS;
+    if (room.status !== 'answering' && !justLate) throw new Error('Answer time is over.');
     if (seat.answers.has(room.round)) throw new Error('You already answered.');
     if (!answer || answer.length > 280) throw new Error('Answers are 1 to 280 characters.');
-    seat.answers.set(room.round, answer);
+    seat.answers.set(room.round, maskProfanity(answer));
     this.emit(room);
     this.endAnsweringIfEveryoneAnswered(room);
   }
@@ -332,12 +421,14 @@ class MockServer implements PopdateApi {
     const room = this.rooms.get(roomId);
     if (!room || room.status === 'finished') return;
 
-    this.recordHistory(room, { left: true });
+    // Already popped, you leave as popped; only leaving while still in counts as left.
+    this.recordHistory(room, { left: this.isPlaying(room) });
     if (room.popper.id === this.userId) {
       // Without a popper the room can't go on.
       this.clearTimers(room);
       room.status = 'finished';
       room.deadline = null;
+      this.keepFinishedRoom(room);
       this.emit(room);
       return;
     }
@@ -375,21 +466,28 @@ class MockServer implements PopdateApi {
 
   async getActiveRoom() {
     for (const room of this.rooms.values()) {
-      if (room.status === 'finished') continue;
-      if (room.popper.id === this.userId) return room.id;
-      const seat = room.seats.find((s) => s.player.id === this.userId);
-      if (seat && isActive(seat)) return room.id;
+      if (this.isPlaying(room)) return room.id;
     }
     return null;
+  }
+
+  /** Whether you're still in this room: its popper, or a balloon that hasn't popped. */
+  private isPlaying(room: ServerRoom) {
+    if (room.status === 'finished') return false;
+    if (room.popper.id === this.userId) return true;
+    const seat = room.seats.find((s) => s.player.id === this.userId);
+    return !!seat && isActive(seat);
   }
 
   // Matches
 
   async listMatches() {
+    await this.restore();
     return [...this.matches].reverse();
   }
 
   async getMatch(matchId: string) {
+    await this.restore();
     return this.matches.find((match) => match.id === matchId) ?? null;
   }
 
@@ -397,6 +495,20 @@ class MockServer implements PopdateApi {
     this.matches = this.matches.filter((match) => match.id !== matchId);
     this.messages.delete(matchId);
     void writeJson(MATCHES_KEY, this.matches);
+    void removeJson(messagesKey(matchId));
+    // The Rooms card and the recap stop offering a chat that's gone.
+    if (this.history.some((entry) => entry.matchId === matchId)) {
+      this.history = this.history.map((entry) =>
+        entry.matchId === matchId ? { ...entry, matchId: null, matchName: null } : entry,
+      );
+      void writeJson(HISTORY_KEY, this.history);
+    }
+    for (const room of this.rooms.values()) {
+      if (room.matchId !== matchId) continue;
+      room.matchId = null;
+      if (room.status === 'finished') this.keepFinishedRoom(room);
+      this.emit(room);
+    }
   }
 
   async listRoomHistory() {
@@ -410,7 +522,9 @@ class MockServer implements PopdateApi {
   }
 
   async listSecondChances() {
-    return structuredClone(this.chances);
+    // Past their week, second chances are gone; blocked people never show up.
+    this.chances = this.chances.filter((c) => !this.isExpired(c));
+    return structuredClone(this.chances.filter((c) => !this.isBlocked(c.person.id)));
   }
 
   async sendSecondChance(roomId: string, userId: string) {
@@ -418,19 +532,32 @@ class MockServer implements PopdateApi {
       (c) => c.roomId === roomId && c.person.id === userId && c.state === 'almost',
     );
     if (!chance) throw new Error('That second chance is no longer open.');
+    if (this.isExpired(chance)) throw new Error('That second chance has passed.');
+    if (this.isBlocked(userId)) throw new Error("You can't send this one.");
     chance.state = 'sent';
     // The bot thinks it over, then says yes.
-    setTimeout(() => {
+    this.later(randomInt(4000, 9000), () => {
+      if (!this.chances.some((c) => c.id === chance.id)) return;
       this.chances = this.chances.filter((c) => c.id !== chance.id);
-      this.addMatch(roomId, chance.person);
-    }, randomInt(4000, 9000));
+      if (!this.isBlocked(chance.person.id)) this.addMatch(roomId, chance.person);
+    });
   }
 
   async answerSecondChance(id: string, accept: boolean) {
     const chance = this.chances.find((c) => c.id === id && c.state === 'incoming');
-    if (!chance) throw new Error('That second chance is no longer open.');
+    if (!chance || this.isExpired(chance) || this.isBlocked(chance.person.id)) {
+      throw new Error('That second chance is no longer open.');
+    }
     this.chances = this.chances.filter((c) => c.id !== id);
     return accept ? this.addMatch(chance.roomId, chance.person) : null;
+  }
+
+  private isExpired(chance: SecondChance) {
+    return Date.parse(chance.createdAt) + SECOND_CHANCE_MS < Date.now();
+  }
+
+  private isBlocked(userId: string) {
+    return this.blocked.some((person) => person.id === userId);
   }
 
   private addMatch(roomId: string, other: Match['other']) {
@@ -484,6 +611,7 @@ class MockServer implements PopdateApi {
       photo: player.photos[0],
     });
     if (room.popper.id === this.userId) {
+      if (this.isBlocked(runnerUp.player.id)) return;
       this.chances.push({
         id: `chance-${randomId()}`,
         roomId: room.id,
@@ -493,7 +621,8 @@ class MockServer implements PopdateApi {
       });
     } else if (runnerUp.player.id === this.userId && Math.random() < 0.5) {
       // Sometimes the chooser comes back for you.
-      setTimeout(() => {
+      this.later(randomInt(5000, 10000), () => {
+        if (this.isBlocked(room.popper.id)) return;
         this.chances.push({
           id: `chance-${randomId()}`,
           roomId: room.id,
@@ -501,8 +630,17 @@ class MockServer implements PopdateApi {
           state: 'incoming',
           createdAt: new Date().toISOString(),
         });
-      }, randomInt(5000, 10000));
+      });
     }
+  }
+
+  /** Keeps a finished room on the device, newest first, so its recap opens after a restart. */
+  private keepFinishedRoom(room: ServerRoom) {
+    const known = this.finishedRooms.some((saved) => saved.id === room.id);
+    this.finishedRooms = known
+      ? this.finishedRooms.map((saved) => (saved.id === room.id ? saveRoom(room) : saved))
+      : [saveRoom(room), ...this.finishedRooms].slice(0, HISTORY_LIMIT);
+    void writeJson(ROOMS_KEY, this.finishedRooms);
   }
 
   // Account
@@ -521,6 +659,10 @@ class MockServer implements PopdateApi {
     this.setQueue({ state: 'idle' });
     this.rooms.forEach((room) => this.clearTimers(room));
     this.rooms.clear();
+    this.timers.forEach(clearTimeout);
+    this.timers.clear();
+    const chats = new Set([...this.matches.map((match) => match.id), ...this.messages.keys()]);
+    chats.forEach((matchId) => void removeJson(messagesKey(matchId)));
     this.userId = null;
     this.profile = null;
     this.matches = [];
@@ -532,8 +674,11 @@ class MockServer implements PopdateApi {
     void removeJson(SETTINGS_KEY);
     void removeJson(HISTORY_KEY);
     void removeJson(MATCHES_KEY);
+    void removeJson(BLOCKED_KEY);
+    void removeJson(ROOMS_KEY);
     this.history = [];
     this.chances = [];
+    this.finishedRooms = [];
   }
 
   // Settings
@@ -565,20 +710,22 @@ class MockServer implements PopdateApi {
     if (!photoUri) throw new Error('Take a selfie first.');
     this.verification = 'pending';
     // A person reviews it on the real server; the mock approves after a few seconds.
-    setTimeout(() => {
+    this.later(4000, () => {
       if (this.verification === 'pending') this.verification = 'verified';
-    }, 4000);
+    });
     return this.verification;
   }
 
   // Safety
 
   async listBlocked() {
+    await this.restore();
     return [...this.blocked];
   }
 
   async block(userId: string) {
-    if (this.blocked.some((person) => person.id === userId)) return;
+    await this.restore();
+    if (this.isBlocked(userId)) return;
     const known = this.findPerson(userId);
     this.blocked.push({
       id: userId,
@@ -587,10 +734,13 @@ class MockServer implements PopdateApi {
       photo: known?.photo ?? 'mock://blocked',
       blockedAt: new Date().toISOString(),
     });
+    void writeJson(BLOCKED_KEY, this.blocked);
   }
 
   async unblock(userId: string) {
+    await this.restore();
     this.blocked = this.blocked.filter((person) => person.id !== userId);
+    void writeJson(BLOCKED_KEY, this.blocked);
   }
 
   async report(userId: string, reason: ReportReason, details?: string) {
@@ -612,6 +762,7 @@ class MockServer implements PopdateApi {
   // Chat
 
   async listMessages(matchId: string) {
+    await this.restore();
     this.requireMatch(matchId);
     return [...(this.messages.get(matchId) ?? [])];
   }
@@ -621,27 +772,32 @@ class MockServer implements PopdateApi {
     listeners.add(onChange);
     this.messageListeners.set(matchId, listeners);
     onChange([...(this.messages.get(matchId) ?? [])]);
+    // Right after a restart the chat may still be loading from the device.
+    void this.restore().then(() => {
+      if (listeners.has(onChange)) onChange([...(this.messages.get(matchId) ?? [])]);
+    });
     return () => {
       listeners.delete(onChange);
     };
   }
 
   async sendMessage(matchId: string, text: string) {
+    await this.restore();
     const match = this.requireMatch(matchId);
     const trimmed = text.trim();
     if (!trimmed) throw new Error('Write something first.');
     if (trimmed.length > MAX_MESSAGE_LENGTH) throw new Error('That message is too long.');
-    if (this.blocked.some((person) => person.id === match.other.id)) {
+    if (this.isBlocked(match.other.id)) {
       throw new Error("You blocked this person, so you can't message them.");
     }
     const message = this.addMessage(matchId, this.userId ?? 'me', trimmed);
     // The other person is a bot: it answers now and then, after a little while.
     if (Math.random() < 0.8) {
-      setTimeout(() => {
-        if (this.matches.some((m) => m.id === matchId)) {
+      this.later(randomInt(1500, 4000), () => {
+        if (this.matches.some((m) => m.id === matchId) && !this.isBlocked(match.other.id)) {
           this.addMessage(matchId, match.other.id, pickRandom(BOT_REPLIES));
         }
-      }, randomInt(1500, 4000));
+      });
     }
     return message;
   }
@@ -655,8 +811,9 @@ class MockServer implements PopdateApi {
       text: maskProfanity(text),
       sentAt: new Date().toISOString(),
     };
-    const list = [...(this.messages.get(matchId) ?? []), message];
+    const list = [...(this.messages.get(matchId) ?? []), message].slice(-MESSAGES_LIMIT);
     this.messages.set(matchId, list);
+    void writeJson(messagesKey(matchId), list);
     this.messageListeners.get(matchId)?.forEach((listener) => listener([...list]));
     return message;
   }
@@ -708,6 +865,7 @@ class MockServer implements PopdateApi {
       questionOptions: [],
       usedQuestionIds: new Set(),
       deadline: null,
+      answerDeadline: null,
       popReminder: false,
       winnerId: null,
       matchId: null,
@@ -739,6 +897,7 @@ class MockServer implements PopdateApi {
     room.status = 'picking';
     room.question = null;
     room.deadline = Date.now() + PICK_MS;
+    room.answerDeadline = null;
     room.popReminder = false;
     const unused = QUESTIONS.filter((q) => !room.usedQuestionIds.has(q.id));
     room.questionOptions = shuffle(unused).slice(0, QUESTION_OPTIONS_PER_ROUND);
@@ -757,6 +916,7 @@ class MockServer implements PopdateApi {
     room.questionOptions = [];
     room.usedQuestionIds.add(question.id);
     room.deadline = Date.now() + ANSWER_MS;
+    room.answerDeadline = room.deadline;
     this.emit(room);
 
     this.after(room, ANSWER_MS, () => this.startPopping(room));
@@ -835,6 +995,7 @@ class MockServer implements PopdateApi {
     }
     this.recordHistory(room);
     this.offerSecondChance(room);
+    this.keepFinishedRoom(room);
     this.emit(room);
   }
 

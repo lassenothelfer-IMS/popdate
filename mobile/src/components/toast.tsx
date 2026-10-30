@@ -4,6 +4,7 @@ import Animated, { FadeOut, SlideInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { OFFLINE_BANNER_SPACE, useOnline } from '@/components/offline-banner';
 import { Ease, Fonts, Radius, Space } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -14,6 +15,7 @@ const TOAST_MS = 3000;
 /**
  * A short confirmation, like "Saved": a pill in the text color that slides in
  * from the top and leaves after 3 s. Render the `toast` element last in a screen.
+ * While the offline pill shows, it sits just under it.
  */
 export function useToast() {
   const [message, setMessage] = useState<string | null>(null);
@@ -40,8 +42,10 @@ function Toast({ message }: { message: string }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const reduced = useReduceMotion();
+  const online = useOnline();
+  const top = insets.top + Space.xs + (online ? 0 : OFFLINE_BANNER_SPACE);
   return (
-    <View pointerEvents="none" style={[styles.layer, { top: insets.top + Space.xs }]}>
+    <View pointerEvents="none" style={[styles.layer, { top }]}>
       <Animated.View
         entering={reduced ? undefined : SlideInUp.duration(400).easing(Ease.rise)}
         exiting={reduced ? undefined : FadeOut.duration(200)}

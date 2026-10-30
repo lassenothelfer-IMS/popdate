@@ -1,9 +1,9 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { api, type Match, type Message } from '@/api';
+import { api } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
@@ -13,19 +13,17 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
-import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE, useTabFocus } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { SecondChances } from '@/features/matches/second-chances';
+import { previewLine, withLastMessages, type Thread } from '@/features/matches/threads';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
 import { useFilterText } from '@/state/settings';
 import { useSession } from '@/state/session';
-
-/** A match with its newest message, if anyone has written yet. */
-type Thread = { match: Match; last: Message | null };
 
 /** "now", "2 min", "21:40", "Sat", "12 Oct": the newest activity, short. */
 function shortTime(t: Translate, locale: string, iso: string) {
@@ -59,31 +57,38 @@ export function MatchesScreen() {
       setThreads((current) => current?.filter((thread) => thread.match.other.id !== person.id) ?? null),
   });
 
-  // Loads on every visit, and again from Try again.
-  const load = useCallback(() => {
-    let active = true;
+  /** Bumped by a pull to refresh, so Almost reloads along with the list. */
+  const [refreshes, setRefreshes] = useState(0);
+
+  const loadThreads = useCallback((isCurrent: () => boolean = () => true) => {
     setFailed(false);
-    api
+    return api
       .listMatches()
-      .then((matches) =>
-        Promise.all(
-          matches.map(async (match) => {
-            const messages = await api.listMessages(match.id).catch(() => []);
-            return { match, last: messages.at(-1) ?? null };
-          }),
-        ),
-      )
-      .then((list) => {
-        if (active) setThreads(list);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-    };
+      .then(withLastMessages)
+      .then(
+        (list) => {
+          if (isCurrent()) setThreads(list);
+        },
+        () => {
+          if (isCurrent()) setFailed(true);
+        },
+      );
   }, []);
-  useFocusEffect(load);
+  // Loads on every visit and each time you page here, and again from Try again.
+  useTabFocus(
+    useCallback(() => {
+      let active = true;
+      void loadThreads(() => active);
+      return () => {
+        active = false;
+      };
+    }, [loadThreads]),
+  );
+
+  function refresh() {
+    setRefreshes((count) => count + 1);
+    return loadThreads();
+  }
 
   const myId = profile?.id ?? null;
   // Newest first. Your turn: they wrote last, or nobody has written yet.
@@ -97,19 +102,22 @@ export function MatchesScreen() {
   return (
     <TabSwipe tab="matches">
     <View style={styles.flex}>
-      <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+      <Screen
+        scroll
+        onRefresh={refresh}
+        contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
         <Rise index={0}>
           <ThemedText type="title" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
             {t('home.matchesTitle')}
           </ThemedText>
         </Rise>
 
-        <SecondChances onMatched={() => void load()} />
+        <SecondChances refreshes={refreshes} onMatched={() => void loadThreads()} />
 
         {threads === null && failed ? (
           <View style={styles.loading}>
             <ErrorLine message={t('home.matchesFailed')} />
-            <Button title={t('common.tryAgain')} variant="tinted" onPress={() => void load()} />
+            <Button title={t('common.tryAgain')} variant="tinted" onPress={() => void loadThreads()} />
           </View>
         ) : threads === null ? (
           <View style={styles.loading}>
@@ -192,11 +200,7 @@ function ThreadRow({
   const filter = useFilterText();
   const { match, last } = thread;
   const name = t('common.nameAge', { name: match.other.name, age: match.other.age });
-  const preview = last
-    ? last.senderId === myId
-      ? t('home.youWrote', { text: last.text })
-      : filter(last.text)
-    : t('home.matchNote');
+  const preview = previewLine(t, filter, thread, myId);
   const time = shortTime(t, locale, last?.sentAt ?? match.createdAt);
   const quiet = highlighted ? 'textSecondary' : 'textTertiary';
   return (

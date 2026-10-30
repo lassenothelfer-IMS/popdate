@@ -1,4 +1,4 @@
-import { Redirect, router, useFocusEffect, type Href } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -7,7 +7,6 @@ import {
   getMockNextRole,
   isMockServer,
   setMockNextRole,
-  type Match,
   type MockRole,
   type QueueStats,
 } from '@/api';
@@ -21,16 +20,18 @@ import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
-import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE, useTabFocus } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { outcomeLine } from '@/features/rooms/rooms-screen';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { useJoinQueue } from '@/features/home/use-join-queue';
+import { previewLine, withLastMessages, type Thread } from '@/features/matches/threads';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
+import { useFilterText } from '@/state/settings';
 
 /** The test server's role chips, labeled by their `home.*` keys. */
 const MOCK_ROLES: { role: MockRole; label: string }[] = [
@@ -39,9 +40,9 @@ const MOCK_ROLES: { role: MockRole; label: string }[] = [
   { role: 'contestant', label: 'home.roleBalloon' },
 ];
 
-/** Home shows your newest matches; the Matches tab has them all. */
-/** How often the live queue line refreshes while Home is open. */
+/** How often the live queue line refreshes while Home is on screen. */
 const LIVE_REFRESH_MS = 20_000;
+/** Home shows your newest matches; the Matches tab has them all. */
 const HOME_MATCHES = 2;
 
 type DayPart = 'Morning' | 'Afternoon' | 'Evening' | 'Night';
@@ -77,51 +78,75 @@ export function HomeScreen() {
   const theme = useTheme();
   const t = useT();
   const locale = useLocale();
-  /** Null until the first load, so nothing flashes before the rows. */
-  const [matches, setMatches] = useState<Match[] | null>(null);
+  const filter = useFilterText();
+  /** Your newest matches with their last message. Null until the first load, so nothing flashes before the rows. */
+  const [matches, setMatches] = useState<Thread[] | null>(null);
   const [mockRole, setMockRole] = useState(getMockNextRole);
   const { join, joining, error } = useJoinQueue();
+  /** Null until it loads, or while it can't: the line then falls back to the day and city. */
   const [live, setLive] = useState<QueueStats | null>(null);
-  const { history } = useRoomHistory();
+  const { history, reload: reloadHistory } = useRoomHistory();
   const lastRoom = history?.[0];
   const streak = history ? roomStats(history).streak : 0;
 
-  // Who's queuing right now: fetched on every visit, then every 20 s while you're here.
-  useFocusEffect(
+  const loadLive = useCallback(
+    (isCurrent: () => boolean = () => true) =>
+      api.getQueueStats().then(
+        (stats) => {
+          if (isCurrent()) setLive(stats);
+        },
+        () => {},
+      ),
+    [],
+  );
+
+  const loadMatches = useCallback(
+    (isCurrent: () => boolean = () => true) =>
+      api
+        .listMatches()
+        .then((list) =>
+          withLastMessages(
+            [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, HOME_MATCHES),
+          ),
+        )
+        .then(
+          (list) => {
+            if (isCurrent()) setMatches(list);
+          },
+          () => {
+            if (isCurrent()) setMatches((previous) => previous ?? []);
+          },
+        ),
+    [],
+  );
+
+  // Who's queuing right now: fetched on every visit, then every 20 s while Home is on screen.
+  useTabFocus(
     useCallback(() => {
       let active = true;
-      const check = () =>
-        api
-          .getQueueStats()
-          .then((stats) => {
-            if (active) setLive(stats);
-          })
-          .catch(() => {});
-      void check();
-      const timer = setInterval(check, LIVE_REFRESH_MS);
+      const isCurrent = () => active;
+      void loadLive(isCurrent);
+      const timer = setInterval(() => void loadLive(isCurrent), LIVE_REFRESH_MS);
       return () => {
         active = false;
         clearInterval(timer);
       };
-    }, []),
+    }, [loadLive]),
   );
 
-  useFocusEffect(
+  useTabFocus(
     useCallback(() => {
       let active = true;
-      api
-        .listMatches()
-        .then((list) => {
-          if (active) setMatches(list);
-        })
-        .catch(() => {
-          if (active) setMatches((previous) => previous ?? []);
-        });
+      void loadMatches(() => active);
       return () => {
         active = false;
       };
-    }, []),
+    }, [loadMatches]),
   );
+
+  function refresh() {
+    return Promise.all([loadLive(), loadMatches(), reloadHistory()]);
+  }
 
   if (!profile) return <Redirect href="/" />;
 
@@ -131,21 +156,22 @@ export function HomeScreen() {
   }
 
   const words = greeting(t, locale, profile.name, profile.city);
-  const newest = [...(matches ?? [])]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, HOME_MATCHES);
 
   return (
     <TabSwipe tab="home">
     <View style={styles.flex}>
-      <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+      <Screen
+        scroll
+        onRefresh={refresh}
+        contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
         <Rise index={0} style={styles.top}>
           <Wordmark />
         </Rise>
 
         <Rise index={1} style={styles.hello}>
           <View style={styles.liveRow}>
-            <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
+            {/* The green dot means live numbers; the day-and-city fallback goes without. */}
+            {live ? <View style={[styles.liveDot, { backgroundColor: theme.success }]} /> : null}
             <ThemedText type="kicker">
               {live
                 ? t('home.liveQueue', { count: live.waiting, city: profile.city })
@@ -230,23 +256,26 @@ export function HomeScreen() {
               </View>
             }
           />
-          {newest.map((match) => (
-            <LinkRow
-              key={match.id}
-              title={t('common.nameAge', { name: match.other.name, age: match.other.age })}
-              subtitle={t('home.matchNote')}
-              accessibilityHint={t('home.openChatHint')}
-              onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
-              icon={
-                <Avatar
-                  name={match.other.name}
-                  uri={match.other.photo}
-                  tone={seatFor(seats, match.other.id)}
-                  size={36}
-                />
-              }
-            />
-          ))}
+          {(matches ?? []).map((thread) => {
+            const { match } = thread;
+            return (
+              <LinkRow
+                key={match.id}
+                title={t('common.nameAge', { name: match.other.name, age: match.other.age })}
+                subtitle={previewLine(t, filter, thread, profile.id)}
+                accessibilityHint={t('home.openChatHint')}
+                onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+                icon={
+                  <Avatar
+                    name={match.other.name}
+                    uri={match.other.photo}
+                    tone={seatFor(seats, match.other.id)}
+                    size={36}
+                  />
+                }
+              />
+            );
+          })}
         </Rise>
 
 
@@ -303,7 +332,7 @@ function LinkRow({ title, subtitle, icon, onPress, accessibilityHint }: LinkRowP
       {icon}
       <View style={styles.rowText}>
         <ThemedText type="headline">{title}</ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+        <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={2}>
           {subtitle}
         </ThemedText>
       </View>

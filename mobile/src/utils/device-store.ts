@@ -23,9 +23,26 @@ async function remove(key: string) {
   else await SecureStore.deleteItemAsync(key);
 }
 
+/**
+ * The last write or removal of each key. The next one waits for it, so two
+ * writes of chunked values never interleave and leave a mix of both behind.
+ */
+const pending = new Map<string, Promise<void>>();
+
+function inOrder(key: string, task: () => Promise<void>): Promise<void> {
+  const run = (pending.get(key) ?? Promise.resolve()).then(task);
+  pending.set(key, run);
+  void run.then(() => {
+    if (pending.get(key) === run) pending.delete(key);
+  });
+  return run;
+}
+
 /** The stored value, or null when there is none or it can't be read. */
 export async function readJson<T>(key: string): Promise<T | null> {
   try {
+    // A write still under way would be read half old, half new.
+    await pending.get(key);
     const count = Number(await get(`${key}.count`));
     if (!count) return null;
     const parts = await Promise.all(Array.from({ length: count }, (_, i) => get(`${key}.${i}`)));
@@ -36,7 +53,15 @@ export async function readJson<T>(key: string): Promise<T | null> {
   }
 }
 
-export async function writeJson(key: string, value: unknown) {
+export function writeJson(key: string, value: unknown) {
+  return inOrder(key, () => write(key, value));
+}
+
+export function removeJson(key: string) {
+  return inOrder(key, () => removeAll(key));
+}
+
+async function write(key: string, value: unknown) {
   try {
     const text = JSON.stringify(value);
     const count = Math.max(1, Math.ceil(text.length / CHUNK));
@@ -49,7 +74,7 @@ export async function writeJson(key: string, value: unknown) {
   }
 }
 
-export async function removeJson(key: string) {
+async function removeAll(key: string) {
   try {
     const count = Number(await get(`${key}.count`)) || 0;
     await remove(`${key}.count`);

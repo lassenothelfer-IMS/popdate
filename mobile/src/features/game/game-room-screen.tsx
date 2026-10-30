@@ -264,6 +264,16 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     setDeveloped(new Set(shownPhotoKeys(room)));
   }
 
+  // The marked balloon and the hold belong to one phase. When the server pops for
+  // the chooser, or the round moves on, they go, so the next pop starts fresh.
+  const phaseKey = room ? `${room.round}:${room.status}` : null;
+  const [markedIn, setMarkedIn] = useState(phaseKey);
+  if (phaseKey !== markedIn) {
+    setMarkedIn(phaseKey);
+    setHoldId(null);
+    setSelectedId(null);
+  }
+
   const matchId = room?.matchId ?? null;
   const matchAs = room?.me.role === 'popper' ? 'popper' : 'winner';
   useEffect(() => {
@@ -903,10 +913,10 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   let footer: ReactNode = null;
   if (finished) {
     // While the last pop holds the room, nothing should pull you off this moment.
-    // When the chooser left, the room didn't count: you go to the front of the next one.
+    // When the chooser left, the room didn't count: you can get back in line right away.
     footer = climax ? null : !winner && !isPopper ? (
       <>
-        <Button title={t('game.nextRoomFirst')} loading={replaying} onPress={() => void playAgain()} />
+        <Button title={t('game.nextRoomLine')} loading={replaying} onPress={() => void playAgain()} />
         <Button variant="plain" title={t('game.backHome')} disabled={replaying} onPress={goHome} />
       </>
     ) : (

@@ -15,8 +15,11 @@ const MAX_ANSWER_LENGTH = 280;
 const COUNTER_FROM = 240;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */
 const SPOKEN_COUNTS = [0, 10, 20, MAX_ANSWER_LENGTH - COUNTER_FROM];
-/** A typed answer goes out this long before time is up, so it still counts. */
-const AUTO_SEND_BEFORE = 1500;
+/**
+ * A typed answer goes out this long before time is up on the phone's clock, so it
+ * still counts when the clock runs a little off or the network is slow.
+ */
+const AUTO_SEND_BEFORE = 3500;
 /** One line of answer. The field grows from here as the answer wraps. */
 const FIELD_HEIGHT = 52;
 /** About four lines, then the field scrolls. */

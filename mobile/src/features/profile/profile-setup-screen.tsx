@@ -22,6 +22,7 @@ import {
   DetailsSection,
   PHOTO_COUNT,
   PhotoSection,
+  saveFailedMessage,
   useProfileForm,
 } from '@/features/profile/profile-form';
 import { testPhotos } from '@/features/profile/test-profile';
@@ -62,8 +63,8 @@ export function ProfileSetupScreen() {
       const profile = await saveProfile(form.details);
       setSaved(profile);
       setPhase('ready');
-    } catch {
-      const message = t('profile.saveFailed');
+    } catch (failure) {
+      const message = saveFailedMessage(t, failure);
       setError(message);
       haptics.error();
       AccessibilityInfo.announceForAccessibility(message);
@@ -79,7 +80,10 @@ export function ProfileSetupScreen() {
         form={form}
         saving={saving}
         error={error}
-        onBack={() => setPhase('photos')}
+        // Going back mid-save would leave the save's outcome on a step you can't see.
+        onBack={() => {
+          if (!saving) setPhase('photos');
+        }}
         onSave={handleSave}
       />
     );
@@ -295,17 +299,20 @@ function ReadyStep({ profile }: { profile: Profile }) {
             style={StyleSheet.absoluteFill}
           />
           <View style={[styles.cardTag, { backgroundColor: TAG_GLASS }]}>
-            <Text style={styles.cardTagText}>{t('onboarding.photoTag', { position: 1 })}</Text>
+            <Text style={styles.cardTagText} maxFontSizeMultiplier={1.2} numberOfLines={1}>
+              {t('onboarding.photoTag', { position: 1 })}
+            </Text>
           </View>
           <View style={[styles.cardInfo, { backgroundColor: INFO_GLASS }]}>
             <View style={styles.cardName}>
               <Balloon color={BrandBalloon.color} size={10} />
-              <Text style={styles.cardNameText}>
+              {/* The card keeps its size: its text grows a little with Dynamic Type, then stops. */}
+              <Text style={styles.cardNameText} maxFontSizeMultiplier={1.3} numberOfLines={2}>
                 {t('common.nameAge', { name: profile.name, age })}
                 <Text style={styles.cardCity}>{`  ${profile.city}`}</Text>
               </Text>
             </View>
-            <Text style={styles.cardBio} numberOfLines={3}>
+            <Text style={styles.cardBio} maxFontSizeMultiplier={1.3} numberOfLines={3}>
               {profile.bio}
             </Text>
           </View>
@@ -314,8 +321,16 @@ function ReadyStep({ profile }: { profile: Profile }) {
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           style={[styles.count, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <Text style={[styles.countNumber, { color: theme.text }]}>{profile.photos.length}</Text>
-          <ThemedText type="caption" themeColor="textSecondary" style={styles.countLabel}>
+          <Text style={[styles.countNumber, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
+            {profile.photos.length}
+          </Text>
+          <ThemedText
+            type="caption"
+            themeColor="textSecondary"
+            maxFontSizeMultiplier={1.2}
+            numberOfLines={2}
+            adjustsFontSizeToFit
+            style={styles.countLabel}>
             {t('onboarding.photosReady')}
           </ThemedText>
         </View>
@@ -482,6 +497,7 @@ const styles = StyleSheet.create({
     gap: Space.xs,
   },
   cardNameText: {
+    flexShrink: 1,
     fontFamily: Fonts.sans,
     fontSize: 15,
     fontWeight: 600,
@@ -504,6 +520,7 @@ const styles = StyleSheet.create({
     top: 92,
     width: 120,
     height: 120,
+    paddingHorizontal: Space.xs,
     borderRadius: Radius.lg,
     borderWidth: 1,
     alignItems: 'center',

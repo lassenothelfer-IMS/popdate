@@ -1,4 +1,5 @@
-import { router, type Href } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
+import { createContext, use, useCallback, type EffectCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -33,6 +34,29 @@ const ICON_PATHS: Record<Exclude<Tab, 'you'>, string[]> = {
   rooms: ['M4.5 12a7.5 7.5 0 1 0 2.2-5.3', 'M4.5 4v3.5H8', 'M12 8.2V12l2.8 1.8'],
   matches: ['M7 4.5h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-6.2L6.5 20v-3.5A3 3 0 0 1 4 13.5v-6a3 3 0 0 1 3-3z'],
 };
+/**
+ * Whether the pager page this sits in is the one showing. The phone's tabs layout
+ * provides it around each page; everywhere else (the web's tab routes, pushed
+ * screens) it's true, since a screen there is only mounted while it's open.
+ */
+export const TabPageContext = createContext(true);
+
+/** True while this tab page is the one on screen, or always outside the pager. */
+export function useTabActive() {
+  return use(TabPageContext);
+}
+
+/**
+ * useFocusEffect for a tab page. On the phone all four pages stay mounted in one
+ * pager, so screen focus alone misses a swipe: this runs `effect` when the screen
+ * gains focus while its page is showing, and again each time you page back to it,
+ * and cleans up when either goes. Pass a stable callback (useCallback).
+ */
+export function useTabFocus(effect: EffectCallback) {
+  const active = useTabActive();
+  useFocusEffect(useCallback(() => (active ? effect() : undefined), [active, effect]));
+}
+
 const ICON = 24;
 const AVATAR = 26;
 
@@ -43,6 +67,8 @@ type TabBarProps = {
   onSelect?: (tab: Tab) => void;
   /** Tabs that wear a small dot, like Matches while a chat is waiting on you. */
   dots?: Partial<Record<Tab, boolean>>;
+  /** What a screen reader says for a tab while it wears its dot, like "Matches, your turn". */
+  dotLabels?: Partial<Record<Tab, string>>;
 };
 
 /**
@@ -50,7 +76,7 @@ type TabBarProps = {
  * 16 pt from the sides. Each tab is an icon over its name; the selected one sits
  * in a soft accent capsule. You is your own photo.
  */
-export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
+export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProps) {
   const theme = useTheme();
   const seats = useSeats();
   const { profile } = useSession();
@@ -63,11 +89,12 @@ export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
         {TABS.map((tab) => {
           const selected = tab === active;
           const color = selected ? theme.accentText : theme.textSecondary;
+          const dotted = dots?.[tab] ?? false;
           return (
             <Pressable
               key={tab}
               accessibilityRole="tab"
-              accessibilityLabel={labels[tab]}
+              accessibilityLabel={dotted ? (dotLabels?.[tab] ?? labels[tab]) : labels[tab]}
               accessibilityState={{ selected }}
               aria-selected={selected}
               onPress={() => {
@@ -109,7 +136,7 @@ export function TabBar({ active, labels, onSelect, dots }: TabBarProps) {
                     ))}
                   </Svg>
                 )}
-                {dots?.[tab] ? (
+                {dotted ? (
                   <View style={[styles.dot, { backgroundColor: theme.accent, borderColor: theme.sheet }]} />
                 ) : null}
               </View>

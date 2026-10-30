@@ -9,6 +9,16 @@ import { Motion, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
+/** Room the offline pill takes at the top, gap included, so a toast can sit under it. */
+export const OFFLINE_BANNER_SPACE = 34 + Space.xs;
+
+/** Whether the server can be reached right now. */
+export function useOnline() {
+  const [online, setOnline] = useState(true);
+  useEffect(() => api.watchConnection(setOnline), []);
+  return online;
+}
+
 /**
  * A quiet pill at the top of every screen while the server can't be reached.
  * Rooms and chats pick up where they were once it's back.
@@ -17,9 +27,7 @@ export function OfflineBanner() {
   const theme = useTheme();
   const t = useT();
   const insets = useSafeAreaInsets();
-  const [online, setOnline] = useState(true);
-
-  useEffect(() => api.watchConnection(setOnline), []);
+  const online = useOnline();
 
   if (online) return null;
   return (
@@ -30,7 +38,8 @@ export function OfflineBanner() {
         accessibilityRole="alert"
         accessibilityLiveRegion="polite"
         style={[styles.pill, { backgroundColor: theme.inverse }]}>
-        <ThemedText type="captionStrong" style={{ color: theme.onInverse }}>
+        {/* Capped, so the pill keeps the height a toast under it makes room for. */}
+        <ThemedText type="captionStrong" maxFontSizeMultiplier={1.3} style={{ color: theme.onInverse }}>
           {t('common.offline')}
         </ThemedText>
       </Animated.View>
@@ -47,6 +56,8 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   pill: {
+    minHeight: 34,
+    justifyContent: 'center',
     paddingVertical: 6,
     paddingHorizontal: Space.md,
     borderRadius: Radius.pill,

@@ -3,6 +3,8 @@ import { router, type Href } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
+import { useSession } from '@/state/session';
+
 /** What the server puts in a push's data, so a tap knows where to go. */
 type PushData =
   | { type: 'room'; roomId: string }
@@ -31,26 +33,37 @@ if (Platform.OS !== 'web') {
   });
 }
 
+/** The last push opened, kept across sign-ins so one tap never opens its screen twice. */
+let handled: string | null = null;
+
 /**
  * Opens the room, match or chat a push is about when you tap it, whether the
- * app was open, in the background or not running at all.
+ * app was open, in the background or not running at all. Only once you're
+ * signed in: before that, the screen it opens couldn't load anything. A tap
+ * that comes in meanwhile waits as the last response and is opened then.
  */
 export function usePushRouting() {
+  const { ready } = useSession();
+
   useEffect(() => {
-    if (Platform.OS === 'web') return;
-    let handled: string | null = null;
+    if (Platform.OS === 'web' || !ready) return;
     function open(response: Notifications.NotificationResponse) {
       const id = response.notification.request.identifier;
+      // Handled now: forget it, so a later launch or sign-in doesn't open it again.
+      try {
+        Notifications.clearLastNotificationResponse();
+      } catch {
+        // Not there on this platform: the id check below still holds.
+      }
       if (id === handled) return;
       handled = id;
       const href = hrefFor(response.notification.request.content.data);
       if (href) router.push(href);
     }
-    // A tap that launched the app.
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) open(response);
-    });
+    // A tap that launched the app, or came in while signing in.
+    const last = Notifications.getLastNotificationResponse();
+    if (last) open(last);
     const subscription = Notifications.addNotificationResponseReceivedListener(open);
     return () => subscription.remove();
-  }, []);
+  }, [ready]);
 }

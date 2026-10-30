@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { api, type Units } from '@/api';
+import { api, convexServer, type Units } from '@/api';
 import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
 import { ErrorIcon, ErrorLine, errorEnter } from '@/components/error-line';
 import { Icon } from '@/components/icon';
@@ -26,6 +26,7 @@ import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Gutter, MaxContentWidth, MinTouch, PhotoGlass, Radius, Velvet } from '@/constants/theme';
 import { asSexuality, type Sexuality } from '@/features/profile/identity';
+import { keepPickedPhoto, livePhoto } from '@/features/profile/photo-files';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
@@ -132,6 +133,58 @@ type SetupDraft = {
   sexuality: Sexuality | null;
 };
 
+function text(value: unknown) {
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * A draft read back from the device, checked field by field: an older app
+ * version (or a broken write) may have left anything there. A missing field
+ * comes back empty, and photos whose file is gone are dropped.
+ */
+function checkedDraft(value: unknown, units: Units): SetupDraft | null {
+  if (!value || typeof value !== 'object') return null;
+  const draft = value as Partial<Record<keyof SetupDraft, unknown>>;
+  const height = (draft.height && typeof draft.height === 'object' ? draft.height : {}) as Partial<
+    Record<keyof HeightEntry, unknown>
+  >;
+  const photos = Array.isArray(draft.photos) ? draft.photos : [];
+  return {
+    photos: photos
+      .map((uri) => (typeof uri === 'string' ? livePhoto(uri) : null))
+      .filter((uri) => uri !== null)
+      .slice(0, PHOTO_COUNT),
+    name: text(draft.name),
+    city: text(draft.city),
+    height: {
+      units: height.units === 'metric' || height.units === 'imperial' ? height.units : units,
+      cm: digitsOnly(text(height.cm)).slice(0, 3),
+      feet: digitsOnly(text(height.feet)).slice(0, 1),
+      inches: digitsOnly(text(height.inches)).slice(0, 2),
+    },
+    job: text(draft.job),
+    bio: text(draft.bio).slice(0, BIO_MAX),
+    genderDetails: text(draft.genderDetails),
+    sexuality: asSexuality(typeof draft.sexuality === 'string' ? draft.sexuality : undefined),
+  };
+}
+
+/**
+ * A failed save in words: the server's own message when it wrote one for you
+ * (like "You need to be 18 or older."), and the generic line for anything else,
+ * like a dropped connection.
+ */
+export function saveFailedMessage(t: Translate, error: unknown) {
+  // Server and mock messages are plain Errors; a TypeError and the like are the app's own faults.
+  if (error instanceof Error && error.name === 'Error' && error.message && error.message !== GENERIC_ERROR) {
+    return error.message;
+  }
+  return t('profile.saveFailed');
+}
+
+/** What the Convex server says when its error wasn't written for you. */
+const GENERIC_ERROR = 'Something went wrong. Try again.';
+
 /**
  * `draftKey`: keep the form on the device as you go and bring it back on the
  * next launch, for profile setup, where nothing is saved to the server yet.
@@ -154,12 +207,15 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
   const [sexuality, setSexuality] = useState<Sexuality | null>(asSexuality(initial?.sexuality));
   // Bring back a draft from an earlier launch, then keep it up to date.
   const draftRestored = useRef(!draftKey);
+  // Set by every change you make. A draft that arrives after you started typing doesn't overwrite it.
+  const touched = useRef(false);
   useEffect(() => {
     if (!draftKey) return;
     let live = true;
-    void readJson<SetupDraft>(draftKey).then((draft) => {
+    void readJson<unknown>(draftKey).then((stored) => {
       if (!live) return;
-      if (draft) {
+      const draft = checkedDraft(stored, units);
+      if (draft && !touched.current) {
         setPhotos(draft.photos);
         setName(draft.name);
         setCity(draft.city);
@@ -174,7 +230,15 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     return () => {
       live = false;
     };
-  }, [draftKey]);
+  }, [draftKey, units]);
+
+  /** A setter that also marks the form as changed by you. */
+  function touching<T>(set: (value: T) => void) {
+    return (value: T) => {
+      touched.current = true;
+      set(value);
+    };
+  }
   useEffect(() => {
     if (!draftKey) return;
     const timer = setTimeout(() => {
@@ -298,10 +362,14 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
         shouldDownloadFromNetwork: true,
       });
       if (result.canceled) return;
-      const picked = result.assets.map((asset) => asset.uri);
+      touched.current = true;
+      // Only as many as there are free slots; the picker's limit isn't kept everywhere.
+      const picked = result.assets.slice(0, PHOTO_COUNT - photos.length);
+      // Copied out of the picker's cache, which the system may clear before the profile is saved.
+      const kept = await Promise.all(picked.map((asset) => keepPickedPhoto(asset.uri)));
       // Start the uploads now, so saving the profile has little left to wait for.
-      picked.forEach((uri) => api.preparePhoto(uri));
-      setPhotos((current) => [...current, ...picked].slice(0, PHOTO_COUNT));
+      kept.forEach((uri) => api.preparePhoto(uri));
+      setPhotos((current) => [...current, ...kept].slice(0, PHOTO_COUNT));
     } catch {
       const message = t('profile.photosFailed');
       setPhotoError(message);
@@ -312,38 +380,43 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
   }
 
   function removePhoto(index: number) {
+    touched.current = true;
     setPhotoError(null);
-    setPhotos((current) => current.filter((_, i) => i !== index));
+    const next = photos.filter((_, i) => i !== index);
+    setPhotos(next);
+    // Its early upload is no longer needed.
+    convexServer?.forgetPhotos(next);
   }
 
-  function changeHeight(part: 'cm' | 'feet' | 'inches', text: string) {
-    setTypedHeight({ ...height, [part]: digitsOnly(text) });
+  function changeHeight(part: 'cm' | 'feet' | 'inches', value: string) {
+    touched.current = true;
+    setTypedHeight({ ...height, [part]: digitsOnly(value) });
   }
 
   return {
     photos,
-    setPhotos,
+    setPhotos: touching(setPhotos),
     addPhotos,
     picking,
     photoError,
     removePhoto,
     name,
-    setName,
+    setName: touching(setName),
     city,
-    setCity,
+    setCity: touching(setCity),
     height,
     changeHeight,
     blurHeight: () => setHeightBlurred(true),
     showHeightError,
     heightError: heightRangeMessage(t, height.units),
     job,
-    setJob,
+    setJob: touching(setJob),
     bio,
-    setBio,
+    setBio: touching(setBio),
     genderDetails,
-    setGenderDetails,
+    setGenderDetails: touching(setGenderDetails),
     sexuality,
-    setSexuality,
+    setSexuality: touching(setSexuality),
     complete,
     details,
     changed,

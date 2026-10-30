@@ -1,12 +1,14 @@
 import { Image } from 'expo-image';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
+import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Motion, PhotoGlass, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 const MOCK_PREFIX = 'mock://';
 
@@ -46,6 +48,9 @@ export function Photo({
   hairline = true,
 }: PhotoProps) {
   const theme = useTheme();
+  const t = useT();
+  // The photo that failed to load, so a new URI gets its own try.
+  const [failedUri, setFailedUri] = useState<string | null>(null);
   // The hairline edge follows whatever corner the caller gives the frame.
   const radius = StyleSheet.flatten(style)?.borderRadius ?? Radius.md;
   const edge = hairline ? (
@@ -70,6 +75,25 @@ export function Photo({
       </View>
     );
   }
+  if (failedUri === uri) {
+    // A file that's gone or a link that broke: say so, rather than show an empty frame.
+    return (
+      <View
+        {...a11y}
+        style={[styles.frame, styles.placeholder, styles.failed, { backgroundColor: theme.surface }, style]}>
+        <Icon name="photo" size={22} color={theme.textTertiary} />
+        <ThemedText
+          type="caption"
+          themeColor="textTertiary"
+          maxFontSizeMultiplier={1.2}
+          numberOfLines={2}
+          style={styles.failedText}>
+          {t('common.photoUnavailable')}
+        </ThemedText>
+        {edge}
+      </View>
+    );
+  }
   return (
     <View {...a11y} style={[styles.frame, style]}>
       <Image
@@ -77,6 +101,7 @@ export function Photo({
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         transition={Motion.state}
+        onError={() => setFailedUri(uri)}
       />
       {edge}
     </View>
@@ -112,6 +137,13 @@ const styles = StyleSheet.create({
   placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  failed: {
+    gap: Space.xxs,
+    padding: Space.xs,
+  },
+  failedText: {
+    textAlign: 'center',
   },
   initial: {
     fontFamily: Fonts.serif,

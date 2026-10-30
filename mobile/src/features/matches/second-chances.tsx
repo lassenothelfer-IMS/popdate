@@ -1,13 +1,14 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { api, type SecondChance } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
+import { useTabFocus } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Radius, Space } from '@/constants/theme';
-import { acknowledge } from '@/features/chat/prompts';
+import { acknowledge, confirmStep } from '@/features/chat/prompts';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
@@ -16,8 +17,9 @@ import { haptics } from '@/utils/haptics';
  * "Almost": the runner-ups from rooms you chose in, whom you can give a second
  * chance, the ones you sent, and choosers who came back for you. Accepting one
  * makes a match and opens the chat. Renders nothing when there are none.
+ * Reloads on every visit, and whenever `refreshes` changes (a pull to refresh).
  */
-export function SecondChances({ onMatched }: { onMatched?: () => void }) {
+export function SecondChances({ onMatched, refreshes = 0 }: { onMatched?: () => void; refreshes?: number }) {
   const t = useT();
   const theme = useTheme();
   const seats = useSeats();
@@ -26,6 +28,8 @@ export function SecondChances({ onMatched }: { onMatched?: () => void }) {
 
   const load = useCallback(() => {
     let active = true;
+    // Read so a pull to refresh, which bumps it, runs this again.
+    void refreshes;
     api
       .listSecondChances()
       .then((list) => {
@@ -35,8 +39,8 @@ export function SecondChances({ onMatched }: { onMatched?: () => void }) {
     return () => {
       active = false;
     };
-  }, []);
-  useFocusEffect(load);
+  }, [refreshes]);
+  useTabFocus(load);
 
   async function send(chance: SecondChance) {
     setBusy(chance.id);
@@ -68,6 +72,19 @@ export function SecondChances({ onMatched }: { onMatched?: () => void }) {
     } finally {
       setBusy(null);
     }
+  }
+
+  /** No thanks takes the row away for good, so it asks first. */
+  async function decline(chance: SecondChance) {
+    const sure = await confirmStep({
+      title: t('almost.declineTitle', { name: chance.person.name }),
+      message: t('almost.declineBody'),
+      confirmLabel: t('almost.decline'),
+      cancelLabel: t('common.cancel'),
+    });
+    if (!sure) return;
+    haptics.light();
+    await answer(chance, false);
   }
 
   if (chances.length === 0) return null;
@@ -118,7 +135,7 @@ export function SecondChances({ onMatched }: { onMatched?: () => void }) {
                     title={t('almost.decline')}
                     variant="plain"
                     disabled={busy !== null}
-                    onPress={() => void answer(chance, false)}
+                    onPress={() => void decline(chance)}
                   />
                 </View>
                 <View style={styles.action}>

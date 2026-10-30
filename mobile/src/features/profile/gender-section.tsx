@@ -1,6 +1,6 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import type { Gender } from '@/api';
+import type { Gender, Interest } from '@/api';
 import { Chip } from '@/components/chip';
 import { OptionRow } from '@/components/option-row';
 import { Section } from '@/components/section';
@@ -94,6 +94,29 @@ export function IdentityPicker({ value, onChange, label }: IdentityPickerProps) 
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+type MeetPickerProps = {
+  value: Interest | null;
+  onChange: (next: Interest) => void;
+  /** Names the radio group for VoiceOver, like the step's title. */
+  label: string;
+};
+
+/** Women, men or everyone: who you want to meet, which decides the rooms you walk into. */
+export function MeetPicker({ value, onChange, label }: MeetPickerProps) {
+  const t = useT();
+  return (
+    <View style={styles.rows} accessibilityRole="radiogroup" accessibilityLabel={label}>
+      <OptionRow label={t('onboarding.women')} selected={value === 'woman'} onPress={() => onChange('woman')} />
+      <OptionRow label={t('onboarding.men')} selected={value === 'man'} onPress={() => onChange('man')} />
+      <OptionRow
+        label={t('onboarding.everyone')}
+        selected={value === 'everyone'}
+        onPress={() => onChange('everyone')}
+      />
     </View>
   );
 }

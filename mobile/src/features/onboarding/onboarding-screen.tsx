@@ -1,4 +1,4 @@
-import { router, type Href } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -16,7 +16,7 @@ import Animated from 'react-native-reanimated';
 import type { Interest } from '@/api';
 import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
-import { CheckMark, OptionRow } from '@/components/option-row';
+import { CheckMark } from '@/components/option-row';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { ProgressSegments } from '@/components/progress-segments';
 import { Rise } from '@/components/rise';
@@ -29,12 +29,17 @@ import { Colors, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/them
 import { INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
-import { IdentityPicker, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
+import {
+  IdentityPicker,
+  MeetPicker,
+  resolvedSide,
+  type IdentityChoice,
+} from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
 import { ForcedScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
-import { ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
+import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
 
 /**
@@ -96,12 +101,14 @@ function checkBirthday({ day, month, year }: BirthEntry):
   const birthDate = parseBirthDate(day, month, year);
   if (!birthDate) return { error: 'onboarding.birthdayInvalid' };
   const age = ageFromBirthDate(birthDate);
+  // Older than anyone alive is a typo in the year, not a birthday.
+  if (age > MAX_AGE) return { error: 'onboarding.birthdayInvalid' };
   if (age < 18) return { error: 'onboarding.birthdayTooYoung' };
   return { birthDate, age };
 }
 
 export function OnboardingScreen() {
-  const { setOnboarding, saveProfile } = useSession();
+  const { failed, setOnboarding, saveProfile } = useSession();
   const theme = useTheme();
   const t = useT();
   const [step, setStep] = useState<Step>('welcome');
@@ -199,6 +206,9 @@ export function OnboardingScreen() {
     setTermsAccepted((accepted) => !accepted);
   }
 
+  // Signing in again after signing out failed: the start screen offers to try again.
+  if (failed) return <Redirect href="/" />;
+
   if (step === 'welcome') {
     // Always the dark treatment: light text over the video, whatever the Appearance setting.
     return (
@@ -206,6 +216,8 @@ export function OnboardingScreen() {
       <StatusBar style="light" />
       <Screen
         key="welcome"
+        // Scrolls at large text sizes, so the copy never runs under the buttons.
+        scroll
         footerStyle="plain"
         contentStyle={styles.welcomeContent}
         background={<VideoBackground video={WELCOME_VIDEO} poster={WELCOME_POSTER} tint={Colors.dark.page} />}
@@ -349,25 +361,7 @@ export function OnboardingScreen() {
 
         {question === 'gender' ? <IdentityPicker value={identity} onChange={setIdentity} label={title} /> : null}
 
-        {question === 'meet' ? (
-          <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel={title}>
-            <OptionRow
-              label={t('onboarding.women')}
-              selected={wantsToMeet === 'woman'}
-              onPress={() => setWantsToMeet('woman')}
-            />
-            <OptionRow
-              label={t('onboarding.men')}
-              selected={wantsToMeet === 'man'}
-              onPress={() => setWantsToMeet('man')}
-            />
-            <OptionRow
-              label={t('onboarding.everyone')}
-              selected={wantsToMeet === 'everyone'}
-              onPress={() => setWantsToMeet('everyone')}
-            />
-          </View>
-        ) : null}
+        {question === 'meet' ? <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={title} /> : null}
 
         {question === 'rules' ? (
           <View style={styles.rulesAnswer}>
@@ -511,6 +505,9 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
   function change(index: number, text: string) {
     const next = { ...birth };
     let rest = digitsOnly(text);
+    // More than one digit at once is a paste or AutoFill: it may fill the fields after this one.
+    // One digit typed into a full field never overwrites the next field's answer.
+    const pasted = rest.length - birth[parts[index].key].length > 1;
     let landed = index;
     for (let i = index; i < parts.length; i++) {
       const { key, max } = parts[i];
@@ -524,6 +521,7 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
       next[key] = value;
       landed = i;
       if (!rest) break;
+      if (!pasted && i + 1 < parts.length && next[parts[i + 1].key] !== '') break;
     }
     onChange(next);
     const { key, max } = parts[landed];
@@ -657,9 +655,6 @@ const styles = StyleSheet.create({
   },
   answer: {
     marginTop: Space.lg,
-  },
-  options: {
-    gap: 10,
   },
   birthday: {
     gap: Space.lg,

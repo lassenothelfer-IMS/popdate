@@ -20,6 +20,9 @@ export const common: Strings = {
     nameAge: '%{name}, %{age}',
     loading: 'Loading…',
     offline: "You're offline. Reconnecting…",
+    signInFailedTitle: "Couldn't connect",
+    signInFailedBody: 'Popdate could not reach the server. Check your connection and try again.',
+    photoUnavailable: "Can't load photo",
   },
   de: {
     back: 'Zurück',
@@ -39,6 +42,9 @@ export const common: Strings = {
     nameAge: '%{name}, %{age}',
     loading: 'Lädt …',
     offline: 'Du bist offline. Verbinde neu…',
+    signInFailedTitle: 'Keine Verbindung',
+    signInFailedBody: 'Popdate erreicht den Server nicht. Prüf deine Verbindung und versuch es nochmals.',
+    photoUnavailable: 'Foto lässt sich nicht laden',
   },
   fr: {
     back: 'Retour',
@@ -58,6 +64,9 @@ export const common: Strings = {
     nameAge: '%{name}, %{age}',
     loading: 'Chargement…',
     offline: 'Tu es hors ligne. Reconnexion…',
+    signInFailedTitle: 'Connexion impossible',
+    signInFailedBody: 'Popdate n’arrive pas à joindre le serveur. Vérifie ta connexion et réessaie.',
+    photoUnavailable: 'Photo impossible à charger',
   },
   it: {
     back: 'Indietro',
@@ -77,5 +86,8 @@ export const common: Strings = {
     nameAge: '%{name}, %{age}',
     loading: 'Caricamento…',
     offline: 'Sei offline. Riconnessione…',
+    signInFailedTitle: 'Connessione non riuscita',
+    signInFailedBody: 'Popdate non riesce a raggiungere il server. Controlla la connessione e riprova.',
+    photoUnavailable: 'Impossibile caricare la foto',
   },
 };

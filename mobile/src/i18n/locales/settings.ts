@@ -13,7 +13,7 @@ export const settings: Strings = {
 
     account: 'Account',
     editProfile: 'Edit profile',
-    editLocked: "Name and birthday can't be changed. Ask us if something is wrong.",
+    editLocked: "Your birthday can't be changed. Write to us if it's wrong.",
     verification: 'Selfie verification',
     statusNone: 'Not verified',
     statusPending: 'In review',
@@ -146,7 +146,7 @@ export const settings: Strings = {
 
     account: 'Konto',
     editProfile: 'Profil bearbeiten',
-    editLocked: 'Name und Geburtstag lassen sich nicht ändern. Schreib uns, wenn etwas nicht stimmt.',
+    editLocked: 'Deinen Geburtstag kannst du nicht ändern. Schreib uns, wenn er nicht stimmt.',
     verification: 'Selfie-Verifizierung',
     statusNone: 'Nicht verifiziert',
     statusPending: 'In Prüfung',
@@ -284,7 +284,7 @@ export const settings: Strings = {
 
     account: 'Compte',
     editProfile: 'Modifier le profil',
-    editLocked: "Le prénom et la date de naissance ne peuvent pas être modifiés. Écris-nous si quelque chose ne va pas.",
+    editLocked: "Ta date de naissance ne peut pas être modifiée. Écris-nous si elle est fausse.",
     verification: 'Vérification par selfie',
     statusNone: 'Non vérifié',
     statusPending: 'En vérification',
@@ -423,7 +423,7 @@ export const settings: Strings = {
 
     account: 'Account',
     editProfile: 'Modifica profilo',
-    editLocked: 'Nome e data di nascita non si possono cambiare. Scrivici se qualcosa non va.',
+    editLocked: 'La tua data di nascita non si può cambiare. Scrivici se è sbagliata.',
     verification: 'Verifica con selfie',
     statusNone: 'Non verificato',
     statusPending: 'In revisione',

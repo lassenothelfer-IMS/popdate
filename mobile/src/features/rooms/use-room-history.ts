@@ -1,29 +1,37 @@
-import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { api, type RoomSummary } from '@/api';
+import { useTabFocus } from '@/components/tab-bar';
 
-/** The rooms you played, loaded on every visit. Null until the first load. */
+/**
+ * The rooms you played, loaded on every visit (and each time you page to a tab
+ * that shows them). Null until the first load. `reload` resolves once it's in.
+ */
 export function useRoomHistory() {
   const [history, setHistory] = useState<RoomSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const load = useCallback(() => {
-    let active = true;
+  const request = useCallback((isCurrent: () => boolean = () => true) => {
     setFailed(false);
-    api
-      .listRoomHistory()
-      .then((list) => {
-        if (active) setHistory(list);
-      })
-      .catch(() => {
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-    };
+    return api.listRoomHistory().then(
+      (list) => {
+        if (isCurrent()) setHistory(list);
+      },
+      () => {
+        if (isCurrent()) setFailed(true);
+      },
+    );
   }, []);
-  useFocusEffect(load);
-  return { history, failed, reload: load };
+  useTabFocus(
+    useCallback(() => {
+      let active = true;
+      void request(() => active);
+      return () => {
+        active = false;
+      };
+    }, [request]),
+  );
+  const reload = useCallback(() => request(), [request]);
+  return { history, failed, reload };
 }
 
 export type RoomStats = {

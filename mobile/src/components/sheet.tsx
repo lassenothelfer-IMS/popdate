@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 /** The dim fades in under the sheet. Opacity only, so it stays under Reduce Motion. */
 const dimIn = FadeIn.duration(Motion.state).reduceMotion(ReduceMotion.Never);
@@ -26,11 +27,12 @@ type SheetProps = {
  */
 export function Sheet({ visible, onClose, title, children }: SheetProps) {
   const theme = useTheme();
+  const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <Animated.View entering={dimIn} style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
       {/* Rides up with the keyboard, so a field in the sheet stays in view. */}
       <KeyboardAvoidingView

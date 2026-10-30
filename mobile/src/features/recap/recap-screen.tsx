@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -93,6 +93,8 @@ function Recap({ room }: { room: Room }) {
   const { profile } = useSession();
   const reduced = useReduceMotion();
   const { history } = useRoomHistory();
+  // Read once, so rendering stays pure.
+  const [today] = useState(() => Date.now());
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.min(CARD.width, windowWidth - 2 * Space.lg);
   const seatWidth = (width - 2 * CARD.padding) / Math.max(room.contestants.length, 1);
@@ -144,11 +146,14 @@ function Recap({ room }: { room: Room }) {
     };
   }).filter((round) => round.question || round.popped.length > 0);
 
+  // The day the room ended, from your history; today until the history has it.
+  const endedAt = summary ? Date.parse(summary.endedAt) : NaN;
+  const day = new Date(Number.isNaN(endedAt) ? today : endedAt);
   let dateLine = '';
   try {
-    dateLine = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
+    dateLine = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(day);
   } catch {
-    dateLine = new Date().toDateString();
+    dateLine = day.toDateString();
   }
   if (profile?.city) dateLine = `${profile.city}, ${dateLine}`;
 

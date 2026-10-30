@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 
-import { TAB_ROUTES, TabBar, TABS, type Tab } from '@/components/tab-bar';
+import { TAB_ROUTES, TabBar, TabPageContext, TABS, type Tab } from '@/components/tab-bar';
 import { HomeScreen } from '@/features/home/home-screen';
 import { ProfileViewScreen } from '@/features/home/profile-view-screen';
 import { MatchesScreen } from '@/features/matches/matches-screen';
@@ -24,7 +24,9 @@ function tabOf(pathname: string): number {
  * Play, Rooms, Matches and You side by side: swipe and the next page follows the
  * finger, or tap the floating tab bar. The URL follows the page, so links to
  * /home, /rooms, /matches or /you land on the right one. All four stay mounted,
- * so a page keeps its scroll and state while you're on another.
+ * so a page keeps its scroll and state while you're on another. Each page knows
+ * whether it's the one showing (TabPageContext): it reloads when you page to it
+ * and holds its loops and polls still while it's off screen.
  */
 export default function TabsLayout() {
   const t = useT();
@@ -59,16 +61,24 @@ export default function TabsLayout() {
           if (index !== tabOf(pathname)) router.navigate(ROUTES[ORDER[index]]);
         }}>
         <View key="home" style={styles.fill}>
-          <HomeScreen />
+          <TabPageContext value={page === 0}>
+            <HomeScreen />
+          </TabPageContext>
         </View>
         <View key="rooms" style={styles.fill}>
-          <RoomsScreen />
+          <TabPageContext value={page === 1}>
+            <RoomsScreen />
+          </TabPageContext>
         </View>
         <View key="matches" style={styles.fill}>
-          <MatchesScreen />
+          <TabPageContext value={page === 2}>
+            <MatchesScreen />
+          </TabPageContext>
         </View>
         <View key="you" style={styles.fill}>
-          <ProfileViewScreen asTab />
+          <TabPageContext value={page === 3}>
+            <ProfileViewScreen asTab />
+          </TabPageContext>
         </View>
       </PagerView>
       <TabBar
@@ -81,6 +91,7 @@ export default function TabsLayout() {
         }}
         onSelect={select}
         dots={{ matches: yourTurn > 0 }}
+        dotLabels={{ matches: t('home.tabMatchesYourTurn') }}
       />
       {/* The routes themselves render nothing; the pages above are the screens. */}
       <View style={styles.hidden}>

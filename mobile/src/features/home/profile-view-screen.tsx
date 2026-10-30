@@ -1,18 +1,19 @@
-import { Redirect, router, useFocusEffect, type Href } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-bar';
 import { Button } from '@/components/button';
 import { api, type VerificationStatus } from '@/api';
 import { Icon } from '@/components/icon';
@@ -32,7 +33,7 @@ import { useSettings } from '@/state/settings';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { formatHeight } from '@/utils/units';
 
-/** The hero photo's height on a 844 pt phone. */
+/** The hero photo's height on a 844 pt phone. It grows when the name and lines under it need more. */
 const HERO = 460;
 
 /**
@@ -48,23 +49,36 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const t = useT();
   const insets = useSafeAreaInsets();
   const [verification, setVerification] = useState<VerificationStatus | null>(null);
-  const { history } = useRoomHistory();
+  const [refreshing, setRefreshing] = useState(false);
+  const { history, reload: reloadHistory } = useRoomHistory();
   const stats = history ? roomStats(history) : null;
 
-  useFocusEffect(
+  const loadVerification = useCallback(
+    (isCurrent: () => boolean = () => true) =>
+      api.getVerification().then(
+        (status) => {
+          if (isCurrent()) setVerification(status);
+        },
+        () => {},
+      ),
+    [],
+  );
+
+  useTabFocus(
     useCallback(() => {
       let active = true;
-      api
-        .getVerification()
-        .then((status) => {
-          if (active) setVerification(status);
-        })
-        .catch(() => {});
+      void loadVerification(() => active);
       return () => {
         active = false;
       };
-    }, []),
+    }, [loadVerification]),
   );
+
+  function refresh() {
+    setRefreshing(true);
+    const done = () => setRefreshing(false);
+    Promise.all([loadVerification(), reloadHistory()]).then(done, done);
+  }
 
   if (!profile) return <Redirect href="/" />;
 
@@ -86,8 +100,22 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   return (
     <View style={[styles.flex, { backgroundColor: theme.page }]}>
       <Animated.ScrollView
-        contentContainerStyle={{ paddingBottom: asTab ? TAB_BAR_CLEARANCE : insets.bottom + Space.xl }}>
-        <View style={styles.hero}>
+        contentContainerStyle={{ paddingBottom: asTab ? TAB_BAR_CLEARANCE : insets.bottom + Space.xl }}
+        // The web has no pull gesture to answer.
+        refreshControl={
+          Platform.OS !== 'web' ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refresh}
+              tintColor={theme.accent}
+              colors={[theme.accent]}
+              progressBackgroundColor={theme.sheet}
+            />
+          ) : undefined
+        }>
+        {/* The name and its lines sit in the flow under the buttons, so a long city or
+            a large text size grows the hero instead of climbing over the photo dots. */}
+        <View style={[styles.hero, { paddingTop: insets.top + Space.xs + MinTouch + Space.lg }]}>
           <HeroPhoto uri={profile.photos[0] ?? 'mock://'} name={profile.name} />
           <HeroScrim />
           <View style={[styles.heroTop, { top: insets.top + Space.xs }]}>
@@ -106,12 +134,12 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               </ThemedText>
             </GlassButton>
           </View>
-          <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            {profile.photos.map((uri, index) => (
-              <View key={`${uri}-${index}`} style={[styles.dot, index === 0 ? styles.dotActive : styles.dotRest]} />
-            ))}
-          </View>
           <View style={styles.heroText}>
+            <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+              {profile.photos.map((uri, index) => (
+                <View key={`${uri}-${index}`} style={[styles.dot, index === 0 ? styles.dotActive : styles.dotRest]} />
+              ))}
+            </View>
             <View
               style={styles.nameRow}
               accessible
@@ -226,15 +254,20 @@ function Stat({ value, label }: { value: number; label: string }) {
   );
 }
 
+/** One drift in or out. */
+const DRIFT_MS = 14000;
+
 /**
  * Photo 1, slowly drifting in (Ken Burns, 1 to 1.08 over 14 s). A placeholder is
- * your tint tile with two soft circles of your balloon color.
+ * your tint tile with two soft circles of your balloon color. Holds still under
+ * Reduce Motion, and while the You page is off screen.
  */
 function HeroPhoto({ uri, name }: { uri: string; name: string }) {
   const seats = useSeats();
   const you = youSeat(seats);
   const { width } = useWindowDimensions();
   const reduced = useReduceMotion();
+  const showing = useTabActive();
   const drift = useSharedValue(0);
   useEffect(() => {
     if (reduced) {
@@ -242,8 +275,20 @@ function HeroPhoto({ uri, name }: { uri: string; name: string }) {
       drift.set(0);
       return;
     }
-    drift.set(withRepeat(withTiming(1, { duration: 14000, easing: Easing.inOut(Easing.ease) }), -1, true));
-  }, [reduced, drift]);
+    if (!showing) {
+      cancelAnimation(drift);
+      return;
+    }
+    // Drifts on from wherever it paused, so the photo doesn't jump when you page back.
+    const easing = Easing.inOut(Easing.ease);
+    const from = drift.get();
+    drift.set(
+      withSequence(
+        withTiming(1, { duration: DRIFT_MS * (1 - from), easing }),
+        withRepeat(withTiming(0, { duration: DRIFT_MS, easing }), -1, true),
+      ),
+    );
+  }, [reduced, showing, drift]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.08 * drift.get() }] }));
 
   if (!uri.startsWith('mock://')) {
@@ -256,7 +301,7 @@ function HeroPhoto({ uri, name }: { uri: string; name: string }) {
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: you.tint }]}>
       <Animated.View style={[StyleSheet.absoluteFill, style]}>
-        <Svg width={width} height={HERO}>
+        <Svg width={width} height="100%">
           <Defs>
             <RadialGradient id="heroBlobA" cx="50%" cy="50%" r="50%">
               <Stop offset="0" stopColor={you.hi} stopOpacity={0.7} />
@@ -279,9 +324,9 @@ function HeroPhoto({ uri, name }: { uri: string; name: string }) {
 function HeroScrim() {
   const theme = useTheme();
   const ink = useScheme() === 'dark' ? theme.page : theme.text;
-  const { width } = useWindowDimensions();
+  // Fills the hero at whatever height it grew to.
   return (
-    <Svg width={width} height={HERO} style={StyleSheet.absoluteFill} pointerEvents="none">
+    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
       <Defs>
         <LinearGradient id="heroScrim" x1="0" y1="1" x2="0" y2="0">
           <Stop offset="0" stopColor={theme.page} stopOpacity={1} />
@@ -289,7 +334,7 @@ function HeroScrim() {
           <Stop offset="0.6" stopColor={ink} stopOpacity={0} />
         </LinearGradient>
       </Defs>
-      <Rect width={width} height={HERO} fill="url(#heroScrim)" />
+      <Rect width="100%" height="100%" fill="url(#heroScrim)" />
     </Svg>
   );
 }
@@ -352,7 +397,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   hero: {
-    height: HERO,
+    minHeight: HERO,
+    justifyContent: 'flex-end',
+    paddingHorizontal: Gutter,
+    paddingBottom: 24,
     overflow: 'hidden',
   },
   heroTop: {
@@ -364,11 +412,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   dots: {
-    position: 'absolute',
-    left: Gutter,
-    bottom: 110,
     flexDirection: 'row',
     gap: 5,
+    marginBottom: Space.md,
   },
   dot: {
     height: 3,
@@ -383,10 +429,6 @@ const styles = StyleSheet.create({
     backgroundColor: PhotoGlass.dot,
   },
   heroText: {
-    position: 'absolute',
-    left: Gutter,
-    right: Gutter,
-    bottom: 24,
     gap: 6,
   },
   nameRow: {

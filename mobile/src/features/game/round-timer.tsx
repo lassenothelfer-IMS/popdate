@@ -53,8 +53,8 @@ export function RoundTimer({ deadline, popReminder, warn = false }: RoundTimerPr
     }
   }, [warn, secondsLeft, deadline]);
 
-  // Over the pop time with no countdown left to show: the quiet pill.
-  if (popReminder && secondsLeft === null) {
+  // Over the pop time: the quiet pill. Its deadline is the random pop, which isn't shown.
+  if (popReminder) {
     const waiting = t('game.everyoneWaiting');
     return (
       <Animated.View

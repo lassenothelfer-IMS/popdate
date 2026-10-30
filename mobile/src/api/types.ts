@@ -222,7 +222,11 @@ export interface PopdateApi {
   preparePhoto(uri: string): void;
 
   joinQueue(): Promise<void>;
-  leaveQueue(): Promise<void>;
+  /**
+   * Leave the line. When a room already formed with you in it, you stay seated
+   * and get its id back, so the app can take you there; otherwise null.
+   */
+  leaveQueue(): Promise<string | null>;
   watchQueue(onChange: (status: QueueStatus) => void): Unsubscribe;
 
   watchRoom(roomId: string, onChange: (room: Room | null) => void): Unsubscribe;
@@ -270,6 +274,7 @@ export interface PopdateApi {
   report(userId: string, reason: ReportReason, details?: string): Promise<void>;
 
   listMessages(matchId: string): Promise<Message[]>;
-  watchMessages(matchId: string, onChange: (messages: Message[]) => void): Unsubscribe;
+  /** `onError` runs when the chat can't be read, so it isn't mistaken for an empty one. */
+  watchMessages(matchId: string, onChange: (messages: Message[]) => void, onError?: () => void): Unsubscribe;
   sendMessage(matchId: string, text: string): Promise<Message>;
 }

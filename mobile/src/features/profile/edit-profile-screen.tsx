@@ -2,16 +2,28 @@ import { Redirect, router, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
+import type { Interest } from '@/api';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Rise } from '@/components/rise';
+import { Section } from '@/components/section';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
 import { MinTouch, Space } from '@/constants/theme';
-import { GenderSection, resolvedSide, type IdentityChoice } from '@/features/profile/gender-section';
+import {
+  GenderSection,
+  MeetPicker,
+  resolvedSide,
+  type IdentityChoice,
+} from '@/features/profile/gender-section';
 import { identityOf } from '@/features/profile/identity';
-import { DetailsSection, PhotoSection, useProfileForm } from '@/features/profile/profile-form';
+import {
+  DetailsSection,
+  PhotoSection,
+  saveFailedMessage,
+  useProfileForm,
+} from '@/features/profile/profile-form';
 import { confirmStep } from '@/features/chat/prompts';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
@@ -51,6 +63,7 @@ export function EditProfileScreen() {
     identity: profile ? identityOf(profile) : null,
     side: profile?.gender ?? null,
   }));
+  const [wantsToMeet, setWantsToMeet] = useState<Interest | null>(profile?.wantsToMeet ?? null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,8 +74,11 @@ export function EditProfileScreen() {
     profile !== null &&
     (form.changed ||
       identity.identity !== identityOf(profile) ||
-      resolvedSide(identity) !== profile.gender);
-  usePreventRemove(dirty && !saving && !saved, ({ data }) => {
+      resolvedSide(identity) !== profile.gender ||
+      wantsToMeet !== profile.wantsToMeet);
+  // While saving, the sheet stays until the save is through, so a failure is never shown to nobody.
+  usePreventRemove((dirty && !saved) || saving, ({ data }) => {
+    if (saving) return;
     void confirmStep({
       title: t('profile.discardTitle'),
       message: t('profile.discardMessage'),
@@ -85,12 +101,13 @@ export function EditProfileScreen() {
   const { details } = form;
   const side = resolvedSide(identity);
   const identityChanged = identity.identity !== identityOf(profile) || side !== profile.gender;
-  const changed = form.changed || identityChanged;
-  const canSave = details !== null && side !== null && changed && !saving && !saved;
+  const changed = form.changed || identityChanged || wantsToMeet !== profile.wantsToMeet;
+  const canSave =
+    details !== null && side !== null && wantsToMeet !== null && changed && !saving && !saved;
   const missing = !details ? form.missing('save') : side === null ? t('profile.pickSide') : null;
 
   async function handleSave() {
-    if (!profile || !details || !side) return;
+    if (!profile || !details || !side || !wantsToMeet) return;
     setSaving(true);
     setError(null);
     try {
@@ -98,7 +115,7 @@ export function EditProfileScreen() {
       await saveProfile(details, {
         birthDate: profile.birthDate,
         gender: side,
-        wantsToMeet: profile.wantsToMeet,
+        wantsToMeet,
         genderIdentity: identity.identity ?? undefined,
         termsAcceptedAt: profile.termsAcceptedAt,
       });
@@ -106,8 +123,8 @@ export function EditProfileScreen() {
       setSaved(true);
       haptics.success();
       show(t('common.saved'));
-    } catch {
-      const message = t('profile.saveFailed');
+    } catch (failure) {
+      const message = saveFailedMessage(t, failure);
       setError(message);
       AccessibilityInfo.announceForAccessibility(message);
       setSaving(false);
@@ -118,7 +135,13 @@ export function EditProfileScreen() {
     <View style={styles.flex}>
       <Screen scroll>
         <Rise index={0} style={styles.bar}>
-          <Button title={t('common.cancel')} variant="plain" fullWidth={false} onPress={goBack} />
+          <Button
+            title={t('common.cancel')}
+            variant="plain"
+            fullWidth={false}
+            disabled={saving}
+            onPress={goBack}
+          />
           <ThemedText type="headline" accessibilityRole="header">
             {t('settings.editProfile')}
           </ThemedText>
@@ -153,8 +176,14 @@ export function EditProfileScreen() {
             identity={{ value: identity, onChange: setIdentity }}
             style={styles.aboutSection}
           />
+          <Section title={t('onboarding.titleMeet')} style={[styles.meetSection, styles.aboutSection]}>
+            <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={t('onboarding.titleMeet')} />
+            <ThemedText type="footnote" themeColor="textTertiary">
+              {t('onboarding.subtitleMeet')}
+            </ThemedText>
+          </Section>
           <ThemedText type="caption" themeColor="textTertiary" style={styles.locked}>
-            {t('settings.editLocked')}
+            {t('profile.birthdayLocked')}
           </ThemedText>
         </Rise>
       </Screen>
@@ -181,6 +210,9 @@ const styles = StyleSheet.create({
   },
   aboutSection: {
     marginTop: Space.lg,
+  },
+  meetSection: {
+    gap: 16,
   },
   locked: {
     marginTop: 14,

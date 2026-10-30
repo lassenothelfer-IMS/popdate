@@ -1,8 +1,9 @@
-import { createContext, use, useEffect, useId, useRef, type ReactNode } from 'react';
+import { createContext, use, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -21,11 +22,13 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { useTabActive } from '@/components/tab-bar';
 import { CanvasGlow, Gutter, Lamp, MaxContentWidth, Space } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useScheme, useTheme } from '@/hooks/use-theme';
@@ -67,22 +70,38 @@ export function Grain() {
   );
 }
 
+/** One breath in or out. */
+const BREATH_MS = 3500;
+
 /**
  * The lamp: a warm ellipse over the canvas that breathes, opacity .55 to 1 and
- * scale 1 to 1.06 over 7 s, forever. Holds still under Reduce Motion.
+ * scale 1 to 1.06 over 7 s, forever. Holds still under Reduce Motion, and pauses
+ * on a tab page that's off screen.
  */
 function BreathingLamp({ width, height, gradient }: { width: number; height: number; gradient: string }) {
   const reduced = useReduceMotion();
-  const breath = useSharedValue(1);
+  const showing = useTabActive();
+  const breath = useSharedValue(0);
   useEffect(() => {
     if (reduced) {
       cancelAnimation(breath);
       breath.set(1);
       return;
     }
-    breath.set(0);
-    breath.set(withRepeat(withTiming(1, { duration: 3500, easing: Easing.inOut(Easing.ease) }), -1, true));
-  }, [reduced, breath]);
+    if (!showing) {
+      cancelAnimation(breath);
+      return;
+    }
+    // Breathes in from wherever it paused, so a page you swipe back to doesn't jump.
+    const easing = Easing.inOut(Easing.ease);
+    const from = breath.get();
+    breath.set(
+      withSequence(
+        withTiming(1, { duration: BREATH_MS * (1 - from), easing }),
+        withRepeat(withTiming(0, { duration: BREATH_MS, easing }), -1, true),
+      ),
+    );
+  }, [reduced, showing, breath]);
   const style = useAnimatedStyle(() => ({
     opacity: 0.55 + 0.45 * breath.get(),
     transform: [{ scale: 1 + 0.06 * breath.get() }],
@@ -195,6 +214,8 @@ type ScreenProps = {
   contentStyle?: StyleProp<ViewStyle>;
   /** Drawn full bleed behind the content, like the welcome screen's video. */
   background?: ReactNode;
+  /** Pull to refresh, for a scrolling screen: the spinner shows until the promise settles. */
+  onRefresh?: () => Promise<unknown>;
 };
 
 export function Screen({
@@ -204,12 +225,21 @@ export function Screen({
   scroll = false,
   contentStyle,
   background,
+  onRefresh,
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { viewportRef, scrollRef, onScroll, reveal } = useFieldReveal(scroll);
+  const [refreshing, setRefreshing] = useState(false);
   // The bottom inset belongs to whatever sits lowest: the footer, or the content.
   const bottom = Math.max(insets.bottom, Space.md);
+
+  function refresh() {
+    if (!onRefresh) return;
+    setRefreshing(true);
+    const done = () => setRefreshing(false);
+    onRefresh().then(done, done);
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.page }]}>
@@ -236,6 +266,18 @@ export function Screen({
                     contentStyle,
                   ]}
                   keyboardShouldPersistTaps="handled"
+                  // The web has no pull gesture to answer.
+                  refreshControl={
+                    onRefresh && Platform.OS !== 'web' ? (
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={refresh}
+                        tintColor={theme.accent}
+                        colors={[theme.accent]}
+                        progressBackgroundColor={theme.sheet}
+                      />
+                    ) : undefined
+                  }
                   // On web a click starts a scroll gesture, so any dismiss mode would blur every field.
                   // On-drag rather than interactive: the footer can't follow an interactive drag.
                   keyboardDismissMode={Platform.select({

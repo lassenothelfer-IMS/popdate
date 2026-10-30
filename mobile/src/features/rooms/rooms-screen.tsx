@@ -31,7 +31,10 @@ export function outcomeLine(t: Translate, room: RoomSummary) {
     case 'left':
       return t('rooms.outcomeLeft');
     default:
-      return t('rooms.outcomePopped', { round: room.poppedInRound ?? 1 });
+      // No round on record: just how it ended, never a made-up round 1.
+      return room.poppedInRound === null
+        ? t('rooms.outcomePoppedNoRound')
+        : t('rooms.outcomePopped', { round: room.poppedInRound });
   }
 }
 
@@ -79,7 +82,10 @@ export function RoomsScreen() {
   return (
     <TabSwipe tab="rooms">
       <View style={styles.flex}>
-        <Screen scroll contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+        <Screen
+          scroll
+          onRefresh={reload}
+          contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
           <Rise index={0}>
             <ThemedText type="title" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
               {t('rooms.title')}
@@ -188,6 +194,7 @@ function RoomCard({ room, pins, pinning, onPin }: RoomCardProps) {
         );
       })}
 
+      {/* Wraps, so a long name or a longer language puts Chat under the recap instead of cutting it. */}
       <View style={styles.actions}>
         <Button
           title={t('rooms.recap')}
@@ -263,6 +270,8 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.xs,
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: Space.xs,

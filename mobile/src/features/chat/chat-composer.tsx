@@ -22,7 +22,7 @@ const FIELD_MAX_HEIGHT = 120;
 const SEND_SIZE = 36;
 
 type ChatComposerProps = {
-  /** The draft lives in the screen, so a failed send keeps it. */
+  /** The draft lives in the chat's footer, so a failed send keeps it. */
   value: string;
   onChangeText: (text: string) => void;
   onSend: () => void;
