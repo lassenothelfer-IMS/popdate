@@ -6,12 +6,13 @@ import {
   HankenGrotesk_700Bold,
 } from '@expo-google-fonts/hanken-grotesk';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { ApiProvider } from '@/api/provider';
+import { CrashScreen } from '@/components/crash-screen';
 import { OfflineBanner } from '@/components/offline-banner';
 import { Colors, Fonts } from '@/constants/theme';
 import { useScheme } from '@/hooks/use-theme';
@@ -21,6 +22,11 @@ import { usePushRouting } from '@/utils/push-routing';
 
 // The splash stays up until both typefaces are in, so no screen paints in a fallback font.
 SplashScreen.preventAutoHideAsync();
+
+/** Expo Router shows this instead of the app when a screen throws while rendering. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <CrashScreen {...props} />;
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts([
