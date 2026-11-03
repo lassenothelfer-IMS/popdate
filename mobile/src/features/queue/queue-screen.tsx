@@ -1,30 +1,39 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
+  Easing,
   FadeIn,
   Keyframe,
-  LinearTransition,
   ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
 } from 'react-native-reanimated';
 
 import { api, type Room } from '@/api';
-import { Balloon, balloonHeight } from '@/components/balloon';
+import { Avatar } from '@/components/avatar';
+import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
+import { ErrorLine } from '@/components/error-line';
+import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { CssEase, Ease, Fonts, Gutter, Motion, Space } from '@/constants/theme';
-import { PopperSeat } from '@/features/queue/popper-seat';
+import { BrandBalloon, Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
-import { useQueueStatus, useRoom } from '@/hooks/use-server';
-import { useT, type Translate } from '@/i18n';
-import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
-import { nativeOnly, webSafeKeyframe } from '@/utils/web-motion';
-import { haptics } from '@/utils/haptics';
-import { goHome } from '@/utils/navigation';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { useQueueStatus, useRoom } from '@/hooks/use-server';
+import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
+import { useT, type Translate } from '@/i18n';
+import { haptics } from '@/utils/haptics';
+import { PushPrompt } from '@/features/home/push-prompt';
+import { goHome } from '@/utils/navigation';
+import { webSafeKeyframe } from '@/utils/web-motion';
 
-/** One popper and five balloons. While searching, the server sends the real number. */
+/** One chooser and five balloons. While searching, the server sends the real number. */
 const ROOM_SIZE = 6;
 /** How long the role beat holds before the room appears. A tap skips it. */
 const ROLE_BEAT_MS = 1500;
@@ -35,38 +44,33 @@ const ROLE_BEAT_SCREEN_READER_MS = 4000;
  * The room screen has its own loading and missing states.
  */
 const ROOM_WAIT_MS = ROLE_BEAT_MS * 2;
-/** A balloon seat, string off: 20 x 28. */
-const SEAT_SIZE = 20;
-/** Your own balloon during the role beat, drawn larger instead of dimming the others. */
-const MY_SEAT_SIZE = 26;
+/** A seat in the row: 30 pt balloons, yours at 36. */
+const SEAT = 30;
+const MY_SEAT = 36;
+/** The two rings behind the row: 160 pt, the second half a cycle behind the first. */
+const RING = 160;
+const RING_MS = 2600;
+/** The join order of the balloon colors. You are crimson; the others take the rest in order. */
+const OTHER_SEATS = [0, 1, 2, 3] as const;
 
-/** A seat lands when someone takes it. Never from scale 0. */
-const seatLands = webSafeKeyframe(
-  new Keyframe({
-    0: { opacity: 0, transform: [{ translateY: 8 }, { scale: 0.92 }] },
-    100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: Ease.out },
-  }).duration(Motion.enter),
-);
-
-/** Reduce Motion: the seat only fades in. */
-const seatFades = webSafeKeyframe(
-  new Keyframe({
-    0: { opacity: 0 },
-    100: { opacity: 1, easing: Ease.out },
-  })
-    .duration(Motion.state)
-    .reduceMotion(ReduceMotion.Never),
-);
+/** A balloon rises 140 pt into its seat, growing from .6, 300 ms after the one before. */
+const seatEntrances = new Map<number, InstanceType<typeof Keyframe>>();
+function seatLands(delay: number) {
+  let keyframe = seatEntrances.get(delay);
+  if (!keyframe) {
+    keyframe = new Keyframe({
+      0: { opacity: 0, transform: [{ translateY: 140 }, { scale: 0.6 }] },
+      100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: Ease.rise },
+    })
+      .duration(1200)
+      .delay(delay);
+    seatEntrances.set(delay, keyframe);
+  }
+  return keyframe;
+}
 
 /** The role lines replace the queue lines. Opacity only, so it stays under Reduce Motion. */
 const beatIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
-
-/**
- * The lines can change height (a longer line, or a title that wraps at large
- * text sizes) and the row grows when your balloon does; the rest moves smoothly
- * instead of jumping. Native only: on web it would squash the views that resize.
- */
-const reflow = nativeOnly(LinearTransition.duration(Motion.enter).easing(Ease.inOut));
 
 /**
  * useQueueStatus starts as idle for one frame before the queue answers, so the
@@ -84,6 +88,12 @@ function numberWord(t: Translate, value: number) {
 
 function capitalized(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** 0:34, 1:05: how long you have waited in line. */
+function waitedLabel(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 function openRoom(roomId: string) {
@@ -109,35 +119,35 @@ function useScreenReader() {
 }
 
 type RoleBeat = {
-  title: string;
+  /** "This time you're holding", over the big word. */
+  lead: string;
+  /** "a balloon", in the count style. */
+  word: string;
   line: string;
-  /** Your balloon seat, or null when you are the popper. */
-  mySeat: number | null;
-  popper: { name: string; photo: string | null };
+  /** The full sentence, for screen readers. */
+  spoken: string;
 };
 
 function roleBeat(room: Room, t: Translate): RoleBeat {
-  const popper = { name: room.popper.name, photo: room.popper.photos[0] ?? null };
   const count = room.totalRounds;
   const rounds = numberWord(t, count);
   if (room.me.role === 'popper') {
     return {
-      title: t('queue.popperTitle'),
+      lead: t('queue.choosingLead'),
+      word: t('queue.choosingWord'),
       line: t('queue.popperLine', {
         count,
         rounds,
         people: capitalized(numberWord(t, room.contestants.length)),
       }),
-      mySeat: null,
-      popper,
+      spoken: t('queue.popperTitle'),
     };
   }
-  const mySeat = room.contestants.findIndex((contestant) => contestant.id === room.me.id);
   return {
-    title: t('queue.contestantTitle'),
+    lead: t('queue.holdingLead'),
+    word: t('queue.holdingWord'),
     line: t('queue.contestantLine', { count, rounds, name: room.popper.name }),
-    mySeat: mySeat >= 0 ? mySeat : null,
-    popper,
+    spoken: t('queue.contestantTitle'),
   };
 }
 
@@ -168,8 +178,8 @@ function NotInQueue() {
           <Button title={t('queue.backHome')} onPress={goHome} />
         </Animated.View>
       }>
-      <Animated.View entering={idleIn} style={styles.stage}>
-        <ThemedText themeColor="textSecondary" style={styles.centered}>
+      <Animated.View entering={idleIn} style={styles.idle}>
+        <ThemedText type="callout" themeColor="textSecondary" style={styles.centered}>
           {t('queue.notInQueue')}
         </ThemedText>
       </Animated.View>
@@ -192,13 +202,31 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   const celebrated = useRef(false);
   const screenReader = useScreenReader();
   const holdMs = screenReader ? ROLE_BEAT_SCREEN_READER_MS : ROLE_BEAT_MS;
+  const [waited, setWaited] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
 
   const matched = roomId !== null;
   const beat = matched && room ? roleBeat(room, t) : null;
-  const seatsFilled = t('queue.seatsFilled', { found, needed });
-  const beatText = beat ? `${beat.title}. ${beat.line}` : null;
+  const missingSeats = Math.max(needed - found, 0);
+  const seatsLine =
+    missingSeats === 0
+      ? t('queue.seatsReady', { found, needed })
+      : t('queue.seatsLine', {
+          count: missingSeats,
+          found,
+          needed,
+          missing: capitalized(numberWord(t, missingSeats)),
+        });
   const ready = matched && room !== undefined;
   const missing = room === null;
+
+  // How long you have been in line, counting up in the pill.
+  useEffect(() => {
+    if (matched) return;
+    const id = setInterval(() => setWaited((seconds) => seconds + 1), 1000);
+    return () => clearInterval(id);
+  }, [matched]);
 
   // The room is full: one success haptic with the role beat, then the room.
   useEffect(() => {
@@ -229,20 +257,36 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   // The live region below only speaks on Android, so VoiceOver gets each new player announced.
   useEffect(() => {
     if (Platform.OS === 'ios' && !matched && found > 1) {
-      AccessibilityInfo.announceForAccessibility(seatsFilled);
+      AccessibilityInfo.announceForAccessibility(seatsLine);
     }
-  }, [matched, found, seatsFilled]);
+  }, [matched, found, seatsLine]);
 
   // The role lines mount fresh, with no live region, so both platforms get them announced.
+  const beatText = beat ? `${beat.spoken}. ${beat.line}` : null;
   useEffect(() => {
     if (beatText) AccessibilityInfo.announceForAccessibility(beatText);
   }, [beatText]);
 
   async function handleCancel() {
-    // Once the room is full you are in it; the button is already fading out.
-    if (matched) return;
-    await api.leaveQueue();
-    goHome();
+    // Once the room is full you are in it.
+    if (matched || leaving) return;
+    setLeaving(true);
+    setLeaveError(null);
+    try {
+      // A room can fill in the moment you leave. You stay seated, so you go to it.
+      const formed = await api.leaveQueue();
+      if (formed) {
+        if (entered.current) return;
+        entered.current = true;
+        openRoom(formed);
+        return;
+      }
+      goHome();
+    } catch {
+      haptics.error();
+      setLeaveError(t('queue.leaveFailed'));
+      setLeaving(false);
+    }
   }
 
   function skipBeat() {
@@ -251,73 +295,91 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
     openRoom(roomId);
   }
 
-  // Android's back button cancels like the button, so the queue doesn't fill a room
+  // Android's back button leaves the line like the button, so the queue doesn't fill a room
   // you've left. Once you're matched it does nothing: the room is on its way.
   useHardwareBack(() => void handleCancel());
 
   return (
-    <Screen
-      scroll
-      // Plain, so nothing of the footer is left once Cancel fades out for the role beat.
-      footerStyle="plain"
-      contentStyle={styles.content}
-      footer={
-        <Animated.View
-          accessibilityElementsHidden={matched}
-          importantForAccessibility={matched ? 'no-hide-descendants' : 'auto'}
-          style={{
-            opacity: matched ? 0 : 1,
-            pointerEvents: matched ? 'none' : 'auto',
-            transitionProperty: 'opacity',
-            transitionDuration: Motion.exit,
-            transitionTimingFunction: CssEase.out,
-          }}>
-          <Button title={t('common.cancel')} variant="secondary" onPress={handleCancel} />
-        </Animated.View>
-      }>
+    <Screen scroll contentStyle={styles.content}>
       {roomId ? <RoomWatcher roomId={roomId} onChange={setRoom} /> : null}
 
       {/* Once the room is full a tap anywhere opens it right away, even before it answers. */}
-      <Pressable accessible={false} disabled={!roomId} onPress={skipBeat} style={styles.stage}>
-        <Animated.View
-          key={beat ? 'role-title' : 'queue-title'}
-          entering={beat ? beatIn : undefined}
-          layout={reflow}>
-          <ThemedText type="question" accessibilityRole="header" style={styles.centered}>
-            {beat ? beat.title : t('queue.filling')}
-          </ThemedText>
-        </Animated.View>
+      <Pressable accessible={false} disabled={!roomId} onPress={skipBeat} style={styles.page}>
+        <Rise index={0} style={styles.top}>
+          {beat ? (
+            <Animated.View entering={beatIn} style={styles.topLabel}>
+              <ThemedText type="kicker">{t('queue.roomReady')}</ThemedText>
+            </Animated.View>
+          ) : (
+            <>
+              <Button
+                title={t('queue.leaveLine')}
+                variant="plain"
+                fullWidth={false}
+                disabled={matched}
+                loading={leaving}
+                onPress={() => void handleCancel()}
+              />
+              <View style={[styles.pill, { backgroundColor: theme.surface }]}>
+                <ThemedText type="timer" style={styles.pillText}>
+                  {t('queue.waited', { time: waitedLabel(waited) })}
+                </ThemedText>
+              </View>
+            </>
+          )}
+        </Rise>
+        {leaveError && !beat ? <ErrorLine message={leaveError} /> : null}
 
-        <Animated.View layout={reflow} style={styles.countGroup}>
-          <ThemedText
-            type="count"
-            accessible
-            accessibilityLabel={seatsFilled}
-            accessibilityLiveRegion="polite"
-            maxFontSizeMultiplier={1.3}
-            style={styles.centered}>
-            {found}
-            <Text style={[styles.countRest, { color: theme.textSecondary }]}>
-              {t('queue.countRest', { needed })}
-            </Text>
-          </ThemedText>
-        </Animated.View>
+        {beat ? (
+          <Animated.View key="beat" entering={beatIn} style={styles.headline}>
+            <ThemedText type="question" themeColor="textSecondary" style={styles.lead}>
+              {beat.lead}
+            </ThemedText>
+            <ThemedText
+              type="count"
+              accessibilityRole="header"
+              maxFontSizeMultiplier={1}
+              allowFontScaling={false}
+              style={styles.centered}>
+              {beat.word}
+            </ThemedText>
+            <ThemedText type="callout" themeColor="textSecondary" style={styles.headlineLine}>
+              {beat.line}
+            </ThemedText>
+          </Animated.View>
+        ) : (
+          <Rise index={1} style={styles.headline}>
+            <View
+              accessible
+              accessibilityLabel={`${t('queue.seatsTaken')} ${found}. ${t('queue.countLine', { needed, people: numberWord(t, needed) })}`}
+              accessibilityLiveRegion="polite"
+              style={styles.headline}>
+              <ThemedText type="kicker">{t('queue.seatsTaken')}</ThemedText>
+              <ThemedText type="count" maxFontSizeMultiplier={1} allowFontScaling={false}>
+                {found}
+              </ThemedText>
+              <ThemedText type="callout" themeColor="textSecondary" style={styles.headlineLine}>
+                {t('queue.countLine', { needed, people: numberWord(t, needed) })}
+              </ThemedText>
+            </View>
+          </Rise>
+        )}
 
-        <Animated.View layout={reflow} style={styles.seatsGroup}>
-          <Seats found={found} needed={needed} mySeat={beat?.mySeat ?? null} popper={beat?.popper ?? null} />
-        </Animated.View>
-
-        <Animated.View
-          key={beat ? 'role-line' : 'queue-line'}
-          entering={beat ? beatIn : undefined}
-          layout={reflow}
-          style={styles.copy}>
-          <ThemedText type="callout" themeColor="textSecondary" style={styles.centered}>
-            {beat
-              ? beat.line
-              : t('queue.perRoom', { people: capitalized(numberWord(t, needed)) })}
-          </ThemedText>
-        </Animated.View>
+        {beat && room ? (
+          <Animated.View key="seats" entering={beatIn} style={styles.cardSlot}>
+            <RoomSeats room={room} />
+          </Animated.View>
+        ) : (
+          <Rise index={2} style={styles.stage}>
+            <Rings />
+            <SeatRow found={found} needed={needed} />
+            <ThemedText type="footnote" themeColor="textTertiary" style={styles.centered}>
+              {seatsLine}
+            </ThemedText>
+          </Rise>
+        )}
+        {/* Asked here, where it's useful: you can leave the app and still hear when the room opens. */}
+        {beat ? null : <PushPrompt />}
       </Pressable>
     </Screen>
   );
@@ -338,138 +400,242 @@ function RoomWatcher({
   return null;
 }
 
-type SeatsProps = {
-  found: number;
-  needed: number;
-  /** Your balloon during the role beat: it grows, the others stay as they are. */
-  mySeat: number | null;
-  /** Once the room is known: the person in the popper's seat. */
-  popper: { name: string; photo: string | null } | null;
-};
-
-/**
- * Five balloon seats in seat order, then the popper's seat. They fill left to
- * right as people arrive, so the popper's seat is the one that completes the room.
- */
-function Seats({ found, needed, mySeat, popper }: SeatsProps) {
-  const seats = useSeats();
-  const reduced = useReduceMotion();
-  const entering = reduced ? seatFades : seatLands;
-  const balloonSeats = Math.max(needed - 1, 0);
-  const popperFilled = found >= needed;
-
+/** Two thin rings that keep expanding out of the row and fading, half a cycle apart. */
+function Rings() {
   return (
     <View
-      style={styles.seats}
+      style={styles.rings}
+      pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
-      {Array.from({ length: balloonSeats }, (_, index) => {
-        const filled = index < found;
-        return (
-          <Animated.View
-            key={`${index}-${filled ? 'filled' : 'empty'}`}
-            entering={filled ? entering : undefined}>
-            <SeatBalloon
-              color={seatAt(seats, index).color}
-              filled={filled}
-              grown={mySeat === index}
-              reduced={reduced}
-            />
-          </Animated.View>
-        );
-      })}
-      <Animated.View
-        key={popperFilled ? 'popper-filled' : 'popper-empty'}
-        entering={popperFilled ? entering : undefined}>
-        <PopperSeat filled={popperFilled} name={popper?.name ?? null} photoUri={popper?.photo ?? null} />
-      </Animated.View>
+      <Ring delay={0} />
+      <Ring delay={RING_MS / 2} />
     </View>
   );
 }
 
-type SeatBalloonProps = {
-  color: string;
-  filled: boolean;
-  /** Your seat during the role beat: 26 x 36 instead of 20 x 28. */
-  grown: boolean;
-  reduced: boolean;
-};
+function Ring({ delay }: { delay: number }) {
+  const theme = useTheme();
+  const reduced = useReduceMotion();
+  const grow = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) {
+      cancelAnimation(grow);
+      grow.set(0);
+      return;
+    }
+    grow.set(
+      withDelay(
+        delay,
+        withRepeat(withTiming(1, { duration: RING_MS, easing: Easing.bezier(0.2, 0.7, 0.3, 1) }), -1),
+      ),
+    );
+  }, [reduced, delay, grow]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.35 * (0.55 - 0.55 * grow.get()),
+    transform: [{ scale: 0.6 + 1.3 * grow.get() }],
+  }));
+  if (reduced) return null;
+  return <Animated.View style={[styles.ring, { borderColor: theme.text }, style]} />;
+}
 
 /**
- * One balloon seat. A filled one is drawn at your seat's size and scaled down,
- * so growing into your seat is one transition on the box and the scale together,
- * anchored at the bottom like the row. Reduce Motion: it just changes size.
+ * Every seat in the room as a balloon: yours in crimson and a little bigger,
+ * the people already here in join order, and a dashed ghost for each seat
+ * still empty. Decorative: the count above carries the meaning.
  */
-function SeatBalloon({ color, filled, grown, reduced }: SeatBalloonProps) {
-  // Never grown: every seat has filled before the role beat. Drawn at its own size, so the outline stays 1.5pt.
-  if (!filled) return <Balloon color={color} size={SEAT_SIZE} ghost />;
-
-  const size = grown ? MY_SEAT_SIZE : SEAT_SIZE;
-  const timing = {
-    transitionDuration: reduced ? 0 : Motion.enter,
-    transitionTimingFunction: CssEase.out,
-  };
+function SeatRow({ found, needed }: { found: number; needed: number }) {
+  const seats = useSeats();
+  const reduced = useReduceMotion();
+  // The seats already filled when the screen opens rise in one after another; later ones rise as they arrive.
+  const [initial] = useState(found);
   return (
-    <Animated.View
-      style={[
-        styles.seatBox,
-        { width: size, height: balloonHeight(size), transitionProperty: ['width', 'height'], ...timing },
-      ]}>
-      <Animated.View
-        style={[
-          styles.seatArt,
-          { transform: [{ scale: size / MY_SEAT_SIZE }], transitionProperty: 'transform', ...timing },
-        ]}>
-        <Balloon color={color} size={MY_SEAT_SIZE} string={false} />
-      </Animated.View>
-    </Animated.View>
+    <View style={styles.row} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {Array.from({ length: needed }, (_, index) => {
+        const filled = index < found;
+        if (!filled) return <GhostSeat key={`ghost-${index}`} />;
+        const mine = index === 0;
+        const color = mine ? BrandBalloon.color : seatAt(seats, OTHER_SEATS[(index - 1) % OTHER_SEATS.length]).color;
+        const delay = index < initial ? index * 300 : 0;
+        return (
+          <Animated.View
+            key={`seat-${index}`}
+            entering={reduced ? undefined : webSafeKeyframe(seatLands(delay))}>
+            <Balloon color={color} size={mine ? MY_SEAT : SEAT} />
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** An empty seat: a dashed balloon outline that pulses softly while it waits. */
+function GhostSeat() {
+  const theme = useTheme();
+  const reduced = useReduceMotion();
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) {
+      cancelAnimation(pulse);
+      pulse.set(0.5);
+      return;
+    }
+    pulse.set(withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }), -1, true));
+  }, [reduced, pulse]);
+  // .25 to .55 of a border that is itself the text color at half strength.
+  const style = useAnimatedStyle(() => ({ opacity: 0.5 * (0.25 + 0.3 * pulse.get()) }));
+  return <Animated.View style={[styles.ghost, { borderColor: theme.text }, style]} />;
+}
+
+/**
+ * The room once it is known: the chooser's avatar, then each balloon with its
+ * holder's name, and yours labeled You.
+ */
+function RoomSeats({ room }: { room: Room }) {
+  const theme = useTheme();
+  const seats = useSeats();
+  const t = useT();
+  return (
+    <View
+      style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <View style={styles.cardSeat}>
+        <Avatar name={room.popper.name} uri={room.popper.photos[0]} size={42} />
+        <ThemedText type="captionStrong" numberOfLines={1}>
+          {room.me.role === 'popper' ? t('common.you') : room.popper.name}
+        </ThemedText>
+      </View>
+      {room.contestants.map((contestant, index) => {
+        const mine = contestant.id === room.me.id;
+        return (
+          <View key={contestant.id} style={styles.cardSeat}>
+            <View style={styles.cardBalloon}>
+              <Balloon color={seatAt(seats, index).color} size={22} />
+            </View>
+            <ThemedText
+              type={mine ? 'captionStrong' : 'caption'}
+              themeColor={mine ? 'text' : 'textSecondary'}
+              numberOfLines={1}>
+              {mine ? t('common.you') : contestant.name}
+            </ThemedText>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
-    justifyContent: 'center',
-  },
-  // With the screen's gutter, the column sits 40 in from each edge.
-  stage: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Gutter,
-    paddingVertical: Space.lg,
   },
   centered: {
     textAlign: 'center',
   },
-  // 14 on the canvas, less the 2pt the count's 68pt line adds above a 64pt line.
-  countGroup: {
-    marginTop: 12,
+  idle: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
-  countRest: {
-    fontFamily: Fonts.serif,
+  page: {
+    flexGrow: 1,
   },
-  // 32 on the canvas, less the 2pt the count's line adds below.
-  seatsGroup: {
-    marginTop: 30,
-  },
-  seats: {
+  top: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: MinTouch,
+  },
+  topLabel: {
+    minHeight: MinTouch,
+    justifyContent: 'center',
+  },
+  pill: {
+    paddingVertical: 7,
+    paddingHorizontal: Space.sm,
+    borderRadius: Radius.pill,
+  },
+  pillText: {
+    fontWeight: 600,
+  },
+  headline: {
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 40,
+  },
+  lead: {
+    fontSize: 22,
+    lineHeight: 28,
+    textAlign: 'center',
+  },
+  headlineLine: {
+    textAlign: 'center',
+    maxWidth: 300,
+    marginTop: Space.xxs,
+  },
+  // The rings and the row, in the lit middle of the screen.
+  stage: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    gap: 72,
+    minHeight: 260,
+    marginTop: Space.lg,
+  },
+  rings: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ring: {
+    position: 'absolute',
+    width: RING,
+    height: RING,
+    borderRadius: RING / 2,
+    borderWidth: 1,
+  },
+  row: {
+    flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'center',
-    rowGap: Space.sm,
-    columnGap: Space.md,
+    gap: 22,
   },
-  seatBox: {
+  ghost: {
+    width: SEAT,
+    height: 38,
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  cardSlot: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    marginTop: Space.lg,
+  },
+  card: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    gap: 18,
+    minHeight: 140,
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  seatArt: {
-    transformOrigin: 'bottom',
+  cardSeat: {
+    alignItems: 'center',
+    gap: Space.xs,
+    maxWidth: 52,
   },
-  copy: {
-    marginTop: 28,
-    maxWidth: 260,
+  cardBalloon: {
+    height: 42,
+    justifyContent: 'center',
   },
 });

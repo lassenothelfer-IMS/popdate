@@ -5,9 +5,10 @@ import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { fail } from './lib/errors';
 import { MAX_MESSAGE_LENGTH } from './lib/game';
-import { isBlockedEitherWay } from './lib/people';
+import { getProfile, isBlockedEitherWay } from './lib/people';
 import { maskProfanity } from './lib/profanity';
 import { rateLimit } from './lib/rateLimit';
+import { schedulePush } from './push';
 
 /** A match you are part of. Only the popper and the winner of a match can read or write its chat. */
 async function requireMyMatch(ctx: QueryCtx, matchId: string) {
@@ -30,16 +31,20 @@ function messageView(message: Doc<'messages'>) {
   };
 }
 
-/** The chat, oldest first, live. */
+/** How many of the newest messages the chat loads. */
+const CHAT_LIMIT = 200;
+
+/** The newest messages of the chat, oldest first, live. */
 export const list = query({
   args: { matchId: v.string() },
   handler: async (ctx, { matchId }) => {
     const { match } = await requireMyMatch(ctx, matchId);
-    const messages = await ctx.db
+    const newest = await ctx.db
       .query('messages')
       .withIndex('by_match', (q) => q.eq('matchId', match._id))
-      .collect();
-    return messages.map(messageView);
+      .order('desc')
+      .take(CHAT_LIMIT);
+    return newest.reverse().map(messageView);
   },
 });
 
@@ -56,6 +61,13 @@ export const send = mutation({
     if (!trimmed) fail('Write something first.');
     if (trimmed.length > MAX_MESSAGE_LENGTH) fail('That message is too long.');
 
+    const sender = await getProfile(ctx, userId);
+    await schedulePush(ctx, [otherId], {
+      kind: 'messages',
+      title: sender?.name ?? 'New message',
+      body: maskProfanity(trimmed).slice(0, 140),
+      data: { type: 'chat', matchId: match._id },
+    });
     const id = await ctx.db.insert('messages', {
       matchId: match._id,
       senderId: userId,

@@ -4,24 +4,34 @@ import { requireUserId } from './lib/auth';
 import { activeRoomOf, getProfile } from './lib/people';
 import { leave } from './lib/room';
 import { deleteImage } from './lib/uploads';
-import { removeFromQueue } from './queue';
+import { dropQueueRow } from './queue';
 
 /** Takes you out of the queue and out of a room you're still playing in. */
 async function stepOut(ctx: MutationCtx, userId: Id<'users'>) {
-  await removeFromQueue(ctx, userId);
+  await dropQueueRow(ctx, userId);
   const room = await activeRoomOf(ctx, userId);
   if (room) await leave(ctx, room, userId);
+}
+
+async function deletePushTokens(ctx: MutationCtx, userId: Id<'users'>) {
+  const rows = await ctx.db
+    .query('pushTokens')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect();
+  for (const row of rows) await ctx.db.delete(row._id);
 }
 
 /**
  * Runs before the app signs out. A test account is anonymous: once signed out
  * nobody can come back to it, so it shouldn't keep waiting in a queue or a room.
+ * Its push tokens go too, so this phone stops getting the old account's pushes.
  */
 export const prepareSignOut = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     await stepOut(ctx, userId);
+    await deletePushTokens(ctx, userId);
   },
 });
 
@@ -59,6 +69,18 @@ export const deleteAccount = mutation({
         .collect();
       for (const row of rows) await ctx.db.delete(row._id);
     }
+
+    const chances = [
+      ...(await ctx.db
+        .query('secondChances')
+        .withIndex('by_from', (q) => q.eq('fromId', userId))
+        .collect()),
+      ...(await ctx.db
+        .query('secondChances')
+        .withIndex('by_to', (q) => q.eq('toId', userId))
+        .collect()),
+    ];
+    for (const chance of chances) await ctx.db.delete(chance._id);
 
     const blocks = [
       ...(await ctx.db

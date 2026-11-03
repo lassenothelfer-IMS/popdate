@@ -91,7 +91,7 @@ export function LeaveSheet({
             },
           ]}>
           <View style={[styles.grabber, { backgroundColor: theme.surfacePressed }]} />
-          <ThemedText type="task" accessibilityRole="header" style={[styles.center, styles.title]}>
+          <ThemedText type="question" accessibilityRole="header" style={[styles.center, styles.title]}>
             {title}
           </ThemedText>
           <ThemedText
@@ -107,7 +107,7 @@ export function LeaveSheet({
           ) : null}
           <View style={styles.actions}>
             <View style={styles.action}>
-              <Button title={t('game.leave')} variant="ghost" loading={leaving} onPress={onLeave} />
+              <Button title={t('game.leave')} variant="plain" loading={leaving} onPress={onLeave} />
             </View>
             <View style={styles.action}>
               <Button title={t('game.stay')} disabled={leaving} onPress={stay} />

@@ -1,20 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import {
   AccessibilityInfo,
+  InputAccessoryView,
+  Keyboard,
   Platform,
   StyleSheet,
   TextInput,
   View,
+  type TextInputInstance,
   type TextInputProps,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
+import { useRevealField } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Space } from '@/constants/theme';
 import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
 
 type TextFieldProps = TextInputProps & {
+  ref?: Ref<TextInputInstance>;
   label?: string;
   /** Short help under the field, or the error message when `error` is set. */
   hint?: string;
@@ -36,12 +43,24 @@ export function TextField({
   multiline,
   onFocus,
   onBlur,
+  onContentSizeChange,
   accessibilityHint,
+  ref,
   ...rest
 }: TextFieldProps) {
   const theme = useTheme();
   const scheme = useScheme();
+  const t = useT();
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<TextInputInstance>(null);
+  // The caller's ref still reaches the input, to move focus from field to field.
+  useImperativeHandle(ref, () => inputRef.current as TextInputInstance);
+  // In a scrolling screen, a focused field scrolls clear of the keyboard and footer.
+  const reveal = useRevealField();
+  // iOS number pads have no return key: a Done bar above them closes the keyboard.
+  const padId = `pad${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  const numberPad =
+    Platform.OS === 'ios' && (rest.keyboardType === 'number-pad' || rest.keyboardType === 'numeric');
   const errorMessage = error && hint ? hint : undefined;
 
   // VoiceOver ignores live regions, so say a new error once, after the key echo.
@@ -50,12 +69,14 @@ export function TextField({
       AccessibilityInfo.announceForAccessibilityWithOptions(errorMessage, { queue: true });
     }
   }, [errorMessage]);
-  const edge = error ? theme.danger : focused || multiline ? theme.borderStrong : theme.outline;
+  const edge = error ? theme.danger : theme.borderStrong;
+  // Focused: a 2 pt ring in the text color, drawn inside so the text never moves.
+  const ring = focused && !error ? { boxShadow: `inset 0 0 0 2px ${theme.text}` } : null;
 
   return (
     <View style={styles.field}>
       {label ? (
-        <ThemedText type="footnote" themeColor="textSecondary">
+        <ThemedText type="kicker">
           {label}
         </ThemedText>
       ) : null}
@@ -64,16 +85,25 @@ export function TextField({
           styles.box,
           multiline && styles.multiline,
           { backgroundColor: theme.field, borderColor: edge },
+          ring,
         ]}>
         <TextInput
+          ref={inputRef}
+          inputAccessoryViewID={numberPad ? padId : undefined}
           accessibilityLabel={rest.accessibilityLabel ?? label}
-          placeholderTextColor={theme.textTertiary}
+          placeholderTextColor={theme.textFaint}
           keyboardAppearance={scheme}
           selectionColor={theme.text}
           multiline={multiline}
           onFocus={(event) => {
             setFocused(true);
+            reveal?.(inputRef.current);
             onFocus?.(event);
+          }}
+          onContentSizeChange={(event) => {
+            // A bio grows a line at a time: keep its newest line above the keyboard.
+            if (multiline && focused) reveal?.(inputRef.current);
+            onContentSizeChange?.(event);
           }}
           onBlur={(event) => {
             setFocused(false);
@@ -121,6 +151,18 @@ export function TextField({
           {counter}
         </ThemedText>
       ) : null}
+      {numberPad ? (
+        <InputAccessoryView nativeID={padId}>
+          <View style={[styles.padBar, { backgroundColor: theme.sheet, borderTopColor: theme.border }]}>
+            <Button
+              title={t('common.done')}
+              variant="plain"
+              fullWidth={false}
+              onPress={() => Keyboard.dismiss()}
+            />
+          </View>
+        </InputAccessoryView>
+      ) : null}
     </View>
   );
 }
@@ -145,6 +187,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    // Shrinks to leave room for a suffix; a web input otherwise keeps its own minimum width.
+    minWidth: 0,
     alignSelf: 'stretch',
     paddingVertical: Space.sm,
     fontFamily: Fonts.sans,
@@ -168,5 +212,11 @@ const styles = StyleSheet.create({
   },
   counter: {
     textAlign: 'right',
+  },
+  padBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Space.md,
   },
 });

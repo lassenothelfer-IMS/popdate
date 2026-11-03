@@ -3,16 +3,29 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
+import { createContext, use } from 'react';
+
 import { Colors, SeatColors, type Seat } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useOptionalSettings } from '@/state/settings';
 
-/** Light or dark: your Appearance setting, or the phone's when it follows the system. */
+/**
+ * Velvet (dark) or Cream (light): your Appearance setting, or the phone's when
+ * it is set to Match system.
+ */
 export function useScheme(): 'light' | 'dark' {
+  const forced = use(ForcedScheme);
   const system = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const appearance = useOptionalSettings()?.settings.appearance ?? 'system';
+  const appearance = useOptionalSettings()?.settings.appearance ?? 'dark';
+  if (forced) return forced;
   return appearance === 'system' ? system : appearance;
 }
+
+/**
+ * Wrap a screen in `<ForcedScheme value="dark">` to draw it in one theme
+ * whatever the setting, like the welcome screen over its video.
+ */
+export const ForcedScheme = createContext<'light' | 'dark' | null>(null);
 
 export function useTheme() {
   return Colors[useScheme()];
@@ -28,7 +41,7 @@ export function seatAt(seats: readonly Seat[], index: number): Seat {
   return seats[((index % seats.length) + seats.length) % seats.length];
 }
 
-/** Your own hue outside a room (your profile, Home): plum, as the canvas draws you. */
+/** Your own hue outside a room (your profile, Home): crimson, as your balloon always is. */
 export function youSeat(seats: readonly Seat[]): Seat {
   return seats[seats.length - 1];
 }

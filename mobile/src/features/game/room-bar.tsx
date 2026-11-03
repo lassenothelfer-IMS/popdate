@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
   StyleSheet,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
 
+import { Button } from '@/components/button';
 import { ProgressSegments } from '@/components/progress-segments';
 import { ThemedText } from '@/components/themed-text';
 import { Gutter, MinTouch, Space } from '@/constants/theme';
 import { Pill } from '@/features/game/you-tag';
 import { useTheme } from '@/hooks/use-theme';
+import { MoreButton } from '@/features/chat/person-actions';
 import { useT } from '@/i18n';
 
 /**
@@ -34,6 +34,8 @@ type RoomBarProps = {
   timer?: ReactNode;
   /** Hidden once the game is over. */
   onLeave?: () => void;
+  /** Report or block someone in the room. */
+  onMore?: () => void;
   leaving: boolean;
   /** The four round segments: filled up to the round being played. */
   rounds: { total: number; filled: number; label: string };
@@ -42,7 +44,10 @@ type RoomBarProps = {
   onLayout?: (event: LayoutChangeEvent) => void;
 };
 
-/** The pinned top of the room: round and phase, timer, Leave, the rounds and the seats. */
+/**
+ * The room header: "Round 1 of 4" over the phase on the left, the ring timer
+ * and a Leave pill on the right, then the four round segments and the seats.
+ */
 export function RoomBar({
   title,
   titleLabel,
@@ -50,6 +55,7 @@ export function RoomBar({
   watching,
   timer,
   onLeave,
+  onMore,
   leaving,
   rounds,
   rail,
@@ -70,7 +76,7 @@ export function RoomBar({
           </ThemedText>
           <View style={styles.phase}>
             <ThemedText
-              type="footnote"
+              type="caption"
               themeColor="textSecondary"
               maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
               style={styles.shrink}>
@@ -79,26 +85,19 @@ export function RoomBar({
             {watching ? <Pill label={t('game.watching')} tone="quiet" /> : null}
           </View>
         </View>
-        {timer || onLeave ? (
+        {timer || onLeave || onMore ? (
           <View style={styles.actions}>
             {timer}
+            {onMore ? <MoreButton label={t('game.reportSomeone')} onPress={onMore} /> : null}
             {onLeave ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('game.leaveRoom')}
-                accessibilityState={{ busy: leaving, disabled: leaving }}
-                disabled={leaving}
+              <Button
+                title={t('game.leave')}
+                variant="tinted"
+                size="small"
+                fullWidth={false}
+                loading={leaving}
                 onPress={onLeave}
-                hitSlop={{ right: Space.sm }}
-                style={({ pressed }) => [styles.leave, pressed && styles.pressed]}>
-                {leaving ? (
-                  <ActivityIndicator color={theme.textSecondary} />
-                ) : (
-                  <ThemedText type="label" maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}>
-                    {t('game.leave')}
-                  </ThemedText>
-                )}
-              </Pressable>
+              />
             ) : null}
           </View>
         ) : null}
@@ -128,7 +127,7 @@ export function RoomBar({
 
 const styles = StyleSheet.create({
   bar: {
-    paddingTop: Space.sm,
+    paddingTop: Space.xs,
     paddingHorizontal: Gutter,
   },
   top: {
@@ -152,23 +151,13 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xxs,
-  },
-  leave: {
-    minWidth: MinTouch,
-    minHeight: MinTouch,
-    paddingLeft: Space.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.6,
+    gap: Space.xs,
   },
   rounds: {
-    marginTop: Space.xs,
+    marginTop: Space.md,
   },
   rail: {
-    marginTop: 14,
-    paddingBottom: Space.sm,
+    marginTop: Space.lg,
+    paddingBottom: Space.md,
   },
 });

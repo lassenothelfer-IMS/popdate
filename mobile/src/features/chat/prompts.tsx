@@ -196,8 +196,8 @@ function ChoiceSheet({ title, message, choices, cancelLabel, onDone }: ChoiceShe
                 paddingBottom: Math.max(insets.bottom, Space.md),
               },
             ]}>
-            <View style={[styles.grabber, { backgroundColor: theme.surfacePressed }]} />
-            <ThemedText type="task" accessibilityRole="header" style={[styles.center, styles.title]}>
+            <View style={[styles.grabber, { backgroundColor: theme.track }]} />
+            <ThemedText type="heading" accessibilityRole="header" style={[styles.center, styles.title]}>
               {title}
             </ThemedText>
             {message ? (
@@ -229,7 +229,7 @@ function ChoiceSheet({ title, message, choices, cancelLabel, onDone }: ChoiceShe
                 </PressableHighlight>
               ))}
             </View>
-            <Button title={cancelLabel} variant="ghost" onPress={() => onDone(null)} />
+            <Button title={cancelLabel} variant="plain" onPress={() => onDone(null)} />
           </View>
         </Animated.View>
       </View>

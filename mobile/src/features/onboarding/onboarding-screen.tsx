@@ -1,53 +1,76 @@
-import { router } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   BackHandler,
   Platform,
+  ScrollView,
   StyleSheet,
+  Text,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+  type TextInputInstance,
   type ViewInstance,
 } from 'react-native';
-import Animated, {
-  FadeIn,
-  Keyframe,
-  ReduceMotion,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
-import type { Gender } from '@/api';
-import { Balloon } from '@/components/balloon';
+import type { Interest } from '@/api';
 import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
-import { CheckMark, OptionRow } from '@/components/option-row';
+import { CheckMark } from '@/components/option-row';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { ProgressSegments } from '@/components/progress-segments';
+import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
+import { VideoBackground } from '@/components/video-background';
+import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { Ease, Motion, Radius, Space } from '@/constants/theme';
+import { Colors, Fonts, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
-import { WheelPicker } from '@/features/onboarding/wheel-picker';
+import {
+  IdentityPicker,
+  MeetPicker,
+  resolvedSide,
+  type IdentityChoice,
+} from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
-import { useTheme } from '@/hooks/use-theme';
-import { useLocale, useT } from '@/i18n';
-import { useSession } from '@/state/session';
-import { ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
-import { haptics } from '@/utils/haptics';
-import { webSafeKeyframe } from '@/utils/web-motion';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { ForcedScheme, useTheme } from '@/hooks/use-theme';
+import { useT } from '@/i18n';
+import { useSession } from '@/state/session';
+import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
+import { haptics } from '@/utils/haptics';
 
-/** The welcome screen, then one question per screen. */
-const STEPS = ['welcome', 'birthday', 'gender', 'meet', 'terms'] as const;
+/**
+ * The welcome, the three "How it works" cards, then one question per screen
+ * (design S01 to S04, S07 to S10 and S17). The profile follows on its own route.
+ */
+const STEPS = ['welcome', 'rooms', 'rounds', 'last', 'birthday', 'gender', 'meet', 'rules'] as const;
 type Step = (typeof STEPS)[number];
-type Question = Exclude<Step, 'welcome'>;
+type Intro = 'rooms' | 'rounds' | 'last';
+type Question = 'birthday' | 'gender' | 'meet' | 'rules';
 
-/** Translation keys of each question's title. */
+const INTROS: Intro[] = ['rooms', 'rounds', 'last'];
+const QUESTIONS: Question[] = ['birthday', 'gender', 'meet', 'rules'];
+
+/** Translation keys of each question's title and the line under it. */
 const TITLES: Record<Question, string> = {
   birthday: 'onboarding.titleBirthday',
   gender: 'onboarding.titleGender',
   meet: 'onboarding.titleMeet',
-  terms: 'onboarding.titleTerms',
+  rules: 'onboarding.titleTerms',
+};
+const SUBTITLES: Record<Question, string> = {
+  birthday: 'onboarding.subtitleBirthday',
+  gender: 'onboarding.subtitleGender',
+  meet: 'onboarding.subtitleMeet',
+  rules: 'onboarding.subtitleRules',
 };
 
 /** Read by VoiceOver on Continue while the step isn't answered yet (translation keys). */
@@ -55,70 +78,59 @@ const CONTINUE_HINTS: Record<Question, string> = {
   birthday: 'onboarding.hintBirthday',
   gender: 'onboarding.hintChoose',
   meet: 'onboarding.hintChoose',
-  terms: 'onboarding.hintTerms',
+  rules: 'onboarding.hintTerms',
 };
 
-/** Each new step rises 8pt into place; with Reduce Motion it only fades. */
-const stepEnter = webSafeKeyframe(
-  new Keyframe({
-    0: { opacity: 0, transform: [{ translateY: 8 }] },
-    100: { opacity: 1, transform: [{ translateY: 0 }], easing: Ease.out },
-  }).duration(Motion.enter),
-);
-const stepEnterReduced = FadeIn.duration(Motion.state)
-  .easing(Ease.out)
-  .reduceMotion(ReduceMotion.Never);
+/** The four house rules: a title and a line each (translation keys). */
+const RULES = [1, 2, 3, 4].map((n) => ({
+  title: `onboarding.rule${n}Title`,
+  body: `onboarding.rule${n}Body`,
+}));
 
-/** The twelve month names in the app's language, from the platform's own calendar data. */
-function monthNames(locale: string) {
-  const format = new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' });
-  return Array.from({ length: 12 }, (_, i) => format.format(new Date(Date.UTC(2000, i, 1))));
-}
-const DAYS = Array.from({ length: 31 }, (_, i) => String(i + 1));
-/** A hundred years back, up to this year. */
-const LAST_YEAR = new Date().getFullYear();
-const FIRST_YEAR = LAST_YEAR - 100;
-const YEARS = Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, i) => String(FIRST_YEAR + i));
+/** The birthday as typed: day, month and year, digits only. */
+type BirthEntry = { day: string; month: string; year: string };
 
-type BirthParts = { day: number; month: number; year: number };
-
-/** Where the wheels start: 1 January 2000. */
-const DEFAULT_BIRTH: BirthParts = { day: 1, month: 1, year: 2000 };
-
-/** `month` counts from 1. */
-function daysInMonth(month: number, year: number) {
-  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+function digitsOnly(text: string) {
+  return text.replace(/\D/g, '');
 }
 
-/** A valid adult birthday, or the translation key of what is wrong with it. */
-function checkBirthday({ day, month, year }: BirthParts): { birthDate: string } | { error: string } {
-  const birthDate = parseBirthDate(String(day), String(month), String(year));
+/**
+ * Nothing until the year has four digits, then a valid adult birthday or the
+ * translation key of what is wrong with it.
+ */
+function checkBirthday({ day, month, year }: BirthEntry):
+  | { pending: true }
+  | { birthDate: string; age: number }
+  | { error: string } {
+  if (!day || !month || year.length < 4) return { pending: true };
+  const birthDate = parseBirthDate(day, month, year);
   if (!birthDate) return { error: 'onboarding.birthdayInvalid' };
-  if (ageFromBirthDate(birthDate) < 18) return { error: 'onboarding.birthdayTooYoung' };
-  return { birthDate };
+  const age = ageFromBirthDate(birthDate);
+  // Older than anyone alive is a typo in the year, not a birthday.
+  if (age > MAX_AGE) return { error: 'onboarding.birthdayInvalid' };
+  if (age < 18) return { error: 'onboarding.birthdayTooYoung' };
+  return { birthDate, age };
 }
 
 export function OnboardingScreen() {
-  const { setOnboarding, saveProfile } = useSession();
+  const { failed, setOnboarding, saveProfile } = useSession();
   const theme = useTheme();
   const t = useT();
-  const locale = useLocale();
   const reduced = useReduceMotion();
   const [step, setStep] = useState<Step>('welcome');
-  // The step you came from. Motion only explains a change, so the first
-  // screen (no step before it) appears without any.
+  // The step you came from: the screen entrance only plays on a change.
   const [from, setFrom] = useState<Step | null>(null);
-  // The current step's heading: the welcome line or the question.
   const headingRef = useRef<ViewInstance>(null);
-  const [birth, setBirth] = useState<BirthParts>(DEFAULT_BIRTH);
-  const [gender, setGender] = useState<Gender | null>(null);
-  const [wantsToMeet, setWantsToMeet] = useState<Gender | null>(null);
+  const [birth, setBirth] = useState<BirthEntry>({ day: '', month: '', year: '' });
+  const [identity, setIdentity] = useState<IdentityChoice>({ identity: null, side: null });
+  const gender = resolvedSide(identity);
+  const [wantsToMeet, setWantsToMeet] = useState<Interest | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // The gender step scrolls itself, so it can bring the side question into view.
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollY = useRef(0);
 
-  const index = STEPS.indexOf(step);
-  const enter = from !== null ? (reduced ? stepEnterReduced : stepEnter) : undefined;
   const birthCheck = checkBirthday(birth);
-  // The wheel always holds a date, so the error shows as soon as it lands on one under 18.
   const birthdayError = 'error' in birthCheck ? t(birthCheck.error) : null;
 
   function goTo(next: Step) {
@@ -139,7 +151,7 @@ export function OnboardingScreen() {
   }, [step]);
 
   // Steps change inside one route, so the system posts no screen change.
-  // Move VoiceOver and TalkBack to the new heading once it has faded in.
+  // Move VoiceOver and TalkBack to the new heading once it has risen in.
   useEffect(() => {
     if (from === null || Platform.OS === 'web') return;
     const timer = setTimeout(() => {
@@ -148,52 +160,38 @@ export function OnboardingScreen() {
     return () => clearTimeout(timer);
   }, [step, from]);
 
-  function showBirthdayError(errorKey: string) {
-    const message = t(errorKey);
-    haptics.error();
-    // The hint's live region already speaks the error on Android and web.
-    // Queued, so it follows the wheel's new value instead of cutting it off.
-    if (Platform.OS === 'ios') {
-      AccessibilityInfo.announceForAccessibilityWithOptions(message, { queue: true });
+  // Say a new birthday error once, after the key echo. The live region speaks it elsewhere.
+  useEffect(() => {
+    if (birthdayError && Platform.OS === 'ios') {
+      AccessibilityInfo.announceForAccessibilityWithOptions(birthdayError, { queue: true });
     }
-  }
-
-  /** One haptic per settled wheel: the error's when the date just became too young. */
-  function changeBirth(next: BirthParts) {
-    const nextCheck = checkBirthday(next);
-    setBirth(next);
-    if ('error' in nextCheck && birthdayError === null) showBirthdayError(nextCheck.error);
-    else haptics.selection();
-  }
+  }, [birthdayError]);
 
   function handleContinue() {
+    haptics.light();
     if (step === 'birthday') {
-      if ('error' in birthCheck) {
-        showBirthdayError(birthCheck.error);
-        return;
-      }
+      if (!('birthDate' in birthCheck)) return;
       goTo('gender');
     } else if (step === 'gender') {
       goTo('meet');
     } else if (step === 'meet') {
-      goTo('terms');
+      goTo('rules');
     } else {
       finish();
     }
   }
 
   function finish() {
-    const checked = checkBirthday(birth);
-    if ('error' in checked) {
+    if (!('birthDate' in birthCheck)) {
       goTo('birthday');
-      showBirthdayError(checked.error);
       return;
     }
     if (!gender || !wantsToMeet) return;
     setOnboarding({
-      birthDate: checked.birthDate,
+      birthDate: birthCheck.birthDate,
       gender,
       wantsToMeet,
+      genderIdentity: identity.identity ?? undefined,
       termsAcceptedAt: new Date().toISOString(),
     });
     router.replace('/profile-setup');
@@ -204,6 +202,7 @@ export function OnboardingScreen() {
       birthDate: '2000-05-17',
       gender: 'woman' as const,
       wantsToMeet: 'man' as const,
+      genderIdentity: 'woman',
       termsAcceptedAt: new Date().toISOString(),
     };
     setOnboarding(answers);
@@ -211,321 +210,591 @@ export function OnboardingScreen() {
     router.replace('/home');
   }
 
+  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    scrollY.current = event.nativeEvent.contentOffset.y;
+  }
+
+  /**
+   * "Which side of the room?" appears under the identities, often below the
+   * fold. Scroll until it sits above Continue, or its top does if it's taller.
+   */
+  function revealSide(side: ViewInstance) {
+    // A frame later, once the new rows are laid out.
+    requestAnimationFrame(() => {
+      const scroller = scrollRef.current;
+      if (!scroller) return;
+      scroller.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
+        side.measureInWindow((_x, top, _w, height) => {
+          const below = top + height - (viewTop + viewHeight - Space.md);
+          if (below <= 0) return;
+          const delta = Math.min(below, top - (viewTop + Space.md));
+          scroller.scrollTo({ y: Math.max(0, scrollY.current + delta), animated: !reduced });
+        });
+      });
+    });
+  }
+
   function toggleTerms() {
     haptics.selection();
     setTermsAccepted((accepted) => !accepted);
   }
 
+  // Signing in again after signing out failed: the start screen offers to try again.
+  if (failed) return <Redirect href="/" />;
+
   if (step === 'welcome') {
+    // Always the dark treatment: light text over the video, whatever the Appearance setting.
     return (
-      // Keyed per step, so every step mounts fresh and starts scrolled to the top.
+      <ForcedScheme value="dark">
+      <StatusBar style="light" />
       <Screen
         key="welcome"
+        // Scrolls at large text sizes, so the copy never runs under the buttons.
         scroll
         footerStyle="plain"
         contentStyle={styles.welcomeContent}
+        background={<VideoBackground video={WELCOME_VIDEO} poster={WELCOME_POSTER} tint={Colors.dark.page} />}
         footer={
-          <View style={styles.welcomeActions}>
-            <Button title={t('onboarding.getStarted')} onPress={() => goTo('birthday')} />
+          <Rise index={3} style={styles.welcomeActions}>
+            <Button
+              title={t('onboarding.getStarted')}
+              onPress={() => {
+                haptics.light();
+                goTo('rooms');
+              }}
+            />
             {__DEV__ ? (
-              <Button
-                title={t('onboarding.skipTest')}
-                variant="ghost"
-                onPress={handleTestProfile}
-              />
+              <Button title={t('onboarding.skipTest')} variant="plain" onPress={handleTestProfile} />
             ) : null}
-          </View>
+          </Rise>
         }>
-        <Animated.View key="welcome" entering={enter} style={styles.welcome}>
-          <Wordmark />
-          <View style={styles.welcomeAbove} />
-          <View>
-            {/* Drawn first so the line sits over its string. Decorative. */}
-            <View
-              pointerEvents="none"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-              style={styles.welcomeBalloon}>
-              <Balloon color={theme.accent} size={160} />
-            </View>
+        <Rise index={0}>
+          {/* On the web a shadow draws around the box, not the glyphs, so only iOS gets one. */}
+          <View style={Platform.OS === 'ios' ? styles.logoShadow : styles.logo}>
+            <Wordmark />
+          </View>
+        </Rise>
+        <View style={styles.welcomeStage}>
+          <Rise index={1} style={styles.welcomeHero}>
             <View
               ref={headingRef}
               accessible
               accessibilityRole="header"
               accessibilityLabel={t('onboarding.heroLabel')}>
-              <ThemedText type="hero" maxFontSizeMultiplier={1.5}>
+              <ThemedText type="hero" maxFontSizeMultiplier={1.4} style={[styles.heroLine, styles.onVideo]}>
                 {t('onboarding.hero')}
               </ThemedText>
             </View>
-            <ThemedText themeColor="textSecondary" style={styles.welcomeBody}>
+          </Rise>
+          <Rise index={2}>
+            <ThemedText themeColor="textSecondary" style={[styles.welcomeBody, styles.onVideo]}>
               {t('onboarding.welcomeBody')}
             </ThemedText>
+          </Rise>
+        </View>
+      </Screen>
+      </ForcedScheme>
+    );
+  }
+
+  if (INTROS.includes(step as Intro)) {
+    const index = INTROS.indexOf(step as Intro);
+    const { Art, title, body } = INTRO[index];
+    const last = index === INTROS.length - 1;
+    return (
+      <Screen
+        key={step}
+        scroll
+        footerStyle="plain"
+        footer={
+          <Button
+            title={last ? t('onboarding.gotIt') : t('onboarding.next')}
+            onPress={() => {
+              haptics.light();
+              goTo(last ? 'birthday' : INTROS[index + 1]);
+            }}
+          />
+        }>
+        <Rise index={0} style={styles.introTop}>
+          <PageDots
+            count={INTROS.length}
+            active={index}
+            label={t('onboarding.introPage', { page: index + 1, total: INTROS.length })}
+          />
+          <Button
+            title={t('onboarding.skip')}
+            variant="plain"
+            fullWidth={false}
+            onPress={() => goTo('birthday')}
+          />
+        </Rise>
+        <Rise index={1} style={styles.introArt}>
+          <Art />
+        </Rise>
+        <Rise index={2} style={styles.introText}>
+          <View ref={headingRef} accessible accessibilityRole="header">
+            <ThemedText type="display">{t(title)}</ThemedText>
           </View>
-          <View style={styles.welcomeBelow} />
-        </Animated.View>
+          <ThemedText themeColor="textSecondary" style={styles.introBody}>
+            {t(body)}
+          </ThemedText>
+        </Rise>
       </Screen>
     );
   }
 
+  const question = step as Question;
+  const number = QUESTIONS.indexOf(question) + 1;
   const canContinue =
-    step === 'birthday'
-      ? birthdayError === null
-      : step === 'gender'
+    question === 'birthday'
+      ? 'birthDate' in birthCheck
+      : question === 'gender'
         ? gender !== null
-        : step === 'meet'
+        : question === 'meet'
           ? wantsToMeet !== null
           : termsAccepted;
-  const days = DAYS.slice(0, daysInMonth(birth.month, birth.year));
-  const stepLabel = setupStepLabel(index, t);
-  const title = t(TITLES[step]);
+  const stepLabel = setupStepLabel(number, t);
+  const title = t(TITLES[question]);
+  const previous = STEPS[STEPS.indexOf(question) - 1];
 
-  return (
-    <Screen
-      key={step}
-      scroll
-      footerStyle="plain"
-      footer={
-        <Button
-          title={t('common.continue')}
-          disabled={!canContinue}
-          onPress={handleContinue}
-          accessibilityHint={canContinue ? undefined : t(CONTINUE_HINTS[step])}
-        />
-      }>
-      {/* The bar and Back sit in the same place on every question, so they only
-          enter when you arrive from the welcome; after that only the question moves. */}
-      <Animated.View key="chrome" entering={from === 'welcome' ? enter : undefined}>
+  // The gender step scrolls in a view of its own, which revealSide can move.
+  const ownScroll = question === 'gender';
+  const body = (
+    <>
+      {/* The bar and Back stay put from question to question: they only rise in from the intro. */}
+      <Rise index={0}>
         <View style={styles.progress}>
-          <ProgressSegments
-            total={SETUP_STEPS}
-            filled={index}
-            accessibilityLabel={stepLabel}
-          />
+          <ProgressSegments total={SETUP_STEPS} filled={number} gap={4} accessibilityLabel={stepLabel} />
         </View>
-        <View style={styles.back}>
-          <BackButton onPress={() => goTo(STEPS[index - 1])} />
-        </View>
-      </Animated.View>
+        <BackButton onPress={() => goTo(previous)} />
+      </Rise>
 
-      <Animated.View key={step} entering={enter}>
-        <View
-          ref={headingRef}
-          accessible
-          accessibilityRole="header"
-          accessibilityLabel={`${title}, ${stepLabel}`}
-          style={styles.title}>
+      <Rise index={1} style={styles.heading}>
+        <View ref={headingRef} accessible accessibilityRole="header" accessibilityLabel={`${title}, ${stepLabel}`}>
           <ThemedText type="display">{title}</ThemedText>
         </View>
+        <ThemedText type="callout" themeColor="textSecondary">
+          {t(SUBTITLES[question])}
+        </ThemedText>
+      </Rise>
 
-        {step === 'birthday' ? (
-          <View style={styles.answer}>
-            <WheelPicker
-              invalid={birthdayError !== null}
-              columns={[
-                {
-                  label: t('onboarding.day'),
-                  values: days,
-                  selected: birth.day - 1,
-                  onChange: (i) => changeBirth({ ...birth, day: i + 1 }),
-                },
-                {
-                  label: t('onboarding.month'),
-                  values: monthNames(locale),
-                  selected: birth.month - 1,
-                  flex: 1.7,
-                  onChange: (i) =>
-                    changeBirth({
-                      ...birth,
-                      month: i + 1,
-                      day: Math.min(birth.day, daysInMonth(i + 1, birth.year)),
-                    }),
-                },
-                {
-                  label: t('onboarding.year'),
-                  values: YEARS,
-                  selected: birth.year - FIRST_YEAR,
-                  onChange: (i) =>
-                    changeBirth({
-                      ...birth,
-                      year: FIRST_YEAR + i,
-                      day: Math.min(birth.day, daysInMonth(birth.month, FIRST_YEAR + i)),
-                    }),
-                },
-              ]}
-            />
-            <BirthdayHint error={birthdayError} />
-          </View>
+      <Rise index={2} style={styles.answer}>
+        {question === 'birthday' ? (
+          <Birthday birth={birth} onChange={setBirth} check={birthCheck} error={birthdayError} />
         ) : null}
 
-        {step === 'gender' ? (
-          <View
-            style={[styles.answer, styles.options]}
-            accessibilityRole="radiogroup"
-            accessibilityLabel={title}>
-            <OptionRow
-              label={t('onboarding.woman')}
-              selected={gender === 'woman'}
-              onPress={() => setGender('woman')}
-            />
-            <OptionRow
-              label={t('onboarding.man')}
-              selected={gender === 'man'}
-              onPress={() => setGender('man')}
-            />
-          </View>
+        {question === 'gender' ? (
+          <IdentityPicker value={identity} onChange={setIdentity} label={title} onSideShown={revealSide} />
         ) : null}
 
-        {step === 'meet' ? (
-          <View
-            style={[styles.answer, styles.options]}
-            accessibilityRole="radiogroup"
-            accessibilityLabel={title}>
-            <OptionRow
-              label={t('onboarding.women')}
-              selected={wantsToMeet === 'woman'}
-              onPress={() => setWantsToMeet('woman')}
-            />
-            <OptionRow
-              label={t('onboarding.men')}
-              selected={wantsToMeet === 'man'}
-              onPress={() => setWantsToMeet('man')}
-            />
-          </View>
-        ) : null}
+        {question === 'meet' ? <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={title} /> : null}
 
-        {step === 'terms' ? (
-          <View style={styles.answer}>
+        {question === 'rules' ? (
+          <View style={styles.rulesAnswer}>
+            <View>
+              {RULES.map((rule, i) => (
+                <View
+                  key={rule.title}
+                  accessible
+                  style={[
+                    styles.rule,
+                    i < RULES.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+                  ]}>
+                  <Text style={[styles.ruleNumber, { color: theme.accent }]}>{i + 1}</Text>
+                  <View style={styles.ruleText}>
+                    <ThemedText type="task">{t(rule.title)}</ThemedText>
+                    <ThemedText type="callout" themeColor="textSecondary" style={styles.ruleBody}>
+                      {t(rule.body)}
+                    </ThemedText>
+                  </View>
+                </View>
+              ))}
+            </View>
             {/* The whole box is the checkbox; the links inside are read as part of its label. */}
             <PressableHighlight
               accessibilityRole="checkbox"
               accessibilityState={{ checked: termsAccepted }}
-              // The web reads the state from ARIA, not from accessibilityState.
               aria-checked={termsAccepted}
               accessibilityLabel={t('onboarding.termsLabel')}
               onPress={toggleTerms}
-              style={styles.terms}>
+              background={theme.field}
+              style={[styles.terms, { borderColor: theme.border }]}>
               <CheckMark checked={termsAccepted} shape="checkbox" />
-              {/* TODO(Elias): link the real Terms and Privacy Policy here. Until then a tap
-                  on either link toggles the box like the rest of it. */}
-              <ThemedText style={styles.flex}>
+              {/* Each link opens its page; a tap anywhere else toggles the box. */}
+              <ThemedText type="callout" style={[styles.flex, styles.termsText]}>
                 {t('onboarding.termsBefore')}
-                <ThemedText accessibilityRole="link" style={styles.link}>
+                <ThemedText
+                  accessibilityRole="link"
+                  style={styles.link}
+                  onPress={() => router.push('/settings/terms' as Href)}>
                   {t('onboarding.terms')}
                 </ThemedText>
                 {t('onboarding.termsAnd')}
-                <ThemedText accessibilityRole="link" style={styles.link}>
+                <ThemedText
+                  accessibilityRole="link"
+                  style={styles.link}
+                  onPress={() => router.push('/settings/privacy' as Href)}>
                   {t('onboarding.privacy')}
                 </ThemedText>
                 {t('onboarding.termsAfter')}
               </ThemedText>
             </PressableHighlight>
             {__DEV__ ? (
-              <ThemedText type="footnote" themeColor="textTertiary" style={styles.footnote}>
+              <ThemedText type="footnote" themeColor="textTertiary">
                 {t('onboarding.testAccount')}
               </ThemedText>
             ) : null}
           </View>
         ) : null}
-      </Animated.View>
+      </Rise>
+    </>
+  );
+
+  return (
+    <Screen
+      key={question}
+      scroll={!ownScroll}
+      contentStyle={ownScroll ? styles.bare : undefined}
+      footerStyle="plain"
+      footer={
+        <Button
+          title={question === 'rules' ? t('onboarding.agree') : t('common.continue')}
+          disabled={!canContinue}
+          onPress={handleContinue}
+          accessibilityHint={canContinue ? undefined : t(CONTINUE_HINTS[question])}
+        />
+      }>
+      {ownScroll ? (
+        <ScrollView
+          ref={scrollRef}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.flex}
+          contentContainerStyle={styles.ownScroll}>
+          {body}
+        </ScrollView>
+      ) : (
+        body
+      )}
     </Screen>
   );
 }
 
-/** The birthday's note, or its error with an icon, in the same place under the wheel. */
-function BirthdayHint({ error }: { error: string | null }) {
-  const t = useT();
+/** The welcome's looping background and its first frame (see VideoBackground). */
+const WELCOME_VIDEO = require('../../../assets/video/popdate_welcome_loop.mp4');
+const WELCOME_POSTER = require('../../../assets/images/popdate_welcome_poster.jpg');
+
+/** AutoFill hints for the three birthday fields. */
+const CONTENT_TYPES = { day: 'birthdateDay', month: 'birthdateMonth', year: 'birthdateYear' } as const;
+const AUTOCOMPLETE = { day: 'birthdate-day', month: 'birthdate-month', year: 'birthdate-year' } as const;
+
+/** Three dots over the intro cards, the current one a 20 pt bar. */
+function PageDots({ count, active, label }: { count: number; active: number; label: string }) {
+  const theme = useTheme();
   return (
-    <View accessibilityLiveRegion="polite" style={styles.hint}>
-      {error ? (
-        <Animated.View key="error" entering={errorEnter} style={styles.error}>
-          <ErrorIcon />
-          <ThemedText type="footnote" themeColor="danger" style={styles.flex}>
-            {error}
-          </ThemedText>
-        </Animated.View>
-      ) : (
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {t('onboarding.birthdayNote')}
-        </ThemedText>
-      )}
+    <View accessible accessibilityRole="progressbar" accessibilityLabel={label} style={styles.dots}>
+      {Array.from({ length: count }, (_, i) => (
+        <View
+          key={i}
+          style={[
+            styles.dot,
+            i === active && styles.dotActive,
+            { backgroundColor: i === active ? theme.accent : theme.track },
+          ]}
+        />
+      ))}
     </View>
   );
 }
 
+type BirthdayProps = {
+  birth: BirthEntry;
+  onChange: (next: BirthEntry) => void;
+  check: ReturnType<typeof checkBirthday>;
+  error: string | null;
+};
+
 /**
- * The welcome's free height splits like the canvas's 812pt frame: 328pt between
- * the wordmark and the line, 38pt between the copy and the bottom padding.
+ * Day, month and year in three fields, then the age the room will see, or what is
+ * wrong. A full field hands the cursor on to the next one, and deleting past the
+ * start of a field goes back to the one before.
  */
-const WELCOME_ABOVE = 328;
-const WELCOME_BELOW = 38;
+function Birthday({ birth, onChange, check, error }: BirthdayProps) {
+  const t = useT();
+  const theme = useTheme();
+  const dayRef = useRef<TextInputInstance>(null);
+  const monthRef = useRef<TextInputInstance>(null);
+  const yearRef = useRef<TextInputInstance>(null);
+  const parts = [
+    {
+      key: 'day',
+      label: t('onboarding.day'),
+      max: 2,
+      placeholder: t('onboarding.dayPlaceholder'),
+      ref: dayRef,
+      previous: null,
+    },
+    {
+      key: 'month',
+      label: t('onboarding.month'),
+      max: 2,
+      placeholder: t('onboarding.monthPlaceholder'),
+      ref: monthRef,
+      previous: dayRef,
+    },
+    {
+      key: 'year',
+      label: t('onboarding.year'),
+      max: 4,
+      placeholder: t('onboarding.yearPlaceholder'),
+      ref: yearRef,
+      previous: monthRef,
+    },
+  ] as const;
+
+  /**
+   * Digits typed into one field fill it, and any it can't hold run on into the
+   * next ones, so typing fast or pasting a whole date lands in the right places.
+   * The cursor follows to the next field once one is full.
+   */
+  function change(index: number, text: string) {
+    const next = { ...birth };
+    let rest = digitsOnly(text);
+    // More than one digit at once is a paste or AutoFill: it may fill the fields after this one.
+    // One digit typed into a full field never overwrites the next field's answer.
+    const pasted = rest.length - birth[parts[index].key].length > 1;
+    let landed = index;
+    for (let i = index; i < parts.length; i++) {
+      const { key, max } = parts[i];
+      let value = rest.slice(0, max);
+      rest = rest.slice(max);
+      // No day starts with 4 to 9 and no month with 2 to 9: that digit is the whole number.
+      const first = Number(value);
+      if (value.length === 1 && ((key === 'day' && first > 3) || (key === 'month' && first > 1))) {
+        value = `0${value}`;
+      }
+      next[key] = value;
+      landed = i;
+      if (!rest) break;
+      if (!pasted && i + 1 < parts.length && next[parts[i + 1].key] !== '') break;
+    }
+    onChange(next);
+    const { key, max } = parts[landed];
+    const filled = next[key].length === max && (landed > index || next[key].length > birth[key].length);
+    const focus = filled && landed < parts.length - 1 ? landed + 1 : landed;
+    if (focus !== index) parts[focus].ref.current?.focus();
+  }
+
+  return (
+    <View style={styles.birthday}>
+      <View style={styles.birthRow}>
+        {parts.map((part, index) => (
+          <View key={part.key} style={styles.flex}>
+            <TextField
+              ref={part.ref}
+              label={part.label}
+              value={birth[part.key]}
+              onChangeText={(text) => change(index, text)}
+              onKeyPress={({ nativeEvent }) => {
+                if (nativeEvent.key === 'Backspace' && birth[part.key] === '') part.previous?.current?.focus();
+              }}
+              autoFocus={part.key === 'day' && birth.day === ''}
+              textContentType={CONTENT_TYPES[part.key]}
+              autoComplete={AUTOCOMPLETE[part.key]}
+              keyboardType="number-pad"
+              placeholder={part.placeholder}
+              error={error !== null}
+              accessibilityHint={error ?? undefined}
+              style={styles.birthInput}
+            />
+          </View>
+        ))}
+      </View>
+      <View accessibilityLiveRegion="polite">
+        {error ? (
+          <Animated.View key="error" entering={errorEnter} style={styles.error}>
+            <ErrorIcon />
+            <ThemedText type="footnote" themeColor="danger" style={styles.flex}>
+              {error}
+            </ThemedText>
+          </Animated.View>
+        ) : 'age' in check ? (
+          <View style={[styles.ageCard, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <Text style={[styles.age, { color: theme.text }]}>{check.age}</Text>
+            <ThemedText type="callout" themeColor="textSecondary" style={styles.flex}>
+              {t('onboarding.ageSeen')}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   welcomeContent: {
     flexGrow: 1,
-    // The wordmark sits 20pt down, where it does on Home.
-    paddingTop: 20,
+    paddingTop: 10,
   },
-  welcome: {
-    flexGrow: 1,
+  // The line and copy sit low; the balloon floats above them in the space left.
+  welcomeStage: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: Space.lg,
+    gap: 20,
   },
-  welcomeAbove: {
-    flexGrow: WELCOME_ABOVE,
-    // Keeps the balloon below the wordmark's line however short the screen.
-    minHeight: 120,
+  welcomeHero: {
+    zIndex: 1,
   },
-  welcomeBelow: {
-    flexGrow: WELCOME_BELOW,
+  heroLine: {
+    maxWidth: 260,
   },
-  // On the canvas the balloon's top is 156pt above the line and 26pt in from the right edge.
-  welcomeBalloon: {
-    position: 'absolute',
-    top: -156,
-    right: 6,
+  // A soft shadow lifts the logo and the copy off the video.
+  onVideo: {
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 12,
+  },
+  logo: {
+    alignSelf: 'flex-start',
+  },
+  logoShadow: {
+    alignSelf: 'flex-start',
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 1 },
   },
   welcomeBody: {
-    marginTop: Space.md,
+    lineHeight: 23,
+    maxWidth: 330,
   },
   welcomeActions: {
     gap: 6,
   },
+  introTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: MinTouch,
+  },
+  dots: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotActive: {
+    width: 20,
+  },
+  introArt: {
+    marginTop: 12,
+  },
+  introText: {
+    marginTop: 40,
+    gap: 14,
+  },
+  introBody: {
+    lineHeight: 23,
+  },
   progress: {
     paddingTop: Space.xxs,
+    paddingBottom: Space.xxs,
   },
-  back: {
-    marginTop: Space.xs,
-  },
-  title: {
-    marginTop: Space.md,
+  heading: {
+    marginTop: 26,
+    gap: 10,
   },
   answer: {
-    marginTop: 28,
+    marginTop: Space.lg,
   },
-  options: {
-    gap: Space.xs,
+  birthday: {
+    gap: Space.lg,
   },
-  hint: {
-    marginTop: 10,
+  birthRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  birthInput: {
+    fontSize: 20,
+    fontVariant: ['tabular-nums'],
   },
   error: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 6,
+    gap: Space.xs,
+  },
+  ageCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  age: {
+    fontFamily: Fonts.serif,
+    fontWeight: 500,
+    fontSize: 28,
+    lineHeight: 30,
+    fontVariant: ['tabular-nums'],
+  },
+  rulesAnswer: {
+    gap: Space.lg,
+  },
+  rule: {
+    flexDirection: 'row',
+    gap: Space.md,
+    paddingVertical: Space.md,
+  },
+  ruleNumber: {
+    width: 28,
+    fontFamily: Fonts.serif,
+    fontSize: 26,
+    lineHeight: 28,
+  },
+  ruleText: {
+    flex: 1,
+    gap: 3,
+  },
+  ruleBody: {
+    fontSize: 14,
+    lineHeight: 19,
   },
   terms: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Space.sm,
-    padding: Space.md,
-    borderRadius: Radius.lg,
+    paddingVertical: 14,
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.md,
     borderCurve: 'continuous',
+    borderWidth: 1,
+  },
+  termsText: {
+    fontSize: 14,
+    lineHeight: 19,
   },
   link: {
     textDecorationLine: 'underline',
   },
-  footnote: {
-    marginTop: 14,
-  },
   flex: {
     flex: 1,
+  },
+  /** The Screen's own padding moves inside the gender step's scroll view. */
+  bare: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  ownScroll: {
+    paddingHorizontal: Gutter,
+    paddingTop: Space.sm,
+    // Room under the last side option, so it never ends flush on Continue.
+    paddingBottom: Space.xl,
   },
 });

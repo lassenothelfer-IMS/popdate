@@ -1,22 +1,52 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
-import { Balloon } from '@/components/balloon';
-import { Fonts, MinTouch } from '@/constants/theme';
+import { Colors, MinTouch } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-/** "Popdate" in Gloock after a small pop-red balloon. Small on purpose: the content leads. */
-export function Wordmark() {
-  const theme = useTheme();
+/** "Popdate" as Gloock glyph outlines with a little tracking, never retyped in the font. */
+const GLYPHS = [
+  'M0 0V-10Q36 -10 58 -32Q80 -54 80 -90V-660Q80 -696 58 -718Q36 -740 0 -740V-750H334Q411 -749 468.5 -723.5Q526 -698 558.5 -653Q591 -608 591 -547Q591 -486 558.5 -440.5Q526 -395 466.5 -369.5Q407 -344 326 -344H234V-90Q234 -54 256 -32Q278 -10 314 -10H316V0ZM234 -357H293Q336 -357 367.5 -381.5Q399 -406 416.5 -449Q434 -492 434 -547Q434 -602 416.5 -645Q399 -688 367 -712.5Q335 -737 292 -737H234Z',
+  'M891 14Q809 14 747.5 -19Q686 -52 652 -112Q618 -172 618 -254Q618 -336 652 -396Q686 -456 747.5 -489Q809 -522 891 -522Q973 -522 1034 -489Q1095 -456 1129 -396Q1163 -336 1163 -254Q1163 -172 1129 -112Q1095 -52 1034 -19Q973 14 891 14ZM890 1Q925 1 950 -34Q975 -69 989 -127.5Q1003 -186 1003 -255Q1003 -330 988.5 -387.5Q974 -445 948.5 -477.5Q923 -510 891 -510Q857 -510 831.5 -475Q806 -440 792 -382Q778 -324 778 -255Q778 -179 793 -121Q808 -63 833.5 -31Q859 1 890 1Z',
+  'M1155 210V200H1156Q1192 200 1214 178Q1236 156 1236 120V-418Q1235 -462 1217 -480Q1199 -498 1155 -498V-508H1254Q1313 -508 1335 -519Q1357 -530 1367 -546H1377L1378 -418Q1401 -463 1448 -493Q1495 -523 1547 -523Q1603 -523 1646 -489Q1689 -455 1713.5 -396.5Q1738 -338 1738 -262Q1738 -178 1708 -116Q1678 -54 1623.5 -20Q1569 14 1494 14Q1453 14 1427 1.5Q1401 -11 1380 -40V120Q1380 156 1402 178Q1424 200 1460 200H1461V210ZM1473 -3Q1527 -3 1555 -70Q1582 -138 1582 -265Q1582 -483 1494 -483Q1460 -483 1427 -456Q1394 -429 1380 -390V-157Q1380 -85 1405 -44Q1430 -3 1473 -3Z',
+  'M2148 38 2147 -104Q2123 -52 2075 -18.5Q2027 15 1972 15Q1918 15 1875 -19Q1832 -53 1807 -112.5Q1782 -172 1782 -247Q1782 -331 1813.5 -393Q1845 -455 1901 -488.5Q1957 -522 2030 -522Q2071 -522 2097 -509.5Q2123 -497 2144 -467V-660Q2144 -696 2121.5 -718Q2099 -740 2063 -740V-750H2165Q2215 -750 2241 -760Q2267 -770 2278 -788H2288V-90Q2288 -54 2310 -32Q2332 -10 2369 -10V0H2267Q2223 0 2197.5 9Q2172 18 2158 38ZM2027 -25Q2050 -25 2073.5 -39.5Q2097 -54 2116 -78Q2135 -102 2144 -129V-373Q2139 -433 2114.5 -469Q2090 -505 2051 -505Q1999 -505 1970 -439Q1942 -373 1942 -244Q1942 -25 2027 -25Z',
+  'M2494 14Q2433 14 2396 -19Q2359 -52 2359 -106Q2359 -129 2367 -149.5Q2375 -170 2397 -190Q2420 -210 2460 -231.5Q2500 -253 2566 -277L2659 -311V-386Q2659 -443 2641 -476.5Q2623 -510 2591 -510Q2553 -509 2526.5 -460Q2500 -411 2491 -324L2383 -386Q2400 -427 2435 -458Q2470 -489 2515.5 -506Q2561 -523 2611 -523Q2696 -523 2749.5 -475.5Q2803 -428 2803 -346V-105Q2803 -47 2842 -47Q2865 -47 2887 -72L2895 -65Q2869 -30 2832 -8Q2795 14 2760 14Q2722 14 2694.5 -12Q2667 -38 2660 -81Q2611 -31 2574.5 -8.5Q2538 14 2494 14ZM2569 -48Q2591 -48 2611.5 -59Q2632 -70 2658 -95L2659 -298L2619 -283Q2568 -264 2541 -244.5Q2514 -225 2503.5 -201Q2493 -177 2493 -146Q2493 -103 2514.5 -75.5Q2536 -48 2569 -48Z',
+  'M3072 14Q3020 14 2987 -19Q2954 -52 2954 -105V-490H2869V-503Q2938 -508 2992.5 -547Q3047 -586 3082 -652H3098V-508H3231L3221 -490H3098V-127Q3098 -47 3152 -47Q3170 -47 3193.5 -58Q3217 -69 3238 -87V-77Q3205 -35 3160 -10.5Q3115 14 3072 14Z',
+  'M3496 12Q3427 12 3373.5 -22Q3320 -56 3290 -116.5Q3260 -177 3260 -255Q3260 -335 3293 -395Q3326 -455 3383.5 -488.5Q3441 -522 3514 -522Q3575 -522 3622.5 -498Q3670 -474 3698.5 -430.5Q3727 -387 3731 -330L3732 -315H3396V-310Q3396 -204 3443 -140.5Q3490 -77 3569 -77Q3617 -77 3660.5 -100.5Q3704 -124 3731 -164L3740 -161Q3723 -110 3687 -71Q3651 -32 3602 -10Q3553 12 3496 12ZM3397 -330H3600Q3600 -409 3574.5 -458Q3549 -507 3503 -507Q3459 -507 3430 -459Q3401 -411 3397 -330Z',
+];
+
+/** The rose dot after the "e", sitting on the baseline. */
+const DOT = { cx: 3830, cy: -88, r: 88 };
+/** The box in font units: the "d"'s ascender to the "p"'s descender, and the dot. */
+const VIEW_BOX = { x: -20, y: -800, width: 3958, height: 1022 };
+
+type WordmarkProps = {
+  /** The font size in points: 20 in headers, 16 on the recap card. */
+  size?: number;
+  /** Draw in one theme whatever the app's theme is, like the recap card, which is always Cream. */
+  tone?: 'velvet' | 'cream';
+  /** Just the mark's own height, for a card. Headers keep a full touch row. */
+  compact?: boolean;
+};
+
+/** "Popdate" in Gloock with a rose dot. Small on purpose: the content leads. */
+export function Wordmark({ size = 20, tone, compact = false }: WordmarkProps) {
+  const current = useTheme();
+  const theme = tone ? Colors[tone === 'cream' ? 'light' : 'dark'] : current;
+  const height = (size * VIEW_BOX.height) / 1000;
+  const width = (height * VIEW_BOX.width) / VIEW_BOX.height;
   return (
     <View
-      style={styles.row}
+      style={[styles.row, compact && styles.compact]}
       accessible
       accessibilityRole="header"
       accessibilityLabel="Popdate">
-      <Balloon color={theme.accent} size={13} string={false} shine={false} />
-      <Text style={[styles.text, { color: theme.text }]} maxFontSizeMultiplier={1.3}>
-        Popdate
-      </Text>
+      <Svg width={width} height={height} viewBox={`${VIEW_BOX.x} ${VIEW_BOX.y} ${VIEW_BOX.width} ${VIEW_BOX.height}`}>
+        {GLYPHS.map((d, i) => (
+          <Path key={i} d={d} fill={theme.text} />
+        ))}
+        <Circle cx={DOT.cx} cy={DOT.cy} r={DOT.r} fill={theme.accent} />
+      </Svg>
     </View>
   );
 }
@@ -25,15 +55,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     minHeight: MinTouch,
     alignSelf: 'flex-start',
   },
-  text: {
-    fontFamily: Fonts.serif,
-    fontWeight: 400,
-    fontSize: 23,
-    lineHeight: 28,
-    letterSpacing: -0.23,
+  compact: {
+    minHeight: 0,
   },
 });

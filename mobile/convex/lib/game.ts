@@ -1,5 +1,14 @@
 export const ANSWER_MS = 60_000;
+/**
+ * Answers still land this long after the deadline players see, so clock skew or a
+ * slow connection doesn't lose one sent right at the end.
+ */
+export const ANSWER_GRACE_MS = 3_000;
 export const POP_REMINDER_MS = 30_000;
+/** How long the popper has to pick a question before one is picked for them. */
+export const PICK_MS = 30_000;
+/** After the reminder, how long until a random balloon pops so the room never stalls. */
+export const POP_LIMIT_MS = 30_000;
 export const QUESTION_OPTIONS_PER_ROUND = 5;
 export const MAX_ANSWER_LENGTH = 280;
 export const MAX_MESSAGE_LENGTH = 1000;

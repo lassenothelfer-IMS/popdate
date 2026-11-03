@@ -2,14 +2,12 @@ import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import type { Question } from '@/api';
+import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { ThemedText } from '@/components/themed-text';
-import { CssEase, Motion, Radius, Space } from '@/constants/theme';
+import { CssEase, Motion, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
-
-/** Rows reach this far into the gutter, so their text lines up with the heading. */
-const ROW_INSET = Space.sm;
 
 type QuestionPickerProps = {
   options: Question[];
@@ -22,7 +20,7 @@ type QuestionPickerProps = {
   answering: number;
 };
 
-/** The popper's question options: plain rows, the picked one on a red wash with a red edge. */
+/** The chooser's question options: New York rows over hairlines, the picked one checked. */
 export function QuestionPicker({
   options,
   selectedId,
@@ -62,23 +60,27 @@ export function QuestionPicker({
                 accessibilityState={{ checked: selected, disabled: locked }}
                 disabled={locked}
                 onPress={() => onSelect(question.id)}
-                background={selected ? theme.accentWash : theme.page}
-                style={styles.option}>
-                <ThemedText style={styles.text}>{question.text}</ThemedText>
-                {/* Drawn over the row, so picking one never moves its text. */}
+                background="transparent"
+                style={[styles.option, { borderBottomColor: theme.border }]}>
+                <ThemedText type="questionRow" style={styles.text}>
+                  {question.text}
+                </ThemedText>
+                {/* The picked one gets a filled check; it always has its place, so text never moves. */}
                 <Animated.View
-                  pointerEvents="none"
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
                   style={[
-                    styles.edge,
+                    styles.check,
                     {
-                      borderColor: theme.accentText,
+                      backgroundColor: theme.inverse,
                       opacity: selected ? 1 : 0,
                       transitionProperty: 'opacity',
                       transitionDuration: Motion.state,
                       transitionTimingFunction: CssEase.out,
                     },
-                  ]}
-                />
+                  ]}>
+                  <Icon name="check" size={11} color={theme.onInverse} />
+                </Animated.View>
               </PressableHighlight>
             </Animated.View>
           );
@@ -94,26 +96,23 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: Space.sm,
-    marginHorizontal: -ROW_INSET,
-    gap: 2,
   },
+  /** A question row: New York 19/24, a hairline under it, the check on the right. */
   option: {
-    paddingHorizontal: ROW_INSET + 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
     paddingVertical: 14,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   text: {
-    fontWeight: 500,
+    flex: 1,
   },
-  edge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: Radius.md,
-    borderCurve: 'continuous',
-    borderWidth: 1,
+  check: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

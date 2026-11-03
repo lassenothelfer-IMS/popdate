@@ -1,18 +1,22 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ActivityIndicator,
   Platform,
   StyleSheet,
+  Text,
   useWindowDimensions,
   View,
   type StyleProp,
+  type TextInputInstance,
   type ViewStyle,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import type { Units } from '@/api';
-import { ErrorIcon, errorEnter } from '@/components/error-line';
+import { api, convexServer, type Units } from '@/api';
+import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
+import { ErrorIcon, ErrorLine, errorEnter } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { Photo, type PhotoTone } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
@@ -20,17 +24,23 @@ import { PressableScale } from '@/components/pressable-scale';
 import { Section } from '@/components/section';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
-import { Gutter, MaxContentWidth, MinTouch, Radius } from '@/constants/theme';
+import { Fonts, Gutter, MaxContentWidth, MinTouch, PhotoGlass, Radius, Velvet } from '@/constants/theme';
+import { asSexuality, type Sexuality } from '@/features/profile/identity';
+import { keepPickedPhoto, livePhoto } from '@/features/profile/photo-files';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
 import { useSettings } from '@/state/settings';
+import { readJson, writeJson } from '@/utils/device-store';
 import { cmToFeetInches, feetInchesToCm, formatHeight } from '@/utils/units';
 
-export const PHOTO_COUNT = 6;
-/** The grid: three columns of 96pt rows; the lead photo spans two by two. */
-const GRID_GAP = 8;
-const ROW_HEIGHT = 96;
+/** Slots in the grid. Four photos are enough to play; the last two are optional. */
+export const PHOTO_COUNT = MAX_PHOTOS;
+/** The grid: three columns of 108 pt rows, 10 apart; the lead photo spans two by two. */
+const GRID_GAP = 10;
+const ROW_HEIGHT = 108;
+/** The "Photo n" tag's dark glass, the same on every photo in both themes. */
+const TAG_GLASS = PhotoGlass.tag;
 const LEAD_HEIGHT = ROW_HEIGHT * 2 + GRID_GAP;
 const HEIGHT_MIN = 120;
 const HEIGHT_MAX = 230;
@@ -111,7 +121,75 @@ function heightRangeMessage(t: Translate, units: Units) {
  * (empty to start) and editing your profile (prefilled). Height follows your
  * units setting and is always handed back in cm.
  */
-export function useProfileForm(initial: ProfileDetails | null) {
+/** What profile setup keeps on the device while you fill it in. */
+type SetupDraft = {
+  photos: string[];
+  name: string;
+  city: string;
+  height: HeightEntry;
+  job: string;
+  bio: string;
+  genderDetails: string;
+  sexuality: Sexuality | null;
+};
+
+function text(value: unknown) {
+  return typeof value === 'string' ? value : '';
+}
+
+/**
+ * A draft read back from the device, checked field by field: an older app
+ * version (or a broken write) may have left anything there. A missing field
+ * comes back empty, and photos whose file is gone are dropped.
+ */
+function checkedDraft(value: unknown, units: Units): SetupDraft | null {
+  if (!value || typeof value !== 'object') return null;
+  const draft = value as Partial<Record<keyof SetupDraft, unknown>>;
+  const height = (draft.height && typeof draft.height === 'object' ? draft.height : {}) as Partial<
+    Record<keyof HeightEntry, unknown>
+  >;
+  const photos = Array.isArray(draft.photos) ? draft.photos : [];
+  return {
+    photos: photos
+      .map((uri) => (typeof uri === 'string' ? livePhoto(uri) : null))
+      .filter((uri) => uri !== null)
+      .slice(0, PHOTO_COUNT),
+    name: text(draft.name),
+    city: text(draft.city),
+    height: {
+      units: height.units === 'metric' || height.units === 'imperial' ? height.units : units,
+      cm: digitsOnly(text(height.cm)).slice(0, 3),
+      feet: digitsOnly(text(height.feet)).slice(0, 1),
+      inches: digitsOnly(text(height.inches)).slice(0, 2),
+    },
+    job: text(draft.job),
+    bio: text(draft.bio).slice(0, BIO_MAX),
+    genderDetails: text(draft.genderDetails),
+    sexuality: asSexuality(typeof draft.sexuality === 'string' ? draft.sexuality : undefined),
+  };
+}
+
+/**
+ * A failed save in words: the server's own message when it wrote one for you
+ * (like "You need to be 18 or older."), and the generic line for anything else,
+ * like a dropped connection.
+ */
+export function saveFailedMessage(t: Translate, error: unknown) {
+  // Server and mock messages are plain Errors; a TypeError and the like are the app's own faults.
+  if (error instanceof Error && error.name === 'Error' && error.message && error.message !== GENERIC_ERROR) {
+    return error.message;
+  }
+  return t('profile.saveFailed');
+}
+
+/** What the Convex server says when its error wasn't written for you. */
+const GENERIC_ERROR = 'Something went wrong. Try again.';
+
+/**
+ * `draftKey`: keep the form on the device as you go and bring it back on the
+ * next launch, for profile setup, where nothing is saved to the server yet.
+ */
+export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { draftKey?: string } = {}) {
   const t = useT();
   const { units } = useSettings().settings;
   const [start] = useState(() => ({
@@ -125,6 +203,64 @@ export function useProfileForm(initial: ProfileDetails | null) {
   const [heightBlurred, setHeightBlurred] = useState(false);
   const [job, setJob] = useState(initial?.job ?? '');
   const [bio, setBio] = useState(initial?.bio ?? '');
+  const [genderDetails, setGenderDetails] = useState(initial?.genderDetails ?? '');
+  const [sexuality, setSexuality] = useState<Sexuality | null>(asSexuality(initial?.sexuality));
+  // Bring back a draft from an earlier launch, then keep it up to date.
+  const draftRestored = useRef(!draftKey);
+  // Set by every change you make. A draft that arrives after you started typing doesn't overwrite it.
+  const touched = useRef(false);
+  useEffect(() => {
+    if (!draftKey) return;
+    let live = true;
+    void readJson<unknown>(draftKey).then((stored) => {
+      if (!live) return;
+      const draft = checkedDraft(stored, units);
+      if (draft && !touched.current) {
+        setPhotos(draft.photos);
+        setName(draft.name);
+        setCity(draft.city);
+        setTypedHeight(draft.height);
+        setJob(draft.job);
+        setBio(draft.bio);
+        setGenderDetails(draft.genderDetails);
+        setSexuality(draft.sexuality);
+      }
+      draftRestored.current = true;
+    });
+    return () => {
+      live = false;
+    };
+  }, [draftKey, units]);
+
+  /** A setter that also marks the form as changed by you. */
+  function touching<T>(set: (value: T) => void) {
+    return (value: T) => {
+      touched.current = true;
+      set(value);
+    };
+  }
+  useEffect(() => {
+    if (!draftKey) return;
+    const timer = setTimeout(() => {
+      if (!draftRestored.current) return;
+      const draft: SetupDraft = {
+        photos,
+        name,
+        city,
+        height: typedHeight,
+        job,
+        bio,
+        genderDetails,
+        sexuality,
+      };
+      void writeJson(draftKey, draft);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [draftKey, photos, name, city, typedHeight, job, bio, genderDetails, sexuality]);
+
+  // The picker is open, or iCloud is still handing over the photos you chose.
+  const [picking, setPicking] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   // If the units setting changes under the form, show the same height in the new units.
   const height =
@@ -141,27 +277,29 @@ export function useProfileForm(initial: ProfileDetails | null) {
       : height.inches.length >= 2 || feetAreHopeless(height.feet);
   const showHeightError = heightTyped && !heightValid && (heightBlurred || heightDone);
 
+  // Height, job and bio are optional; a height you start typing has to make sense.
   const missingDetails = (
     [
       !name.trim() && 'name',
       !city.trim() && 'city',
-      !heightValid && 'height',
-      !job.trim() && 'job',
-      !bio.trim() && 'bio',
+      heightTyped && !heightValid && 'height',
     ] as const
   ).filter((detail) => detail !== false);
   const detailsDone = missingDetails.length === 0;
-  const photosLeft = PHOTO_COUNT - photos.length;
+  /** Photos still needed to play (the minimum, not every slot). */
+  const photosLeft = Math.max(0, MIN_PHOTOS - photos.length);
   const complete = photosLeft === 0 && detailsDone;
+  const savedHeight = heightTyped ? heightCm : null;
 
-  const details: ProfileDetails | null =
-    complete && heightCm !== null
+  const details: ProfileDetails | null = complete
       ? {
           name: name.trim(),
           city: city.trim(),
-          heightCm,
+          heightCm: savedHeight,
           job: job.trim(),
           bio: bio.trim(),
+          genderDetails: genderDetails.trim() || undefined,
+          sexuality: sexuality ?? undefined,
           photos,
         }
       : null;
@@ -172,9 +310,11 @@ export function useProfileForm(initial: ProfileDetails | null) {
     photos.join('\n') !== before.photos.join('\n') ||
     name.trim() !== before.name.trim() ||
     city.trim() !== before.city.trim() ||
-    heightCm !== before.heightCm ||
+    savedHeight !== before.heightCm ||
     job.trim() !== before.job.trim() ||
-    bio.trim() !== before.bio.trim();
+    bio.trim() !== before.bio.trim() ||
+    genderDetails.trim() !== (before.genderDetails ?? '').trim() ||
+    sexuality !== asSexuality(before.sexuality);
 
   /** What still stands between you and the footer's action, or null when nothing does. */
   function missing(purpose: 'start' | 'save'): string | null {
@@ -203,44 +343,80 @@ export function useProfileForm(initial: ProfileDetails | null) {
   }
 
   async function addPhotos() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: PHOTO_COUNT - photos.length,
-      orderedSelection: true,
-      quality: 0.8,
-    });
-    if (result.canceled) return;
-    const picked = result.assets.map((asset) => asset.uri);
-    setPhotos((current) => [...current, ...picked].slice(0, PHOTO_COUNT));
+    // A second tap while photos are still loading would open a second picker.
+    if (picking) return;
+    setPicking(true);
+    setPhotoError(null);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: PHOTO_COUNT - photos.length,
+        orderedSelection: true,
+        // Hand back each photo as stored, without decoding and re-saving it as a JPEG:
+        // the picker then only copies the files, which is what makes picking six fast.
+        quality: 1,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
+        // Most iPhone photos are Live Photos, often kept in iCloud only. Without this
+        // the first pick of one fails, and only a second try finds it downloaded.
+        shouldDownloadFromNetwork: true,
+      });
+      if (result.canceled) return;
+      touched.current = true;
+      // Only as many as there are free slots; the picker's limit isn't kept everywhere.
+      const picked = result.assets.slice(0, PHOTO_COUNT - photos.length);
+      // Copied out of the picker's cache, which the system may clear before the profile is saved.
+      const kept = await Promise.all(picked.map((asset) => keepPickedPhoto(asset.uri)));
+      // Start the uploads now, so saving the profile has little left to wait for.
+      kept.forEach((uri) => api.preparePhoto(uri));
+      setPhotos((current) => [...current, ...kept].slice(0, PHOTO_COUNT));
+    } catch {
+      const message = t('profile.photosFailed');
+      setPhotoError(message);
+      AccessibilityInfo.announceForAccessibility(message);
+    } finally {
+      setPicking(false);
+    }
   }
 
   function removePhoto(index: number) {
-    setPhotos((current) => current.filter((_, i) => i !== index));
+    touched.current = true;
+    setPhotoError(null);
+    const next = photos.filter((_, i) => i !== index);
+    setPhotos(next);
+    // Its early upload is no longer needed.
+    convexServer?.forgetPhotos(next);
   }
 
-  function changeHeight(part: 'cm' | 'feet' | 'inches', text: string) {
-    setTypedHeight({ ...height, [part]: digitsOnly(text) });
+  function changeHeight(part: 'cm' | 'feet' | 'inches', value: string) {
+    touched.current = true;
+    setTypedHeight({ ...height, [part]: digitsOnly(value) });
   }
 
   return {
     photos,
-    setPhotos,
+    setPhotos: touching(setPhotos),
     addPhotos,
+    picking,
+    photoError,
     removePhoto,
     name,
-    setName,
+    setName: touching(setName),
     city,
-    setCity,
+    setCity: touching(setCity),
     height,
     changeHeight,
     blurHeight: () => setHeightBlurred(true),
     showHeightError,
     heightError: heightRangeMessage(t, height.units),
     job,
-    setJob,
+    setJob: touching(setJob),
     bio,
-    setBio,
+    setBio: touching(setBio),
+    genderDetails,
+    setGenderDetails: touching(setGenderDetails),
+    sexuality,
+    setSexuality: touching(setSexuality),
     complete,
     details,
     changed,
@@ -253,10 +429,12 @@ export type ProfileForm = ReturnType<typeof useProfileForm>;
 type PhotoSectionProps = {
   form: ProfileForm;
   style?: StyleProp<ViewStyle>;
+  /** Just the grid, for a screen whose title already says "photos" (profile setup). */
+  bare?: boolean;
 };
 
 /** "Photos" and the six-slot grid: the lead photo two by two, then five more, in order. */
-export function PhotoSection({ form, style }: PhotoSectionProps) {
+export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
   const t = useT();
   const seats = useSeats();
   const { width: windowWidth } = useWindowDimensions();
@@ -280,6 +458,7 @@ export function PhotoSection({ form, style }: PhotoSectionProps) {
         size={index === 0 ? leadSize : smallSize}
         uri={photos[index]}
         isNext={index === photos.length}
+        busy={form.picking}
         name={form.name.trim()}
         tone={tone}
         onAdd={form.addPhotos}
@@ -288,25 +467,33 @@ export function PhotoSection({ form, style }: PhotoSectionProps) {
     );
   }
 
+  const grid = (
+    <View
+      style={[styles.grid, bare && style]}
+      onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
+      <View style={styles.gridRow}>
+        {slot(0)}
+        <View style={styles.grid}>
+          {slot(1)}
+          {slot(2)}
+        </View>
+      </View>
+      <View style={styles.gridRow}>
+        {slot(3)}
+        {slot(4)}
+        {slot(5)}
+      </View>
+      {form.photoError ? <ErrorLine message={form.photoError} /> : null}
+    </View>
+  );
+  if (bare) return grid;
+
   return (
     <Section
       title={t('profile.photos')}
       aside={t('profile.photosCount', { filled: photos.length, total: PHOTO_COUNT })}
       style={[styles.section, style]}>
-      <View style={styles.grid} onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}>
-        <View style={styles.gridRow}>
-          {slot(0)}
-          <View style={styles.grid}>
-            {slot(1)}
-            {slot(2)}
-          </View>
-        </View>
-        <View style={styles.gridRow}>
-          {slot(3)}
-          {slot(4)}
-          {slot(5)}
-        </View>
-      </View>
+      {grid}
     </Section>
   );
 }
@@ -318,6 +505,8 @@ type PhotoSlotProps = {
   uri: string | undefined;
   /** The first empty slot: where the next photo goes. */
   isNext: boolean;
+  /** Photos are on their way in: the next slot spins and taps wait. */
+  busy: boolean;
   /** Your first name, for a mock photo's initial. */
   name: string;
   tone: PhotoTone;
@@ -326,7 +515,7 @@ type PhotoSlotProps = {
 };
 
 /** One slot of the photo grid: filled, the next one to add, or a quiet numbered placeholder. */
-function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: PhotoSlotProps) {
+function PhotoSlot({ index, size, uri, isNext, busy, name, tone, onAdd, onRemove }: PhotoSlotProps) {
   const t = useT();
   const theme = useTheme();
   const position = index + 1;
@@ -343,13 +532,21 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
           style={StyleSheet.absoluteFill}
           accessibilityLabel={t('profile.yourPhoto', { position })}
         />
-        {/* The order is the point of this grid, so every photo wears its number. */}
+        {/* The order is the point of this grid, so every photo wears its number. The
+            lead says which round sees it, on the text color; the rest on dark glass. */}
         <View
-          style={[styles.number, { backgroundColor: theme.field }]}
+          style={[
+            styles.number,
+            lead ? styles.leadTag : styles.smallTag,
+            { backgroundColor: lead ? theme.inverse : TAG_GLASS },
+          ]}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants">
-          <ThemedText type="captionStrong" maxFontSizeMultiplier={1.2}>
-            {position}
+          <ThemedText
+            type="captionStrong"
+            maxFontSizeMultiplier={1.2}
+            style={[styles.tagText, { color: lead ? theme.onInverse : Velvet.cream }]}>
+            {lead ? t('profile.roundTag', { round: 1 }) : position}
           </ThemedText>
         </View>
         <PressableScale
@@ -357,32 +554,62 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
           accessibilityLabel={t('profile.removePhoto', { position })}
           onPress={onRemove}
           containerStyle={styles.removeTarget}
-          style={[styles.removeCircle, { backgroundColor: theme.inverse }]}>
-          <Icon name="close" size={10} color={theme.onInverse} />
+          style={[styles.removeCircle, { backgroundColor: theme.field }]}>
+          <Icon name="close" size={10} color={theme.text} />
         </PressableScale>
       </View>
     );
   }
 
-  if (isNext) {
-    const title = lead ? t('profile.addLeadPhoto') : t('profile.add');
+  if (isNext && lead) {
+    // The first photo: the one place to tap, on accent soft with a coral edge.
     return (
       <PressableHighlight
         accessibilityRole="button"
-        accessibilityLabel={lead ? title : t('profile.addPhotosLabel')}
+        accessibilityLabel={t('profile.addLeadPhoto')}
         accessibilityHint={t('profile.addPhotoHint', { position })}
+        accessibilityState={{ busy }}
         onPress={onAdd}
-        background={theme.field}
-        style={[styles.slot, styles.addSlot, size, { borderColor: theme.borderStrong }]}>
-        <Icon name="add" size={lead ? 28 : 22} color={theme.text} />
+        disabled={busy}
+        background={theme.accentWash}
+        style={[styles.slot, styles.addSlot, size, { boxShadow: `inset 0 0 0 1.5px ${theme.accent}` }]}>
+        {busy ? (
+          <ActivityIndicator color={theme.accentText} />
+        ) : (
+          <Icon name="add" size={28} color={theme.accentText} />
+        )}
         {/* The slot keeps its size, so the label shrinks rather than overflow it. */}
         <ThemedText
           type="headline"
-          numberOfLines={lead ? 2 : 1}
+          themeColor="accentText"
+          numberOfLines={2}
           adjustsFontSizeToFit
-          style={styles.addLabel}>
-          {title}
+          style={[styles.addLabel, styles.addTitle]}>
+          {t('profile.firstPhoto')}
         </ThemedText>
+        <ThemedText type="caption" themeColor="accentText" style={[styles.addLabel, styles.addNote]}>
+          {t('profile.roundSees', { round: 1 })}
+        </ThemedText>
+      </PressableHighlight>
+    );
+  }
+
+  if (isNext) {
+    return (
+      <PressableHighlight
+        accessibilityRole="button"
+        accessibilityLabel={t('profile.addPhotosLabel')}
+        accessibilityHint={t('profile.addPhotoHint', { position })}
+        accessibilityState={{ busy }}
+        onPress={onAdd}
+        disabled={busy}
+        background={theme.surface}
+        style={[styles.slot, styles.addSlot, size]}>
+        {busy ? (
+          <ActivityIndicator color={theme.textSecondary} />
+        ) : (
+          <Icon name="add" size={22} color={theme.textSecondary} />
+        )}
       </PressableHighlight>
     );
   }
@@ -392,9 +619,9 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
       accessible
       accessibilityLabel={t('profile.emptySlot', { position })}
       style={[styles.slot, size, { backgroundColor: theme.surface }]}>
-      <ThemedText type="label" themeColor="textSecondary" numberOfLines={1} adjustsFontSizeToFit>
+      <Text style={[styles.emptyNumber, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
         {position}
-      </ThemedText>
+      </Text>
     </View>
   );
 }
@@ -402,66 +629,107 @@ function PhotoSlot({ index, size, uri, isNext, name, tone, onAdd, onRemove }: Ph
 type DetailsSectionProps = {
   form: ProfileForm;
   style?: StyleProp<ViewStyle>;
+  /** Just the fields, for a screen whose title already introduces them (profile setup). */
+  bare?: boolean;
 };
 
-/** "About you": first name, city, height (in your units), job or school, and the bio. */
-export function DetailsSection({ form, style }: DetailsSectionProps) {
+/**
+ * "About you": first name and city, then height (in your units) beside job or
+ * school, then the bio with what is left of its length.
+ */
+export function DetailsSection({ form, style, bare = false }: DetailsSectionProps) {
   const t = useT();
   const bioLeft = BIO_MAX - form.bio.length;
+  const metric = form.height.units === 'metric';
+  // Next on the keyboard walks name, city, height, job, then the bio.
+  const cityRef = useRef<TextInputInstance>(null);
+  const heightRef = useRef<TextInputInstance>(null);
+  const jobRef = useRef<TextInputInstance>(null);
+  const bioRef = useRef<TextInputInstance>(null);
+  const job = (
+    <TextField
+      ref={jobRef}
+      label={t('profile.optionalLabel', { label: t('profile.jobOrSchool') })}
+      value={form.job}
+      onChangeText={form.setJob}
+      maxLength={60}
+      returnKeyType="next"
+      submitBehavior="submit"
+      onSubmitEditing={() => bioRef.current?.focus()}
+    />
+  );
+
+  const fields = (
+    <View style={[styles.fields, bare && style]}>
+      <TextField
+        label={t('profile.firstName')}
+        value={form.name}
+        onChangeText={form.setName}
+        maxLength={30}
+        autoCapitalize="words"
+        autoComplete="given-name"
+        textContentType="givenName"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => cityRef.current?.focus()}
+      />
+      <TextField
+        ref={cityRef}
+        label={t('profile.city')}
+        value={form.city}
+        onChangeText={form.setCity}
+        maxLength={40}
+        autoCapitalize="words"
+        textContentType="addressCity"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => (metric ? heightRef : jobRef).current?.focus()}
+      />
+      {/* Checked inline by the ring, icon and message. No error haptic: that's for the save.
+          Centimeters fit beside the job; feet and inches need the whole row. */}
+      {metric ? (
+        <View style={styles.pair}>
+          <View style={styles.pairPart}>
+            <TextField
+              ref={heightRef}
+              label={t('profile.optionalLabel', { label: t('profile.height') })}
+              accessibilityLabel={t('profile.heightCmLabel')}
+              value={form.height.cm}
+              onChangeText={(text) => form.changeHeight('cm', text)}
+              onBlur={form.blurHeight}
+              keyboardType="number-pad"
+              maxLength={3}
+              suffix={t('profile.cm')}
+              error={form.showHeightError}
+              hint={form.showHeightError ? form.heightError : undefined}
+            />
+          </View>
+          <View style={styles.pairPart}>{job}</View>
+        </View>
+      ) : (
+        <>
+          <ImperialHeight form={form} />
+          {job}
+        </>
+      )}
+      <TextField
+        ref={bioRef}
+        label={t('profile.optionalLabel', { label: t('profile.bio') })}
+        value={form.bio}
+        onChangeText={form.setBio}
+        maxLength={BIO_MAX}
+        multiline
+        placeholder={t('profile.bioPlaceholder')}
+        hint={t('profile.bioShown')}
+        counter={t('profile.charactersLeft', { count: bioLeft })}
+      />
+    </View>
+  );
+  if (bare) return fields;
 
   return (
     <Section title={t('profile.aboutYou')} style={[styles.section, style]}>
-      <View style={styles.fields}>
-        <TextField
-          label={t('profile.firstName')}
-          value={form.name}
-          onChangeText={form.setName}
-          maxLength={30}
-          autoCapitalize="words"
-          autoComplete="given-name"
-          textContentType="givenName"
-        />
-        <TextField
-          label={t('profile.city')}
-          value={form.city}
-          onChangeText={form.setCity}
-          maxLength={40}
-          autoCapitalize="words"
-          textContentType="addressCity"
-        />
-        {/* Checked inline by the ring, icon and message. No error haptic: that's for the save. */}
-        {form.height.units === 'metric' ? (
-          <TextField
-            label={t('profile.height')}
-            accessibilityLabel={t('profile.heightCmLabel')}
-            value={form.height.cm}
-            onChangeText={(text) => form.changeHeight('cm', text)}
-            onBlur={form.blurHeight}
-            keyboardType="number-pad"
-            maxLength={3}
-            suffix={t('profile.cm')}
-            error={form.showHeightError}
-            hint={form.showHeightError ? form.heightError : undefined}
-          />
-        ) : (
-          <ImperialHeight form={form} />
-        )}
-        <TextField
-          label={t('profile.jobOrSchool')}
-          value={form.job}
-          onChangeText={form.setJob}
-          maxLength={60}
-        />
-        <TextField
-          label={t('profile.bio')}
-          value={form.bio}
-          onChangeText={form.setBio}
-          maxLength={BIO_MAX}
-          multiline
-          placeholder={t('profile.bioPlaceholder')}
-          counter={t('profile.charactersLeft', { count: bioLeft })}
-        />
-      </View>
+      {fields}
     </Section>
   );
 }
@@ -551,23 +819,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The next slot to fill: the place to tap.
   addSlot: {
     gap: 8,
     padding: 8,
-    borderWidth: 1,
   },
   addLabel: {
     textAlign: 'center',
   },
+  addTitle: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  addNote: {
+    opacity: 0.8,
+  },
+  emptyNumber: {
+    fontFamily: Fonts.serif,
+    fontSize: 20,
+    lineHeight: 24,
+  },
   number: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 22,
-    height: 22,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  leadTag: {
+    top: 10,
+    left: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
+  },
+  smallTag: {
+    top: 8,
+    left: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  tagText: {
+    fontSize: 11,
+    lineHeight: 13,
   },
   removeTarget: {
     position: 'absolute',
@@ -579,14 +871,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   removeCircle: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fields: {
-    gap: 12,
+    gap: 16,
+  },
+  pair: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  pairPart: {
+    flex: 1,
   },
   // Matches TextField's own label-to-box spacing.
   heightGroup: {

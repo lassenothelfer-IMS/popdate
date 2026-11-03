@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import type { Contestant, RoomPlayer } from '@/api';
 import { Photo, PhotoBadge, type PhotoTone } from '@/components/photo';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
+import { Ease, Fonts, Gutter, MaxContentWidth, Motion, Space } from '@/constants/theme';
 import { useNeutralTone } from '@/features/game/popper-presence';
 import { useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
@@ -16,17 +16,28 @@ import { useT, type Translate } from '@/i18n';
  */
 const DESIGN_WIDTH = 375 - Gutter * 2;
 const WINNER = { left: 92, width: 240, height: 320, initial: 56 };
-/** The popper's portrait, 90 x 120 inside a 3pt page-colored border, tilted over the winner's corner. */
-const PORTRAIT = { left: 18, top: 206, width: 96, height: 126, border: 3, initial: 32 };
-const TILT = '-6deg';
+/** The popper's portrait, a small print on a paper mat, tilted over the winner's corner. */
+const PORTRAIT = { left: 18, top: 206, width: 96, height: 126, border: 5, initial: 32 };
+const TILT = '-7deg';
+/** The winner's print leans the other way. */
+const WINNER_TILT = '4deg';
+/** Paper around each photo, like a print. */
+const MAT = 7;
+const MAT_RADIUS = 8;
+const PRINT_RADIUS = 4;
 /** Down to the tilted portrait's lowest corner, ring included. */
 const DESIGN_HEIGHT = 338;
 /** From the line under the title to the winner's photo. */
 const COMPOSITION_TOP = 50;
 /** On a wide screen the pair grows a little, then stays put. */
 const MAX_SCALE = 1.2;
-/** Someone with no photo out yet: Photo draws their initial for mock URIs. */
+/** Someone with no photo out yet: Photo draws a plain tile, and the print sets their initial on it. */
 const NO_PHOTO = 'mock://none';
+
+/** No real photo to show: none out yet, or the mock server's stand-in. */
+function noPhoto(uri: string | undefined) {
+  return !uri || uri.startsWith('mock://');
+}
 
 const resultIn = FadeIn.duration(Motion.enter).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
@@ -52,6 +63,22 @@ type ResultBlockProps = {
 export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: ResultBlockProps) {
   const t = useT();
   if (!winner) {
+    // A room with no last balloon ended because its chooser left: nobody is penalised.
+    if (viewer !== 'popper') {
+      return (
+        <Animated.View entering={resultIn} style={styles.copy}>
+          <ThemedText type="title" accessibilityRole="header" maxFontSizeMultiplier={1.5}>
+            {t('game.chooserLeft', { name: popper.name })}
+          </ThemedText>
+          <ThemedText type="body" themeColor="textSecondary">
+            {t('game.chooserLeftBody')}
+          </ThemedText>
+          <ThemedText type="footnote" themeColor="textTertiary" style={styles.note}>
+            {t('game.holderLeavesNote')}
+          </ThemedText>
+        </Animated.View>
+      );
+    }
     return (
       <Animated.View entering={resultIn} style={styles.copy}>
         <ThemedText type="display" accessibilityRole="header">
@@ -132,6 +159,8 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
               width: pt(WINNER.width),
               height: pt(WINNER.height),
             },
+            styles.print,
+            { backgroundColor: theme.paper },
           ]}>
           <Photo
             uri={winnerPhoto ?? NO_PHOTO}
@@ -142,6 +171,9 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
             accessibilityLabel={winnerLabel}
             style={styles.winnerPhoto}
           />
+          {noPhoto(winnerPhoto) ? (
+            <Initial name={winner.name} size={pt(WINNER.initial)} color={theme.text} />
+          ) : null}
           {winnerPhoto ? (
             <PhotoBadge
               label={
@@ -153,7 +185,7 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
           ) : null}
           <View
             pointerEvents="none"
-            style={[styles.ring, { borderRadius: Radius.md + 1, borderColor: theme.borderStrong }]}
+            style={[styles.ring, { borderRadius: MAT_RADIUS + 1, borderColor: theme.border }]}
           />
         </View>
         {/* Drawn last, so it lies over the winner's corner. */}
@@ -166,7 +198,7 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
               top: pt(PORTRAIT.top),
               width: pt(PORTRAIT.width),
               height: pt(PORTRAIT.height),
-              backgroundColor: theme.page,
+              backgroundColor: theme.paper,
             },
           ]}>
           <Photo
@@ -178,9 +210,13 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
             accessibilityLabel={popperLabel}
             style={styles.portraitPhoto}
           />
+          {/* Without a photo the neutral tile is blank, so their initial stands in. */}
+          {noPhoto(popperPhoto) ? (
+            <Initial name={popper.name} size={pt(PORTRAIT.initial)} color={theme.text} />
+          ) : null}
           <View
             pointerEvents="none"
-            style={[styles.ring, { borderRadius: Radius.md + 1, borderColor: theme.borderStrong }]}
+            style={[styles.ring, { borderRadius: MAT_RADIUS + 1, borderColor: theme.border }]}
           />
         </View>
       </View>
@@ -188,9 +224,37 @@ function Pair({ popper, winner, winnerTone, viewer }: PairProps) {
   );
 }
 
+/** A person's initial in Gloock, centered over a print that has no photo. Hidden: the photo's label says who it is. */
+function Initial({ name, size, color }: { name: string; size: number; color: string }) {
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={styles.initialBox}>
+      <Text style={[styles.initial, { color, fontSize: size }]} maxFontSizeMultiplier={1}>
+        {name.charAt(0).toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  initialBox: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  initial: {
+    fontFamily: Fonts.serif,
+    fontWeight: 400,
+    includeFontPadding: false,
+  },
   copy: {
     gap: Space.xs,
+  },
+  note: {
+    marginTop: Space.md,
   },
   // Centers the pair once it stops growing on a wide screen.
   column: {
@@ -200,24 +264,30 @@ const styles = StyleSheet.create({
   placed: {
     position: 'absolute',
   },
+  // A print: the photo on a paper mat, tilted.
+  print: {
+    borderRadius: MAT_RADIUS,
+    borderCurve: 'continuous',
+    transform: [{ rotate: WINNER_TILT }],
+  },
   winnerPhoto: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: Radius.md,
+    top: MAT,
+    right: MAT,
+    bottom: MAT,
+    left: MAT,
+    borderRadius: PRINT_RADIUS,
   },
-  // The page shows as a border between the two photos.
+  // The paper mat shows as a border between the two photos.
   portrait: {
     padding: PORTRAIT.border,
-    borderRadius: Radius.md,
+    borderRadius: MAT_RADIUS,
     borderCurve: 'continuous',
     transform: [{ rotate: TILT }],
   },
   portraitPhoto: {
     flex: 1,
-    borderRadius: Radius.md - PORTRAIT.border,
+    borderRadius: PRINT_RADIUS,
   },
   // A 1pt ring just outside the edge, as on the canvas.
   ring: {

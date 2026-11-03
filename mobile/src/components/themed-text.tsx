@@ -4,48 +4,56 @@ import { Fonts, ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * The type scale. Gloock for people's words and the few big lines, Hanken
- * Grotesk for everything you read to act or tap. All sizes follow the user's
- * text size setting; cap the large serif roles with maxFontSizeMultiplier.
+ * The type scale (design/DESIGN.md section 3). New York for display, SF Pro for
+ * text. All sizes follow the user's text size setting; cap the large serif
+ * roles with maxFontSizeMultiplier. Nothing under 11 pt; changing numbers are tabular.
  */
 export type TextType =
-  /** One per screen at most: the welcome line, the match, the room result. 40/42. */
-  | 'hero'
-  /** The queue count. 64. */
+  /** "3rd", "a balloon". New York 300, 112/100. */
   | 'count'
-  /** Screen titles and the pop line. 30/34. */
+  /** The number under "Round 2 in". New York 300, 56/56, tabular. */
+  | 'countdown'
+  /** One per screen at most: "Good evening, Lasse.", "Mia chose Ben." New York 500, 44/46. */
+  | 'hero'
+  /** "Settings", "Matches", "Not this time." New York 500, 40/42. */
+  | 'title'
+  /** Onboarding titles, "You popped Noah." New York 500, 30/34. */
   | 'display'
-  /** A name on Home. 24/28. */
+  /** A name on Home or a profile. New York 500, 24/28. */
   | 'heading'
-  /** The round's question, the role line. 22/28. */
+  /** The chooser's question in a round. New York 400, 32/38. */
   | 'question'
-  /** An answer. 20/26. */
+  /** The question while waiting, or in the final. New York 400, 26/32. */
+  | 'questionSmall'
+  /** Pick-a-question rows. New York 400, 19/24. */
+  | 'questionRow'
+  /** An answer on a card. New York italic, 20/26. */
   | 'quote'
-  /** A longer answer or bio. 17/24. */
+  /** A longer answer or bio. New York italic, 18/24. */
   | 'quoteLong'
-  /** "Mia is choosing", a sheet's title. 17/22 SemiBold. */
+  /** A sheet's title, "Mia is choosing". SF Pro 600, 17/22. */
   | 'task'
-  /** Section titles, the round, "Choose whose balloon to pop". 15/20 SemiBold. */
+  /** "Round 1 of 4", section titles. SF Pro 600, 15/20. */
   | 'headline'
-  /** 17/22. */
+  /** Paragraphs. SF Pro 400, 17/22. */
   | 'body'
-  /** Status lines and asides. 15/20. */
+  /** Helper text under titles. SF Pro 400, 15/20. */
   | 'callout'
-  /** Chips and text actions. 15/20 Medium. */
+  /** Chips and text actions. SF Pro 500, 15/20. */
   | 'label'
-  /** Names in the room's lists and option rows. 16/20 Medium. */
+  /** List rows. SF Pro 500, 17/22. */
   | 'row'
-  /** Countdowns. 13 Medium, tabular. */
+  /** Countdowns in a pill. SF Pro 500, 13, tabular. */
   | 'timer'
-  /** Meta, helper text, field labels. 13/18. */
+  /** Meta: timestamps, hints, "0 of 6". SF Pro 400, 13/18. */
   | 'footnote'
-  /** "You asked", "Mia asks". 13/18 SemiBold in pop red's text shade. */
+  /** Labels: section headers, "You asked", "Photos". SF Pro 600, 13/18, secondary. */
   | 'kicker'
-  /** Names under the balloon strip. 12/20 Medium. */
+  /** Names under the balloon row. SF Pro 500, 12/16. */
   | 'railName'
-  /** Quiet pills such as Watching and Photo 1. 12/16 Medium. */
+  /** Small meta. SF Pro 400, 12/16. */
   | 'caption'
-  /** The You tag. 12/16 SemiBold. */
+  /** Tags: "Photo 1", "Round 1", "You". SF Pro 600, 12/16. */
   | 'captionStrong';
 
 export type ThemedTextProps = TextProps & {
@@ -55,7 +63,7 @@ export type ThemedTextProps = TextProps & {
 
 /** Roles that come with their own color unless told otherwise. */
 const DEFAULT_COLOR: Partial<Record<TextType, ThemeColor>> = {
-  kicker: 'accentText',
+  kicker: 'textSecondary',
 };
 
 export function ThemedText({ style, type = 'body', themeColor, ...rest }: ThemedTextProps) {
@@ -64,33 +72,44 @@ export function ThemedText({ style, type = 'body', themeColor, ...rest }: Themed
   return <Text style={[{ color }, styles[type], style]} {...rest} />;
 }
 
-const serif = { fontFamily: Fonts.serif, fontWeight: 400 } as const;
+const serif = { fontFamily: Fonts.serif } as const;
 const sans = { fontFamily: Fonts.sans } as const;
 
 const styles = StyleSheet.create({
-  hero: { ...serif, fontSize: 40, lineHeight: 42, letterSpacing: -0.8 },
   count: {
     ...serif,
-    fontSize: 64,
-    lineHeight: 68,
-    letterSpacing: -1.9,
+    fontWeight: 300,
+    fontSize: 112,
+    lineHeight: 100,
+    letterSpacing: -3.36,
     fontVariant: ['lining-nums', 'tabular-nums'],
   },
-  display: { ...serif, fontSize: 30, lineHeight: 34, letterSpacing: -0.45 },
-  heading: { ...serif, fontSize: 24, lineHeight: 28 },
-  question: { ...serif, fontSize: 22, lineHeight: 28 },
-  quote: { ...serif, fontSize: 20, lineHeight: 26, fontVariant: ['lining-nums'] },
-  quoteLong: { ...serif, fontSize: 17, lineHeight: 24 },
+  countdown: {
+    ...serif,
+    fontWeight: 300,
+    fontSize: 56,
+    lineHeight: 56,
+    fontVariant: ['lining-nums', 'tabular-nums'],
+  },
+  hero: { ...serif, fontWeight: 500, fontSize: 44, lineHeight: 46, letterSpacing: -0.88 },
+  title: { ...serif, fontWeight: 500, fontSize: 40, lineHeight: 42, letterSpacing: -0.8 },
+  display: { ...serif, fontWeight: 500, fontSize: 30, lineHeight: 34, letterSpacing: -0.45 },
+  heading: { ...serif, fontWeight: 500, fontSize: 24, lineHeight: 28 },
+  question: { ...serif, fontWeight: 400, fontSize: 32, lineHeight: 38 },
+  questionSmall: { ...serif, fontWeight: 400, fontSize: 26, lineHeight: 32 },
+  questionRow: { ...serif, fontWeight: 400, fontSize: 19, lineHeight: 24 },
+  quote: { ...serif, fontStyle: 'italic', fontWeight: 400, fontSize: 20, lineHeight: 26, fontVariant: ['lining-nums'] },
+  quoteLong: { ...serif, fontStyle: 'italic', fontWeight: 400, fontSize: 18, lineHeight: 24 },
   task: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 600 },
   headline: { ...sans, fontSize: 15, lineHeight: 20, fontWeight: 600 },
   body: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 400 },
   callout: { ...sans, fontSize: 15, lineHeight: 20, fontWeight: 400 },
   label: { ...sans, fontSize: 15, lineHeight: 20, fontWeight: 500 },
-  row: { ...sans, fontSize: 16, lineHeight: 20, fontWeight: 500 },
+  row: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 500 },
   timer: { ...sans, fontSize: 13, lineHeight: 18, fontWeight: 500, fontVariant: ['tabular-nums'] },
   footnote: { ...sans, fontSize: 13, lineHeight: 18, fontWeight: 400 },
   kicker: { ...sans, fontSize: 13, lineHeight: 18, fontWeight: 600 },
-  railName: { ...sans, fontSize: 12, lineHeight: 20, fontWeight: 500 },
-  caption: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 500 },
+  railName: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 500 },
+  caption: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 400 },
   captionStrong: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 600 },
 });

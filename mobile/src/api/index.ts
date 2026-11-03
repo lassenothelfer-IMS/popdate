@@ -9,9 +9,17 @@ import type { PopdateApi } from '@/api/types';
  * `convex/`. The screens are the same either way.
  */
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
+const wantsConvex = process.env.EXPO_PUBLIC_API === 'convex';
 
-export const convexServer =
-  process.env.EXPO_PUBLIC_API === 'convex' && convexUrl ? new ConvexServer(convexUrl) : null;
+// Asked for Convex without saying where it is: never fall back to the bots quietly.
+// A release build stops right here, so a misconfigured build can't ship on the mock.
+if (wantsConvex && !convexUrl) {
+  const message = 'EXPO_PUBLIC_API is convex but EXPO_PUBLIC_CONVEX_URL is not set';
+  console.error(__DEV__ ? `${message}: using the mock server.` : message);
+  if (!__DEV__) throw new Error(message);
+}
+
+export const convexServer = wantsConvex && convexUrl ? new ConvexServer(convexUrl) : null;
 
 export const api: PopdateApi = convexServer ?? mockServer;
 

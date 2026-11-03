@@ -1,16 +1,28 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { api, type VerificationStatus } from '@/api';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
-import { Icon } from '@/components/icon';
+import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { MinTouch, PhotoAspect, Radius, Space } from '@/constants/theme';
+import { VerifiedCheck } from '@/components/verified-check';
+import { MinTouch, Radius, Space } from '@/constants/theme';
 import { goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
@@ -29,7 +41,7 @@ const STATUS: Record<
   rejected: { label: 'settings.statusRejected', body: 'settings.verifyRejectedBody', color: 'danger' },
 };
 
-/** Selfie verification, as a modal: why, where it stands, and the camera to take one. */
+/** Selfie verification (P02), as a modal: why, where it stands, and the camera in an oval. */
 export function VerifyScreen() {
   const t = useT();
   const theme = useTheme();
@@ -64,7 +76,6 @@ export function VerifyScreen() {
         if (next === 'pending') return;
         setStatus(next);
         if (next === 'verified') haptics.success();
-        else haptics.error();
         AccessibilityInfo.announceForAccessibility(t(STATUS[next].label));
       }, () => {});
     }, POLL_MS);
@@ -75,7 +86,6 @@ export function VerifyScreen() {
 
   function fail(message = t('common.somethingWrong')) {
     setError(message);
-    haptics.error();
     AccessibilityInfo.announceForAccessibility(message);
   }
 
@@ -126,7 +136,7 @@ export function VerifyScreen() {
       setStatus(next);
       setPhoto(null);
       setMode('info');
-      haptics.success();
+      haptics.light();
       AccessibilityInfo.announceForAccessibility(t(STATUS[next].label));
     } catch {
       fail();
@@ -138,6 +148,8 @@ export function VerifyScreen() {
   const close = () => goBackOr(SETTINGS_PAGE);
   const canTake = status === 'none' || status === 'rejected';
   const current = status ? STATUS[status] : null;
+  // The three steps: read why, take it, check it.
+  const step = mode === 'info' ? 1 : mode === 'camera' ? 2 : 3;
 
   const footer =
     mode === 'camera' ? (
@@ -150,7 +162,7 @@ export function VerifyScreen() {
           onPress={takePhoto}
           style={({ pressed }) => [
             styles.shutter,
-            { borderColor: theme.inverse },
+            { borderColor: theme.text },
             pressed && styles.shutterPressed,
           ]}>
           <View
@@ -164,12 +176,14 @@ export function VerifyScreen() {
     ) : mode === 'preview' ? (
       <View style={styles.pair}>
         <View style={styles.flex}>
-          <Button variant="secondary" title={t('settings.retake')} disabled={busy} onPress={retake} />
+          <Button variant="tinted" title={t('settings.retake')} disabled={busy} onPress={retake} />
         </View>
         <View style={styles.flex}>
           <Button title={t('settings.usePhoto')} loading={busy} onPress={submit} />
         </View>
       </View>
+    ) : status === 'pending' ? (
+      <Button variant="tinted" title={t('settings.checking')} disabled />
     ) : canTake && !isWeb ? (
       <Button
         title={status === 'rejected' ? t('settings.retakeSelfie') : t('settings.takeSelfie')}
@@ -181,47 +195,63 @@ export function VerifyScreen() {
 
   return (
     <Screen scroll={mode === 'info'} footer={footer} footerStyle="plain">
-      <View style={styles.top}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          onPress={close}
-          style={({ pressed }) => [styles.close, { backgroundColor: theme.surface }, pressed && styles.pressed]}>
-          <Icon name="close" size={15} color={theme.text} />
-        </Pressable>
-      </View>
+      <Rise index={0} style={styles.bar}>
+        <Button title={t('common.cancel')} variant="plain" fullWidth={false} onPress={close} />
+        <ThemedText type="headline" accessibilityRole="header">
+          {t('settings.verifyCheckTitle')}
+        </ThemedText>
+        <View style={styles.barButton} />
+      </Rise>
 
       {mode === 'info' ? (
         <>
-          <ThemedText type="display" accessibilityRole="header">
-            {t('settings.verifyTitle')}
-          </ThemedText>
-          <ThemedText type="body" themeColor="textSecondary" style={styles.intro}>
-            {t('settings.verifyIntro')}
-          </ThemedText>
-          <ThemedText type="callout" themeColor="textSecondary" style={styles.private}>
-            {t('settings.verifyPrivate')}
-          </ThemedText>
+          <Rise index={1}>
+            <ThemedText type="display" style={styles.title}>
+              {t('settings.verifyTitle')}
+            </ThemedText>
+            <ThemedText type="callout" themeColor="textSecondary" style={styles.intro}>
+              {t('settings.verifyIntro')}
+            </ThemedText>
+            <ThemedText type="callout" themeColor="textSecondary" style={styles.private}>
+              {t('settings.verifyPrivate')}
+            </ThemedText>
+          </Rise>
 
           {current ? (
-            <View
-              accessible
-              style={[styles.status, { backgroundColor: theme.field, borderColor: theme.outline }]}>
-              <View style={styles.statusLine}>
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  {t('settings.status')}
-                </ThemedText>
-                <ThemedText type="row" themeColor={current.color}>
-                  {t(current.label)}
+            <Rise index={2}>
+              <View
+                accessible
+                style={[styles.status, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                <View style={styles.statusLine}>
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    {t('settings.status')}
+                  </ThemedText>
+                  <ThemedText type="row" themeColor={current.color}>
+                    {t(current.label)}
+                  </ThemedText>
+                </View>
+                {current.body ? (
+                  <ThemedText type="callout" themeColor="textSecondary">
+                    {t(current.body)}
+                  </ThemedText>
+                ) : null}
+              </View>
+            </Rise>
+          ) : null}
+
+          <Rise index={3}>
+            <View style={[styles.perk, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              <View style={[styles.perkMark, { backgroundColor: theme.inverse }]}>
+                <VerifiedCheck size={20} />
+              </View>
+              <View style={styles.flex}>
+                <ThemedText type="headline">{t('settings.verifyPerkTitle')}</ThemedText>
+                <ThemedText type="caption" themeColor="textSecondary">
+                  {t('settings.verifyPerkBody')}
                 </ThemedText>
               </View>
-              {current.body ? (
-                <ThemedText type="callout" themeColor="textSecondary">
-                  {t(current.body)}
-                </ThemedText>
-              ) : null}
             </View>
-          ) : null}
+          </Rise>
 
           {isWeb && canTake ? (
             <ThemedText type="callout" themeColor="textSecondary" style={styles.note}>
@@ -236,7 +266,7 @@ export function VerifyScreen() {
               </ThemedText>
               <View style={styles.openSettings}>
                 <Button
-                  variant="secondary"
+                  variant="tinted"
                   title={t('settings.openSettings')}
                   onPress={() => Linking.openSettings()}
                 />
@@ -246,10 +276,10 @@ export function VerifyScreen() {
         </>
       ) : (
         <View style={styles.frameWrap}>
-          <ThemedText type="headline" accessibilityRole="header" style={styles.frameTitle}>
-            {mode === 'camera' ? t('settings.cameraTitle') : t('settings.previewTitle')}
+          <ThemedText type="callout" themeColor="textSecondary" style={styles.face}>
+            {mode === 'camera' ? t('settings.verifyFace') : t('settings.previewTitle')}
           </ThemedText>
-          <View style={[styles.frame, { backgroundColor: theme.surface }]}>
+          <Oval scanning={mode === 'camera'}>
             {mode === 'camera' ? (
               <CameraView
                 ref={camera}
@@ -273,9 +303,23 @@ export function VerifyScreen() {
                 accessibilityLabel={t('settings.selfieLabel')}
               />
             ) : null}
-          </View>
+          </Oval>
         </View>
       )}
+
+      <View style={styles.steps} accessible accessibilityLabel={t('settings.verifyStep', { step })}>
+        <View style={styles.stepBars}>
+          {[1, 2, 3].map((n) => (
+            <View
+              key={n}
+              style={[styles.stepBar, { backgroundColor: theme.text, opacity: n <= step ? 1 : 0.3 }]}
+            />
+          ))}
+        </View>
+        <ThemedText type="footnote" themeColor="textTertiary" style={styles.stepNote}>
+          {t('settings.verifyStep', { step })}
+        </ThemedText>
+      </View>
 
       {error ? (
         <View style={styles.error}>
@@ -286,23 +330,74 @@ export function VerifyScreen() {
   );
 }
 
+/** The oval's size in the mockup. */
+const OVAL = { width: 260, height: 340 };
+/** One pass of the scan line, and one flicker of the ring. */
+const SCAN_MS = 2200;
+
+/**
+ * The selfie window: an oval (as near as React Native's corner radii get, a
+ * rounded capsule) whose ring flickers from the text color to gold while a gold
+ * scan line travels it. Still under Reduce Motion.
+ */
+function Oval({ children, scanning }: { children: ReactNode; scanning: boolean }) {
+  const theme = useTheme();
+  const reduced = useReduceMotion();
+  const pass = useSharedValue(0);
+  const animate = scanning && !reduced;
+  useEffect(() => {
+    if (!animate) {
+      cancelAnimation(pass);
+      pass.set(0);
+      return;
+    }
+    pass.set(withRepeat(withTiming(1, { duration: SCAN_MS, easing: Easing.inOut(Easing.ease) }), -1, true));
+  }, [animate, pass]);
+  const from = theme.text;
+  const to = theme.gold;
+  const ring = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(pass.get(), [0, 1], [from, to]),
+  }));
+  const line = useAnimatedStyle(() => ({
+    transform: [{ translateY: 20 + pass.get() * (OVAL.height - 40) }],
+  }));
+  return (
+    <Animated.View style={[styles.oval, { backgroundColor: theme.surface }, ring]}>
+      {children}
+      {animate ? (
+        <Animated.View pointerEvents="none" style={[styles.scan, line]}>
+          <Svg width="100%" height={2}>
+            <Defs>
+              <LinearGradient id="scan" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor={theme.gold} stopOpacity={0} />
+                <Stop offset="0.5" stopColor={theme.gold} stopOpacity={0.9} />
+                <Stop offset="1" stopColor={theme.gold} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height={2} fill="url(#scan)" />
+          </Svg>
+        </Animated.View>
+      ) : null}
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  top: {
-    alignItems: 'flex-end',
-    marginBottom: Space.xs,
-  },
-  close: {
-    width: MinTouch,
-    height: MinTouch,
-    borderRadius: MinTouch / 2,
+  bar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  barButton: {
+    minHeight: MinTouch,
+    minWidth: MinTouch,
     justifyContent: 'center',
   },
-  pressed: {
-    opacity: 0.6,
+  title: {
+    marginTop: Space.lg,
   },
   intro: {
     marginTop: Space.sm,
@@ -314,7 +409,7 @@ const styles = StyleSheet.create({
     marginTop: Space.lg,
     padding: Space.md,
     gap: Space.xs,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
   },
@@ -324,6 +419,25 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: Space.xs,
+  },
+  // The perk card: a 36 pt circle in the text color with the check, a title over a quiet line.
+  perk: {
+    marginTop: Space.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    paddingVertical: 14,
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  perkMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   note: {
     marginTop: Space.md,
@@ -338,19 +452,43 @@ const styles = StyleSheet.create({
   frameWrap: {
     flex: 1,
     alignItems: 'center',
+    gap: Space.lg,
+    paddingTop: Space.xs,
   },
-  frameTitle: {
-    alignSelf: 'stretch',
-    marginBottom: Space.sm,
+  face: {
+    textAlign: 'center',
   },
-  // A portrait 3:4 window, as tall as the space allows.
-  frame: {
-    flex: 1,
+  oval: {
+    width: OVAL.width,
     maxWidth: '100%',
-    aspectRatio: PhotoAspect,
-    borderRadius: Radius.xl,
-    borderCurve: 'continuous',
+    aspectRatio: OVAL.width / OVAL.height,
+    borderRadius: OVAL.width / 2,
+    borderWidth: 2,
     overflow: 'hidden',
+  },
+  scan: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 2,
+  },
+  steps: {
+    marginTop: Space.lg,
+    alignItems: 'center',
+    gap: Space.sm,
+  },
+  stepBars: {
+    flexDirection: 'row',
+    gap: Space.xs,
+  },
+  stepBar: {
+    width: 32,
+    height: 4,
+    borderRadius: 2,
+  },
+  stepNote: {
+    textAlign: 'center',
   },
   shutterRow: {
     alignItems: 'center',
@@ -359,7 +497,7 @@ const styles = StyleSheet.create({
     width: SHUTTER,
     height: SHUTTER,
     borderRadius: SHUTTER / 2,
-    borderWidth: 3,
+    borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
   },

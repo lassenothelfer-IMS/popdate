@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Cream: Seeded chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+.pd-msg{animation:pd-msg 600ms cubic-bezier(.22,1,.36,1) both}
+.pd-msg:nth-child(1){animation-delay:.2s}.pd-msg:nth-child(2){animation-delay:.35s}.pd-msg:nth-child(3){animation-delay:.5s}.pd-msg:nth-child(4){animation-delay:.65s}.pd-msg:nth-child(5){animation-delay:.8s}.pd-msg:nth-child(6){animation-delay:1.0s}.pd-msg:nth-child(7){animation-delay:1.3s}
+@keyframes pd-msg{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+.pd-play span{display:block;width:2.5px;border-radius:2px;background:currentColor;animation:pd-wave 1s ease-in-out infinite}
+.pd-play span:nth-child(odd){animation-duration:.8s}.pd-play span:nth-child(3n){animation-delay:.15s}
+@keyframes pd-wave{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}
+.pd-dot{animation:pd-dot 1.2s ease-in-out infinite}.pd-dot:nth-child(2){animation-delay:.2s}.pd-dot:nth-child(3){animation-delay:.4s}
+@keyframes pd-dot{0%,100%{opacity:.3}50%{opacity:1}}
+
+.pd-root{isolation:isolate}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(1){animation-delay:40ms}.pd-root > *:nth-child(2){animation-delay:110ms}.pd-root > *:nth-child(3){animation-delay:180ms}.pd-root > *:nth-child(4){animation-delay:250ms}.pd-root > *:nth-child(5){animation-delay:320ms}.pd-root > *:nth-child(6){animation-delay:390ms}.pd-root > *:nth-child(7){animation-delay:460ms}.pd-root > *:nth-child(8){animation-delay:530ms}.pd-root > *:nth-child(9){animation-delay:600ms}
+.pd-root > .pd-fx{animation:none}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pd-root a[href],.pd-root button{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms,box-shadow 180ms;-webkit-tap-highlight-color:transparent}
+.pd-root a[href]:active,.pd-root button:active{transform:scale(.97)}
+.pd-root a[href]:hover,.pd-root button:hover{opacity:.92}
+.pd-root [style*="height: 3px"]{transform-origin:left center;animation:pd-fill 600ms cubic-bezier(.22,1,.36,1) both;animation-delay:calc(200ms + var(--i,0)*40ms)}
+@keyframes pd-fill{from{transform:scaleX(.2);opacity:.4}to{transform:none;opacity:1}}
+.pd-root input,.pd-root textarea{transition:box-shadow 200ms}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+
+.pd-root a[href][style*="background: #1C1917"],.pd-root button[style*="background: #1C1917"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(28,25,23,.18),0 10px 24px -10px rgba(28,25,23,.45)}
+.pd-root a[href][style*="background: #CF3A2F"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 14px 32px -10px rgba(240,105,92,.6)}
+.pd-glow{position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 50% 62%,rgba(255,138,110,.16) 0%,rgba(255,138,110,0) 70%);animation:pd-breathe 7s ease-in-out infinite;z-index:0}
+@keyframes pd-breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.pd-root > *:not(.pd-fx){position:relative}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box"><svg class="pd-fx pd-grain" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.05;mix-blend-mode:multiply;z-index:5"><filter id="pdg"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#pdg)"></rect></svg>
+  <div style="position: absolute; left: 20px; right: 20px; top: 58px; display: flex; align-items: center; gap: 12px">
+    <a href="L_Main.html" aria-label="Back" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-left: -10px"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1C1917" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3 5 8l5 5"></path></svg></a>
+    <span style="width: 40px; height: 40px; border-radius: 50%; background: #E8DEE6; display: flex; align-items: center; justify-content: center; font-family: 'Fraunces', serif; font-size: 17px; color: #7A4A6B; box-shadow: 0 0 0 1px rgba(28,25,23,0.14)">M</span>
+    <div style="display: flex; flex-direction: column; gap: 1px; flex: 1"><div style="display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 600">Mia <svg width="14" height="14" viewBox="0 0 14 14" aria-label="Verified" role="img"><circle cx="7" cy="7" r="7" fill="#1C1917"></circle><path d="M4 7l2 2 4-4" fill="none" stroke="#FFFDFA" stroke-width="1.6" stroke-linecap="round"></path></svg></div><div style="font-size: 12px; color: #1F7A4C">Online, matched 2 min ago</div></div>
+    <a href="L_Chat.html" aria-label="More" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center"><svg width="18" height="4" viewBox="0 0 18 4" fill="#5F574F" aria-hidden="true"><circle cx="2" cy="2" r="2"></circle><circle cx="9" cy="2" r="2"></circle><circle cx="16" cy="2" r="2"></circle></svg></a>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 118px; bottom: 110px; display: flex; flex-direction: column; gap: 10px; overflow: hidden">
+    <div class="pd-msg" style="align-self: center; padding: 6px 12px; border-radius: 999px; background: #FFFDFA; font-size: 12px; color: #5F574F; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08)">Room 4812, four rounds. Your answers are below.</div>
+
+    <div class="pd-msg" style="align-self: flex-start; max-width: 290px; display: flex; flex-direction: column; gap: 4px">
+      <div style="font-size: 11px; color: #8C8378; padding-left: 4px">Mia asked, round 1</div>
+      <div style="padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08); font-family: 'Fraunces', serif; font-size: 16px; line-height: 21px">What's the last thing that made you laugh really hard?</div>
+    </div>
+
+    <div class="pd-msg" style="align-self: flex-end; max-width: 290px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end">
+      <div style="font-size: 11px; color: #8C8378; padding-right: 4px">You, by voice</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 18px 18px 6px 18px; background: #1C1917; color: #FFFDFA">
+        <span style="width: 28px; height: 28px; border-radius: 50%; background: #F3E9DA; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 2l7 4-7 4z" fill="#1C1917"></path></svg></span>
+        <div class="pd-play" style="display: flex; align-items: center; gap: 3px; height: 22px; width: 120px"><span style="height: 8px"></span><span style="height: 14px"></span><span style="height: 20px"></span><span style="height: 10px"></span><span style="height: 18px"></span><span style="height: 22px"></span><span style="height: 9px"></span><span style="height: 16px"></span><span style="height: 12px"></span><span style="height: 20px"></span><span style="height: 8px"></span><span style="height: 14px"></span><span style="height: 20px"></span><span style="height: 10px"></span><span style="height: 18px"></span><span style="height: 9px"></span><span style="height: 16px"></span><span style="height: 22px"></span></div>
+        <span style="font-size: 12px; font-variant-numeric: tabular-nums">0:14</span>
+      </div>
+    </div>
+
+    <div class="pd-msg" style="align-self: flex-start; max-width: 290px; display: flex; flex-direction: column; gap: 4px">
+      <div style="font-size: 11px; color: #8C8378; padding-left: 4px">Mia asked, round 4</div>
+      <div style="padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08); font-family: 'Fraunces', serif; font-size: 16px; line-height: 21px">What's your most controversial food opinion?</div>
+    </div>
+
+    <div class="pd-msg" style="align-self: flex-end; max-width: 290px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end">
+      <div style="padding: 10px 14px; border-radius: 18px 18px 6px 18px; background: #1C1917; color: #FFFDFA; font-size: 16px; line-height: 21px">Fondue is soup.</div>
+      <div style="display: flex; gap: 4px; margin-top: -10px; margin-right: 6px"><span style="padding: 3px 8px; border-radius: 999px; background: #E9DDC8; font-size: 12px; box-shadow: 0 0 0 2px #F3E9DA">haha</span></div>
+    </div>
+
+    <div class="pd-msg" style="align-self: flex-start; max-width: 290px; display: flex; flex-direction: column; gap: 4px">
+      <div style="padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08); font-size: 16px; line-height: 21px">Okay the fondue line is what did it. Where do you even eat fondue in October?</div>
+    </div>
+
+    <div class="pd-msg" style="align-self: flex-start; display: flex; gap: 4px; padding: 12px 14px; border-radius: 18px 18px 18px 6px; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08)"><span class="pd-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #5F574F"></span><span class="pd-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #5F574F"></span><span class="pd-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #5F574F"></span></div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; bottom: 34px; display: flex; align-items: center; gap: 8px">
+    <a href="L_Chat.html" aria-label="Send a photo" style="width: 44px; height: 44px; border-radius: 50%; background: #E9DDC8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.14)"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#1C1917" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="2" y="3" width="14" height="12" rx="2.5"></rect><circle cx="6.5" cy="7.5" r="1.5"></circle><path d="M16 12l-4-4-6 6"></path></svg></a>
+    <div style="flex: 1; display: flex; align-items: center; height: 48px; border-radius: 24px; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.14); padding: 0 6px 0 16px">
+      <input type="text" placeholder="Message Mia" aria-label="Message" style="flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; font-family: inherit; color: #1C1917; outline: none">
+      <button type="button" aria-label="Hold to record" style="width: 36px; height: 36px; border: 0; border-radius: 50%; background: #CF3A2F; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#FFFDFA" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="6" y="2" width="8" height="12" rx="4"></rect><path d="M4 10a6 6 0 0 0 12 0M10 16v2"></path></svg></button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

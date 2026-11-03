@@ -25,13 +25,39 @@ export async function enablePush(): Promise<PushPermission> {
   if (status === 'undetermined') {
     ({ status } = await Notifications.requestPermissionsAsync());
   }
-  if (status !== 'granted') return status;
-  try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
-    const { data } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
-    await api.registerPushToken(data);
-  } catch {
-    // No token until the app has an EAS project id (Elias sets up EAS). Try again on a later launch.
-  }
+  if (status === 'granted') await sendToken();
   return status;
+}
+
+/**
+ * Sends this phone's token for the account signed in now, without asking for
+ * anything: only when push is already allowed. The session calls it after every
+ * sign-in, so a new account after signing out gets its pushes too. Quiet on failure.
+ */
+export async function registerPushIfAllowed() {
+  if (Platform.OS === 'web') return;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status === 'granted') await sendToken();
+  } catch {
+    // Can't tell: the next sign-in tries again.
+  }
+}
+
+/** The send in flight, so calls that overlap share it instead of registering twice. */
+let sending: Promise<void> | null = null;
+
+function sendToken() {
+  sending ??= (async () => {
+    try {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+      const { data } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+      await api.registerPushToken(data);
+    } catch {
+      // No token yet (Expo Go without an EAS project id, or offline). The next launch tries again.
+    } finally {
+      sending = null;
+    }
+  })();
+  return sending;
 }

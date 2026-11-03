@@ -1,20 +1,23 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import { internalMutation, mutation, query } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { fail } from './lib/errors';
-import { MAX_ANSWER_LENGTH } from './lib/game';
+import { ANSWER_GRACE_MS, MAX_ANSWER_LENGTH, POP_LIMIT_MS } from './lib/game';
 import { maskProfanity } from './lib/profanity';
 import { rateLimit } from './lib/rateLimit';
 import {
   endAnsweringIfEveryoneAnswered,
+  finish,
   leave,
   pop,
   roomView,
   seatsOf,
   startAnswering,
   startPopping,
+  unusedQuestions,
 } from './lib/room';
 
 /** The room as you may see it, live. Null when it doesn't exist or you aren't in it. */
@@ -26,6 +29,32 @@ export const get = query({
     if (!userId || !id) return null;
     const room = await ctx.db.get(id);
     return room ? await roomView(ctx, room, userId) : null;
+  },
+});
+
+/** The room you're still playing in: as its popper, or with your balloon still up. */
+export const active = query({
+  args: {},
+  handler: async (ctx): Promise<string | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const asPopper = await ctx.db
+      .query('rooms')
+      .withIndex('by_popper', (q) => q.eq('popperId', userId))
+      .order('desc')
+      .first();
+    if (asPopper && asPopper.status !== 'finished') return asPopper._id;
+    const seats = await ctx.db
+      .query('roomPlayers')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .order('desc')
+      .take(5);
+    for (const seat of seats) {
+      if (seat.popped || seat.left) continue;
+      const room = await ctx.db.get(seat.roomId);
+      if (room && room.status !== 'finished') return room._id;
+    }
+    return null;
   },
 });
 
@@ -57,7 +86,8 @@ export const postAnswer = mutation({
     const room = await requireRoom(ctx, roomId);
     const seat = (await seatsOf(ctx, room._id)).find((s) => s.userId === userId);
     if (!seat || seat.popped) fail("You can't answer in this round.");
-    if (room.status !== 'answering' || Date.now() > (room.deadline ?? 0)) {
+    // The grace covers clock skew and latency for answers sent right at the deadline.
+    if (room.status !== 'answering' || Date.now() > (room.deadline ?? 0) + ANSWER_GRACE_MS) {
       fail('Answer time is over.');
     }
     const existing = await ctx.db
@@ -104,7 +134,7 @@ export const leaveRoom = mutation({
   },
 });
 
-/** The 60-second answer timer. Does nothing if the round already moved on. */
+/** The answer timer, run after the grace. Does nothing if the round already moved on. */
 export const answerTimeUp = internalMutation({
   args: { roomId: v.id('rooms'), round: v.number() },
   handler: async (ctx, { roomId, round }) => {
@@ -113,13 +143,48 @@ export const answerTimeUp = internalMutation({
   },
 });
 
-/** The 30-second pop timer: it only reminds the popper. There is no auto-pop. */
+/**
+ * The pick timer: an idle popper gets one of the options picked for them. Without
+ * options it falls back to any question the room hasn't asked, and with none left
+ * the room ends, so it never stays stuck in picking.
+ */
+export const pickTimeUp = internalMutation({
+  args: { roomId: v.id('rooms'), round: v.number() },
+  handler: async (ctx, { roomId, round }) => {
+    const room = await ctx.db.get(roomId);
+    if (room?.status !== 'picking' || room.round !== round) return;
+    const options =
+      room.questionOptionIds.length > 0
+        ? room.questionOptionIds
+        : (await unusedQuestions(ctx, room)).map((question) => question._id);
+    if (options.length === 0) {
+      await finish(ctx, roomId, { withWinner: false });
+      return;
+    }
+    await startAnswering(ctx, room, options[Math.floor(Math.random() * options.length)]);
+  },
+});
+
+/** The 30-second pop timer: it reminds the popper, and starts the last 30 seconds. */
 export const popTimeUp = internalMutation({
   args: { roomId: v.id('rooms'), round: v.number() },
   handler: async (ctx, { roomId, round }) => {
     const room = await ctx.db.get(roomId);
-    if (room?.status === 'popping' && room.round === round) {
-      await ctx.db.patch(roomId, { popReminder: true });
-    }
+    if (room?.status !== 'popping' || room.round !== round) return;
+    const deadline = Date.now() + POP_LIMIT_MS;
+    await ctx.db.patch(roomId, { popReminder: true, deadline });
+    await ctx.scheduler.runAt(deadline, internal.rooms.popLimitUp, { roomId, round });
+  },
+});
+
+/** Past the pop limit a random balloon pops, so five people never wait forever. */
+export const popLimitUp = internalMutation({
+  args: { roomId: v.id('rooms'), round: v.number() },
+  handler: async (ctx, { roomId, round }) => {
+    const room = await ctx.db.get(roomId);
+    if (room?.status !== 'popping' || room.round !== round) return;
+    const stillIn = (await seatsOf(ctx, roomId)).filter((seat) => !seat.popped);
+    if (stillIn.length === 0) return;
+    await pop(ctx, room, stillIn[Math.floor(Math.random() * stillIn.length)]);
   },
 });

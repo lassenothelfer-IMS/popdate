@@ -1,33 +1,38 @@
-import { Redirect, router, useFocusEffect } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import { StyleSheet, View } from 'react-native';
 
 import {
   api,
   getMockNextRole,
   isMockServer,
   setMockNextRole,
-  type Match,
   type MockRole,
+  type Profile,
+  type QueueStats,
 } from '@/api';
+import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
+import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { Chip } from '@/components/chip';
 import { ErrorLine } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
+import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
+import { TAB_BAR_CLEARANCE, useTabFocus } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
-import { PushPrompt } from '@/features/home/push-prompt';
-import { SettingsButton } from '@/features/home/settings-button';
-import { seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { BrandBalloon, Radius, Space } from '@/constants/theme';
+import { outcomeLine } from '@/features/rooms/rooms-screen';
+import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
+import { useJoinQueue } from '@/features/home/use-join-queue';
+import { previewLine, withLastMessages, type Thread } from '@/features/matches/threads';
+import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
+import { useLocale, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
-import { ageFromBirthDate } from '@/utils/birth-date';
-import { haptics } from '@/utils/haptics';
+import { useFilterText } from '@/state/settings';
 
 /** The test server's role chips, labeled by their `home.*` keys. */
 const MOCK_ROLES: { role: MockRole; label: string }[] = [
@@ -36,294 +41,427 @@ const MOCK_ROLES: { role: MockRole; label: string }[] = [
   { role: 'contestant', label: 'home.roleBalloon' },
 ];
 
-/** The matches arrive once the list has loaded, instead of flashing the empty state first. */
-const listIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+/** How often the live queue line refreshes while Home is on screen. */
+const LIVE_REFRESH_MS = 20_000;
+/** Home shows your newest matches; the Matches tab has them all. */
+const HOME_MATCHES = 2;
+
+type DayPart = 'Morning' | 'Afternoon' | 'Evening' | 'Night';
+
+function dayPart(hour: number): DayPart {
+  if (hour >= 5 && hour < 12) return 'Morning';
+  if (hour >= 12 && hour < 18) return 'Afternoon';
+  if (hour >= 18 && hour < 22) return 'Evening';
+  return 'Night';
+}
+
+/** "Good evening, Lasse." and "Zürich, Monday night", for right now. */
+function greeting(t: Translate, locale: string, name: string, city: string) {
+  const now = new Date();
+  const part = dayPart(now.getHours());
+  let weekday = '';
+  try {
+    weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(now);
+  } catch {
+    weekday = '';
+  }
+  // Night still says good evening, as people do.
+  const hello = part === 'Night' ? 'Evening' : part;
+  return {
+    hero: t(`home.greet${hello}`, { name }),
+    live: t('home.liveLine', { city, day: t(`home.part${part}`, { weekday }) }),
+  };
+}
+
+/**
+ * What Complete your profile asks for: only the optional parts still missing,
+ * like "Add your job". Null once height, job and bio are all in.
+ */
+function missingNote(t: Translate, profile: Pick<Profile, 'heightCm' | 'job' | 'bio'>) {
+  const items = [
+    profile.heightCm === null ? t('home.completeHeight') : null,
+    profile.job.trim() ? null : t('home.completeJob'),
+    profile.bio.trim() ? null : t('home.completeBio'),
+  ].filter((item): item is string => item !== null);
+  if (items.length === 0) return null;
+  const [a, b, c] = items;
+  const list =
+    items.length === 1
+      ? a
+      : items.length === 2
+        ? t('home.completeTwo', { a, b })
+        : t('home.completeThree', { a, b, c });
+  return t('home.completeProfileNote', { items: list });
+}
 
 export function HomeScreen() {
   const { profile } = useSession();
   const seats = useSeats();
   const theme = useTheme();
   const t = useT();
-  /** Null until the first load, so the empty state never flashes before the rows. */
-  const [matches, setMatches] = useState<Match[] | null>(null);
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const locale = useLocale();
+  const filter = useFilterText();
+  /** Your newest matches with their last message. Null until the first load, so nothing flashes before the rows. */
+  const [matches, setMatches] = useState<Thread[] | null>(null);
   const [mockRole, setMockRole] = useState(getMockNextRole);
+  const { join, joining, error } = useJoinQueue();
+  /** Null until it loads, or while it can't: the line then falls back to the day and city. */
+  const [live, setLive] = useState<QueueStats | null>(null);
+  const { history, reload: reloadHistory } = useRoomHistory();
+  const lastRoom = history?.[0];
+  const streak = history ? roomStats(history).streak : 0;
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      setJoining(false);
+  const loadLive = useCallback(
+    (isCurrent: () => boolean = () => true) =>
+      api.getQueueStats().then(
+        (stats) => {
+          if (isCurrent()) setLive(stats);
+        },
+        () => {},
+      ),
+    [],
+  );
+
+  const loadMatches = useCallback(
+    (isCurrent: () => boolean = () => true) =>
       api
         .listMatches()
-        .then((list) => {
-          if (active) setMatches(list);
-        })
-        // A failed load still shows the section: the last list, or the empty state.
-        .catch(() => {
-          if (active) setMatches((previous) => previous ?? []);
-        });
+        .then((list) =>
+          withLastMessages(
+            [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, HOME_MATCHES),
+          ),
+        )
+        .then(
+          (list) => {
+            if (isCurrent()) setMatches(list);
+          },
+          () => {
+            if (isCurrent()) setMatches((previous) => previous ?? []);
+          },
+        ),
+    [],
+  );
+
+  // Who's queuing right now: fetched on every visit, then every 20 s while Home is on screen.
+  useTabFocus(
+    useCallback(() => {
+      let active = true;
+      const isCurrent = () => active;
+      void loadLive(isCurrent);
+      const timer = setInterval(() => void loadLive(isCurrent), LIVE_REFRESH_MS);
+      return () => {
+        active = false;
+        clearInterval(timer);
+      };
+    }, [loadLive]),
+  );
+
+  useTabFocus(
+    useCallback(() => {
+      let active = true;
+      void loadMatches(() => active);
       return () => {
         active = false;
       };
-    }, []),
+    }, [loadMatches]),
   );
 
-  if (!profile) return <Redirect href="/" />;
-
-  async function handlePlay() {
-    setJoining(true);
-    setError(null);
-    try {
-      await api.joinQueue();
-      router.push('/queue');
-    } catch {
-      const message = t('home.joinError');
-      setError(message);
-      haptics.error();
-      AccessibilityInfo.announceForAccessibility(message);
-      setJoining(false);
-    }
+  function refresh() {
+    return Promise.all([loadLive(), loadMatches(), reloadHistory()]);
   }
+
+  if (!profile) return <Redirect href="/" />;
 
   function chooseMockRole(role: MockRole) {
     setMockNextRole(role);
     setMockRole(role);
   }
 
-  const hasMatches = (matches?.length ?? 0) > 0;
+  const words = greeting(t, locale, profile.name, profile.city);
+  const missing = missingNote(t, profile);
 
   return (
-    <Screen scroll contentStyle={styles.content}>
-      <View style={styles.top}>
-        <Wordmark />
-        <SettingsButton />
-      </View>
+    <TabSwipe tab="home">
+    <View style={styles.flex}>
+      <Screen
+        scroll
+        onRefresh={refresh}
+        contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+        <Rise index={0} style={styles.top}>
+          <Wordmark />
+        </Rise>
 
-      {/* The whole row opens your profile; the highlight reaches a little past the avatar. */}
-      <PressableHighlight
-        accessibilityRole="button"
-        accessibilityLabel={t('home.editProfile')}
-        onPress={() => router.push('/profile')}
-        background="transparent"
-        style={styles.you}>
-        <Avatar name={profile.name} uri={profile.photos[0]} tone={youSeat(seats)} size={64} />
-        <View style={styles.youText}>
-          <ThemedText type="heading">{profile.name}</ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {ageFromBirthDate(profile.birthDate)} · {profile.city}
-          </ThemedText>
-        </View>
-        <View style={styles.chevron}>
-          <Icon name="chevronRight" size={14} color={theme.textTertiary} />
-        </View>
-      </PressableHighlight>
-
-      <View style={styles.play}>
-        <Button
-          title={t('home.play')}
-          loading={joining}
-          onPress={handlePlay}
-          accessibilityHint={t('home.playHint')}
-        />
-        {error ? <ErrorLine message={error} /> : null}
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.centered}>
-          {t('home.roleNote')}
-        </ThemedText>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={t('home.howToPlay')}
-          onPress={() => router.push('/how-to-play')}
-          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={({ pressed }) => [styles.howTo, pressed && styles.pressed]}>
-          <ThemedText type="label" style={styles.link}>
-            {t('home.howToPlay')}
-          </ThemedText>
-        </Pressable>
-      </View>
-
-      <PushPrompt style={styles.push} />
-
-      {matches ? (
-        <Animated.View entering={listIn} style={styles.matches}>
-          <ThemedText type="headline" accessibilityRole="header">
-            {t('home.matches')}
-          </ThemedText>
-          {matches.length === 0 ? (
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.empty}>
-              {t('home.noMatches')}
+        <Rise index={1} style={styles.hello}>
+          <View style={styles.liveRow}>
+            {/* The green dot means live numbers; the day-and-city fallback goes without. */}
+            {live ? <View style={[styles.liveDot, { backgroundColor: theme.success }]} /> : null}
+            <ThemedText type="kicker">
+              {live
+                ? t('home.liveQueue', { count: live.waiting, city: profile.city })
+                : words.live}
             </ThemedText>
-          ) : (
-            <View style={styles.list}>
-              {matches.map((match) => (
-                <MatchRow key={match.id} match={match} />
+          </View>
+          <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.3}>
+            {words.hero}
+          </ThemedText>
+        </Rise>
+
+        <Rise index={2}>
+          <View style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <View
+              style={styles.cardBalloon}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              <Balloon color={BrandBalloon.color} size={260} />
+            </View>
+            <View style={styles.cardText}>
+              <ThemedText type="kicker">{t('home.cardLabel', { city: profile.city })}</ThemedText>
+              <ThemedText type="display" style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
+                {t('home.cardTitle')}
+              </ThemedText>
+              <ThemedText type="callout" themeColor="textSecondary" style={styles.cardNote}>
+                {t('home.roleNote')}
+              </ThemedText>
+            </View>
+            <Button
+              title={t('home.play')}
+              loading={joining}
+              onPress={join}
+              accessibilityHint={t('home.playHint')}
+            />
+          </View>
+          {error ? <ErrorLine message={error} /> : null}
+          {live ? (
+            <ThemedText type="footnote" themeColor="textSecondary" style={styles.liveNote}>
+              {t('home.roomsLastHour', { count: live.roomsLastHour })}
+            </ThemedText>
+          ) : null}
+        </Rise>
+
+        <Rise index={3} style={styles.rows}>
+          {lastRoom ? (
+            <LinkRow
+              title={t('home.lastRoom')}
+              subtitle={
+                streak > 1
+                  ? `${outcomeLine(t, lastRoom)} · ${t('home.streak', { count: streak })}`
+                  : outcomeLine(t, lastRoom)
+              }
+              onPress={() => router.navigate('/rooms' as Href)}
+              icon={
+                <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                  <Icon name="rooms" size={16} color={theme.text} />
+                </View>
+              }
+            />
+          ) : null}
+          {/* Height, job and bio are optional at sign-up: a nudge until they're in. */}
+          {missing ? (
+            <LinkRow
+              title={t('home.completeProfile')}
+              subtitle={missing}
+              onPress={() => router.push('/profile')}
+              icon={
+                <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                  <Icon name="add" size={16} color={theme.text} />
+                </View>
+              }
+            />
+          ) : null}
+          <LinkRow
+            title={t('home.howToPlay')}
+            subtitle={t('home.howToPlayNote')}
+            onPress={() => router.push('/how-to-play')}
+            icon={
+              <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                <Balloon color={BrandBalloon.color} size={14} />
+              </View>
+            }
+          />
+          {(matches ?? []).map((thread) => {
+            const { match } = thread;
+            return (
+              <LinkRow
+                key={match.id}
+                title={t('common.nameAge', { name: match.other.name, age: match.other.age })}
+                subtitle={previewLine(t, filter, thread, profile.id)}
+                accessibilityHint={t('home.openChatHint')}
+                onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+                icon={
+                  <Avatar
+                    name={match.other.name}
+                    uri={match.other.photo}
+                    tone={seatFor(seats, match.other.id)}
+                    size={36}
+                  />
+                }
+              />
+            );
+          })}
+        </Rise>
+
+
+        {/* On the page, not in a card, so the chips keep their filled shape at rest.
+            Only in development: a store build never shows the bots' test controls. */}
+        {isMockServer && __DEV__ ? (
+          <View style={styles.mock}>
+            <ThemedText type="kicker" accessibilityRole="header">
+              {t('home.testServer')}
+            </ThemedText>
+            <View
+              style={styles.chips}
+              accessibilityRole="radiogroup"
+              accessibilityLabel={t('home.roleGroup')}>
+              {MOCK_ROLES.map(({ role, label }) => (
+                <Chip
+                  key={role}
+                  label={t(label)}
+                  selected={mockRole === role}
+                  onPress={() => chooseMockRole(role)}
+                />
               ))}
             </View>
-          )}
-        </Animated.View>
-      ) : null}
-
-      {/* On the page, not in a card, so the chips keep their filled shape at rest. */}
-      {isMockServer ? (
-        <View style={hasMatches ? styles.mockAfterRows : styles.mock}>
-          <ThemedText type="headline" accessibilityRole="header">
-            {t('home.testServer')}
-          </ThemedText>
-          {/* Sized to their labels; larger text wraps them onto a second line. */}
-          <View
-            style={styles.chips}
-            accessibilityRole="radiogroup"
-            accessibilityLabel={t('home.roleGroup')}>
-            {MOCK_ROLES.map(({ role, label }) => (
-              <Chip
-                key={role}
-                label={t(label)}
-                selected={mockRole === role}
-                onPress={() => chooseMockRole(role)}
-              />
-            ))}
+            <ThemedText type="footnote" themeColor="textTertiary">
+              {t('home.testNote')}
+            </ThemedText>
           </View>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.mockNote}>
-            {t('home.testNote')}
-          </ThemedText>
-        </View>
-      ) : null}
-    </Screen>
+        ) : null}
+      </Screen>
+    </View>
+    </TabSwipe>
   );
 }
 
-/** One match: a card with their avatar in their hue, their name and age, and a chevron. Opens your chat. */
-function MatchRow({ match }: { match: Match }) {
+type LinkRowProps = {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+  accessibilityHint?: string;
+};
+
+/** A row card: a 36 pt icon or avatar, a title over a quiet line, a chevron. */
+function LinkRow({ title, subtitle, icon, onPress, accessibilityHint }: LinkRowProps) {
   const theme = useTheme();
-  const seats = useSeats();
-  const t = useT();
   return (
     <PressableHighlight
       accessibilityRole="button"
-      accessibilityLabel={t('common.nameAge', { name: match.other.name, age: match.other.age })}
-      accessibilityHint={t('home.openChatHint')}
-      onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
+      accessibilityLabel={title}
+      accessibilityHint={accessibilityHint}
+      onPress={onPress}
       background={theme.field}
-      style={[styles.row, { borderColor: theme.outline }]}>
-      <Avatar
-        name={match.other.name}
-        uri={match.other.photo}
-        tone={seatFor(seats, match.other.id)}
-        size={40}
-      />
-      <ThemedText type="row" style={styles.flex}>
-        {match.other.name},{' '}
-        <ThemedText type="row" themeColor="textSecondary" style={styles.age}>
-          {match.other.age}
+      style={[styles.row, { borderColor: theme.border }]}>
+      {icon}
+      <View style={styles.rowText}>
+        <ThemedText type="headline">{title}</ThemedText>
+        <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={2}>
+          {subtitle}
         </ThemedText>
-      </ThemedText>
-      <View style={styles.chevron}>
-        <Icon name="chevronRight" size={14} color={theme.textTertiary} />
       </View>
+      <Icon name="chevronRight" size={13} color={theme.textTertiary} />
     </PressableHighlight>
   );
 }
 
-/** How far the profile row's pressed fill reaches past its content. */
-const YOU_INSET = Space.sm;
-
 const styles = StyleSheet.create({
-  // Home starts 8pt lower than the other screens: the wordmark has the top to itself.
-  content: {
-    paddingTop: 20,
-  },
   flex: {
     flex: 1,
   },
-  centered: {
-    textAlign: 'center',
+  content: {
+    paddingTop: Space.xs,
   },
   top: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  // The row sits where it did before it became a button: its padding is taken back by the margins.
-  you: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-    marginTop: 28 - YOU_INSET,
-    marginHorizontal: -YOU_INSET,
-    padding: YOU_INSET,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-  },
-  youText: {
-    flex: 1,
-    gap: 2,
-  },
-  play: {
-    gap: 10,
-    marginTop: 28 - YOU_INSET,
-  },
-  // A 44pt target around one line of text, pulled in so it reads as part of the note above.
-  howTo: {
-    alignSelf: 'center',
-    minHeight: MinTouch,
-    justifyContent: 'center',
-    paddingHorizontal: Space.sm,
-    marginTop: -Space.xs,
-    marginBottom: -Space.xs,
-  },
-  link: {
-    textDecorationLine: 'underline',
-  },
-  pressed: {
-    opacity: 0.6,
-  },
-  push: {
-    marginTop: Space.lg,
-  },
-  // More room above the list than between the groups above it.
-  matches: {
+  hello: {
+    gap: Space.xs,
     marginTop: 40,
   },
-  empty: {
-    marginTop: 6,
-  },
-  list: {
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Space.xs,
-    marginTop: 10,
+  },
+  liveNote: {
+    marginTop: Space.xs,
+    textAlign: 'center',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  // The play card: 300 tall, the brand balloon leaning in from the top right.
+  card: {
+    minHeight: 300,
+    marginTop: Space.lg,
+    padding: Space.md,
+    paddingTop: 22,
+    justifyContent: 'space-between',
+    borderRadius: Radius.card,
+    borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  cardBalloon: {
+    position: 'absolute',
+    right: -60,
+    top: -40,
+    opacity: 0.22,
+  },
+  cardText: {
+    gap: 6,
+    paddingHorizontal: 6,
+    marginBottom: Space.lg,
+    maxWidth: 230,
+  },
+  cardTitle: {
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  cardNote: {
+    marginTop: Space.xxs,
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  rows: {
+    gap: 10,
+    marginTop: Space.lg,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
-    minHeight: 64,
-    paddingHorizontal: Space.sm,
-    paddingVertical: Space.xs,
-    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: Space.md,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  age: {
-    fontWeight: 400,
-  },
-  // The chevron's 18pt slot, so the name ends where the canvas's does.
-  chevron: {
-    width: 18,
+  rowIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowText: {
+    flex: 1,
+    gap: 1,
+  },
+  push: {
+    marginTop: Space.lg,
   },
   mock: {
-    marginTop: 36,
-  },
-  // A card ends flush, so the group sits a little closer to it than to a line of text.
-  mockAfterRows: {
+    gap: Space.sm,
     marginTop: Space.xl,
   },
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Space.xs,
-    marginTop: Space.sm,
-  },
-  mockNote: {
-    marginTop: 10,
   },
 });

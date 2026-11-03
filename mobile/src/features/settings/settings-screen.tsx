@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -29,9 +29,6 @@ import { enablePush, getPushPermission, type PushPermission } from '@/utils/push
 
 const SUPPORT_EMAIL = 'support@popdate.app';
 
-/** TODO(Elias): the hosted terms and privacy pages. Until then the rows say "Coming soon". */
-const TERMS_URL: string | null = null;
-const PRIVACY_URL: string | null = null;
 
 type SectionKey = 'preferences' | 'notifications' | 'safety' | 'account';
 type NotificationKey = keyof Settings['notifications'];
@@ -125,14 +122,6 @@ export function SettingsScreen() {
     await save('notifications', { notifications: { ...base, [key]: on } });
   }
 
-  function openLegal(url: string | null) {
-    if (url) {
-      Linking.openURL(url).catch(() => fail('account'));
-      return;
-    }
-    showNotice(t('settings.comingSoon'), t('settings.comingSoonBody'));
-  }
-
   async function contactSupport() {
     try {
       await Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
@@ -208,155 +197,165 @@ export function SettingsScreen() {
   ];
 
   return (
-    <Screen scroll>
-      <BackButton onPress={() => goBackOr('/home')} />
-      <ThemedText type="display" accessibilityRole="header" style={styles.title}>
-        {t('settings.title')}
-      </ThemedText>
+    <View style={styles.flex}>
+      <Screen scroll>
+        {/* Back to the screen that opened it; from a link or a reload, to Home. */}
+        <BackButton onPress={() => goBackOr('/home')} />
+        <ThemedText
+          type="title"
+          accessibilityRole="header"
+          maxFontSizeMultiplier={1.3}
+          style={styles.title}>
+          {t('settings.title')}
+        </ThemedText>
 
-      <SettingsSection title={t('settings.account')}>
-        <NavRow label={t('settings.editProfile')} onPress={() => router.push('/profile')} />
-        <NavRow
-          label={t('settings.verification')}
-          value={verificationLabel}
-          valueColor={verificationColor}
-          onPress={() => router.push('/settings/verify')}
-        />
-      </SettingsSection>
-
-      <SettingsSection title={t('settings.preferences')} footer={errorFor('preferences')}>
-        <NavRow
-          label={t('settings.language')}
-          value={languageName(settings.language, t)}
-          onPress={() => router.push('/settings/language')}
-        />
-        <NavRow
-          label={t('settings.region')}
-          value={regionSettingLabel(settings.region, deviceRegion(), t)}
-          onPress={() => router.push('/settings/region')}
-        />
-        <ChoiceRow
-          label={t('settings.units')}
-          value={settings.units}
-          options={[
-            { value: 'metric', label: t('settings.unitsMetric') },
-            { value: 'imperial', label: t('settings.unitsImperial') },
-          ]}
-          onChange={(units) => save('preferences', { units })}
-        />
-        <ChoiceRow
-          label={t('settings.appearance')}
-          value={settings.appearance}
-          options={[
-            { value: 'system', label: t('settings.appearanceSystem') },
-            { value: 'light', label: t('settings.appearanceLight') },
-            { value: 'dark', label: t('settings.appearanceDark') },
-          ]}
-          onChange={(appearance) => save('preferences', { appearance })}
-        />
-      </SettingsSection>
-
-      <SettingsSection
-        title={t('settings.notifications')}
-        footer={
-          isWeb || showDenied || error?.section === 'notifications' ? (
-            <>
-              {isWeb ? (
-                <ThemedText type="footnote" themeColor="textSecondary">
-                  {t('settings.notificationsWeb')}
-                </ThemedText>
-              ) : null}
-              {showDenied ? (
-                <View style={styles.denied}>
-                  <ThemedText type="footnote" themeColor="textSecondary">
-                    {deniedMessage}
-                  </ThemedText>
-                  <View style={styles.openSettings}>
-                    <Button
-                      variant="secondary"
-                      title={t('settings.openSettings')}
-                      onPress={() => Linking.openSettings()}
-                    />
-                  </View>
-                </View>
-              ) : null}
-              {errorFor('notifications')}
-            </>
-          ) : null
-        }>
-        {notificationRows.map(({ key, label }) => (
-          <SwitchRow
-            key={key}
-            label={label}
-            value={!isWeb && pushAllowed && settings.notifications[key]}
-            disabled={isWeb}
-            onValueChange={(on) => toggleNotification(key, on)}
+        <SettingsSection title={t('settings.account')}>
+          <NavRow label={t('settings.editProfile')} onPress={() => router.push('/profile')} />
+          <NavRow
+            label={t('settings.verification')}
+            value={verificationLabel}
+            valueColor={verificationColor}
+            onPress={() => router.push('/settings/verify')}
           />
-        ))}
-      </SettingsSection>
+        </SettingsSection>
 
-      <SettingsSection title={t('settings.safety')} footer={errorFor('safety')}>
-        <SwitchRow
-          label={t('settings.commentFilter')}
-          description={t('settings.commentFilterHint')}
-          value={settings.commentFilter}
-          onValueChange={(commentFilter) => save('safety', { commentFilter })}
-        />
-        <NavRow
-          label={t('settings.blocked')}
-          value={
-            blockedCount === null
-              ? undefined
-              : blockedCount === 0
-                ? t('settings.blockedNone')
-                : String(blockedCount)
-          }
-          onPress={() => router.push('/settings/blocked')}
-        />
-        <NavRow label={t('settings.safetyTips')} onPress={() => router.push('/settings/safety-tips')} />
-      </SettingsSection>
+        <SettingsSection title={t('settings.preferences')} footer={errorFor('preferences')}>
+          <NavRow
+            label={t('settings.language')}
+            value={languageName(settings.language, t)}
+            onPress={() => router.push('/settings/language')}
+          />
+          <NavRow
+            label={t('settings.region')}
+            value={regionSettingLabel(settings.region, deviceRegion(), t)}
+            onPress={() => router.push('/settings/region')}
+          />
+          <ChoiceRow
+            label={t('settings.units')}
+            value={settings.units}
+            options={[
+              { value: 'metric', label: t('settings.unitsMetric') },
+              { value: 'imperial', label: t('settings.unitsImperial') },
+            ]}
+            onChange={(units) => save('preferences', { units })}
+          />
+          <ChoiceRow
+            label={t('settings.appearance')}
+            value={settings.appearance}
+            options={[
+              { value: 'system', label: t('settings.appearanceSystem') },
+              { value: 'light', label: t('settings.appearanceLight') },
+              { value: 'dark', label: t('settings.appearanceDark') },
+            ]}
+            onChange={(appearance) => save('preferences', { appearance })}
+          />
+        </SettingsSection>
 
-      <SettingsSection title={t('settings.legal')}>
-        <NavRow label={t('settings.terms')} onPress={() => openLegal(TERMS_URL)} />
-        <NavRow label={t('settings.privacy')} onPress={() => openLegal(PRIVACY_URL)} />
-        <NavRow
-          label={t('settings.support')}
-          value={SUPPORT_EMAIL}
-          onPress={contactSupport}
-          accessibilityHint={t('settings.supportHint')}
-        />
-        <InfoRow label={t('settings.version')} value={Constants.expoConfig?.version ?? '–'} />
-      </SettingsSection>
+        <SettingsSection
+          title={t('settings.notifications')}
+          footer={
+            isWeb || showDenied || error?.section === 'notifications' ? (
+              <>
+                {isWeb ? (
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    {t('settings.notificationsWeb')}
+                  </ThemedText>
+                ) : null}
+                {showDenied ? (
+                  <View style={styles.denied}>
+                    <ThemedText type="footnote" themeColor="textSecondary">
+                      {deniedMessage}
+                    </ThemedText>
+                    <View style={styles.openSettings}>
+                      <Button
+                        variant="tinted"
+                        title={t('settings.openSettings')}
+                        onPress={() => Linking.openSettings()}
+                      />
+                    </View>
+                  </View>
+                ) : null}
+                {errorFor('notifications')}
+              </>
+            ) : null
+          }>
+          {notificationRows.map(({ key, label }) => (
+            <SwitchRow
+              key={key}
+              label={label}
+              value={!isWeb && pushAllowed && settings.notifications[key]}
+              disabled={isWeb}
+              onValueChange={(on) => toggleNotification(key, on)}
+            />
+          ))}
+        </SettingsSection>
 
-      <View style={styles.end}>
-        {errorFor('account')}
-        <Button
-          variant="ghost"
-          title={t('settings.signOut')}
-          loading={ending === 'signOut'}
-          disabled={ending !== null}
-          onPress={handleSignOut}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('settings.deleteAccount')}
-          accessibilityState={{ disabled: ending !== null, busy: ending === 'delete' }}
-          disabled={ending !== null}
-          onPress={handleDelete}
-          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={({ pressed }) => [styles.delete, pressed && styles.pressed]}>
-          <ThemedText type="label" themeColor={ending === 'delete' ? 'textTertiary' : 'danger'}>
-            {ending === 'delete' ? t('settings.deleting') : t('settings.deleteAccount')}
-          </ThemedText>
-        </Pressable>
-      </View>
-    </Screen>
+        <SettingsSection title={t('settings.safety')} footer={errorFor('safety')}>
+          <SwitchRow
+            label={t('settings.commentFilter')}
+            description={t('settings.commentFilterHint')}
+            value={settings.commentFilter}
+            onValueChange={(commentFilter) => save('safety', { commentFilter })}
+          />
+          <NavRow
+            label={t('settings.blocked')}
+            value={
+              blockedCount === null
+                ? undefined
+                : blockedCount === 0
+                  ? t('settings.blockedNone')
+                  : String(blockedCount)
+            }
+            onPress={() => router.push('/settings/blocked')}
+          />
+          <NavRow label={t('settings.safetyTips')} onPress={() => router.push('/settings/safety-tips')} />
+        </SettingsSection>
+
+        <SettingsSection title={t('settings.legal')}>
+          <NavRow label={t('settings.terms')} onPress={() => router.push('/settings/terms' as Href)} />
+          <NavRow label={t('settings.privacy')} onPress={() => router.push('/settings/privacy' as Href)} />
+          <NavRow
+            label={t('settings.support')}
+            value={SUPPORT_EMAIL}
+            onPress={contactSupport}
+            accessibilityHint={t('settings.supportHint')}
+          />
+          <InfoRow label={t('settings.version')} value={Constants.expoConfig?.version ?? '–'} />
+        </SettingsSection>
+
+        <View style={styles.end}>
+          {errorFor('account')}
+          <Button
+            variant="plain"
+            title={t('settings.signOut')}
+            loading={ending === 'signOut'}
+            disabled={ending !== null}
+            onPress={handleSignOut}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.deleteAccount')}
+            accessibilityState={{ disabled: ending !== null, busy: ending === 'delete' }}
+            disabled={ending !== null}
+            onPress={handleDelete}
+            pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            style={({ pressed }) => [styles.delete, pressed && styles.pressed]}>
+            <ThemedText type="label" themeColor={ending === 'delete' ? 'textTertiary' : 'danger'}>
+              {ending === 'delete' ? t('settings.deleting') : t('settings.deleteAccount')}
+            </ThemedText>
+          </Pressable>
+        </View>
+      </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   title: {
-    marginTop: Space.md,
+    marginTop: Space.xs,
   },
   denied: {
     gap: Space.sm,

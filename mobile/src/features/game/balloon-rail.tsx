@@ -6,6 +6,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { CssEase, Motion } from '@/constants/theme';
 import { SeatMark, type SeatState } from '@/features/game/seat-mark';
+import { roomSeatIndex } from '@/features/game/room-seats';
 import { YouTag } from '@/features/game/you-tag';
 import { useTextScale } from '@/hooks/use-text-scale';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
@@ -18,7 +19,7 @@ import { useT, type Translate } from '@/i18n';
 const NAMES_UP_TO_SCALE = 1.35;
 const DOT_SIZE = 6;
 /** A seat whose answer card is out of view while the popper browses the cards. */
-const DIMMED = 0.4;
+const DIMMED = 0.45;
 
 type BalloonRailProps = {
   contestants: Contestant[];
@@ -56,7 +57,7 @@ export function BalloonRail({
           <Seat
             key={contestant.id}
             contestant={contestant}
-            color={seatAt(seats, index).color}
+            color={seatAt(seats, roomSeatIndex(contestants, index, meId)).color}
             state={popped ? 'pop' : marked ? 'mark' : 'up'}
             dimmed={!popped && !marked && !!inView && !inView.includes(contestant.id)}
             isMe={contestant.id === meId}
@@ -128,7 +129,7 @@ function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelec
             transitionTimingFunction: CssEase.out,
           },
         ]}>
-        <SeatMark color={color} state={state} risen={risen} />
+        <SeatMark color={color} state={state} active={isMe} risen={risen} />
         {isMe ? (
           showName ? (
             <YouTag />
@@ -138,7 +139,7 @@ function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelec
         ) : showName ? (
           <ThemedText
             type="railName"
-            themeColor={state === 'pop' ? 'textTertiary' : 'textSecondary'}
+            themeColor="textTertiary"
             numberOfLines={1}
             style={styles.name}>
             {contestant.name}

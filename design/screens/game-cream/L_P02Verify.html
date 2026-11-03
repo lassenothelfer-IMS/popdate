@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Cream: Selfie verification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+.pd-scan{animation:pd-scan 2.2s ease-in-out infinite}
+@keyframes pd-scan{0%,100%{transform:translateY(0)}50%{transform:translateY(300px)}}
+.pd-oval{animation:pd-oval 2.2s ease-in-out infinite}
+@keyframes pd-oval{0%,100%{box-shadow:0 0 0 2px rgba(28,25,23,.9),0 0 0 2000px rgba(28,25,23,.72)}50%{box-shadow:0 0 0 3px rgba(233,190,114,1),0 0 0 2000px rgba(28,25,23,.72)}}
+
+.pd-root{isolation:isolate}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(1){animation-delay:40ms}.pd-root > *:nth-child(2){animation-delay:110ms}.pd-root > *:nth-child(3){animation-delay:180ms}.pd-root > *:nth-child(4){animation-delay:250ms}.pd-root > *:nth-child(5){animation-delay:320ms}.pd-root > *:nth-child(6){animation-delay:390ms}.pd-root > *:nth-child(7){animation-delay:460ms}.pd-root > *:nth-child(8){animation-delay:530ms}.pd-root > *:nth-child(9){animation-delay:600ms}
+.pd-root > .pd-fx{animation:none}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pd-root a[href],.pd-root button{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms,box-shadow 180ms;-webkit-tap-highlight-color:transparent}
+.pd-root a[href]:active,.pd-root button:active{transform:scale(.97)}
+.pd-root a[href]:hover,.pd-root button:hover{opacity:.92}
+.pd-root [style*="height: 3px"]{transform-origin:left center;animation:pd-fill 600ms cubic-bezier(.22,1,.36,1) both;animation-delay:calc(200ms + var(--i,0)*40ms)}
+@keyframes pd-fill{from{transform:scaleX(.2);opacity:.4}to{transform:none;opacity:1}}
+.pd-root input,.pd-root textarea{transition:box-shadow 200ms}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+
+.pd-root a[href][style*="background: #1C1917"],.pd-root button[style*="background: #1C1917"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(28,25,23,.18),0 10px 24px -10px rgba(28,25,23,.45)}
+.pd-root a[href][style*="background: #CF3A2F"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 14px 32px -10px rgba(240,105,92,.6)}
+.pd-glow{position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 50% 62%,rgba(255,138,110,.16) 0%,rgba(255,138,110,0) 70%);animation:pd-breathe 7s ease-in-out infinite;z-index:0}
+@keyframes pd-breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.pd-root > *:not(.pd-fx){position:relative}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box"><svg class="pd-fx pd-grain" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.05;mix-blend-mode:multiply;z-index:5"><filter id="pdg"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#pdg)"></rect></svg>
+  <div style="position: absolute; inset: 0; background: #E4D7C5"></div>
+  <div style="position: absolute; left: -60px; top: 180px; width: 400px; height: 400px; border-radius: 50%; background: #D2BFA8; filter: blur(60px)"></div>
+  <div style="position: absolute; right: -80px; top: 380px; width: 360px; height: 360px; border-radius: 50%; background: #DCCDB6; filter: blur(60px)"></div>
+
+  <div class="pd-oval" style="position: absolute; left: 65px; top: 190px; width: 260px; height: 340px; border-radius: 50% 50% 50% 50% / 48% 48% 52% 52%; overflow: hidden">
+    <div class="pd-scan" style="position: absolute; left: 0; right: 0; top: 20px; height: 2px; background: linear-gradient(90deg, transparent, #E9BE72, transparent); opacity: .9"></div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 62px; display: flex; align-items: center; justify-content: space-between">
+    <a href="L_Profile.html" style="font-size: 15px; font-weight: 500; color: #1C1917; text-decoration: none; height: 44px; display: flex; align-items: center">Cancel</a>
+    <div style="font-size: 15px; font-weight: 600">Selfie check</div>
+    <span style="width: 44px"></span>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 112px; text-align: center; font-size: 15px; line-height: 20px; color: #5F574F">Face in the oval, then turn your head slowly to the left.</div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 560px; display: flex; flex-direction: column; align-items: center; gap: 12px">
+    <div style="display: flex; gap: 8px">
+      <span style="width: 32px; height: 4px; border-radius: 2px; background: #1C1917"></span><span style="width: 32px; height: 4px; border-radius: 2px; background: #1C1917"></span><span style="width: 32px; height: 4px; border-radius: 2px; background: rgba(28,25,23,.3)"></span>
+    </div>
+    <div style="font-size: 13px; color: #8C8378">Step 2 of 3. Your selfie is compared to photo 1 and then deleted.</div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 630px; padding: 14px 16px; border-radius: 14px; background: rgba(255,253,250,.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08); display: flex; align-items: center; gap: 12px">
+    <span style="width: 36px; height: 36px; border-radius: 50%; background: #1C1917; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 7l2 2 4-4" fill="none" stroke="#FFFDFA" stroke-width="1.8" stroke-linecap="round"></path></svg></span>
+    <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 600">Verified people get the cream check</span><span style="font-size: 12px; color: #5F574F">Choosers pop unverified balloons first. Takes 20 seconds.</span></div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; bottom: 34px">
+    <a href="L_Profile.html" style="display: flex; align-items: center; justify-content: center; height: 54px; border-radius: 16px; background: #E9DDC8; color: #5F574F; font-size: 17px; font-weight: 600; text-decoration: none; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.14)">Checking...</a>
+  </div>
+</div>
+</body>
+</html>

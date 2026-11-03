@@ -1,35 +1,228 @@
-import type { ReactNode } from 'react';
+import { createContext, use, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
-  Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
   type StyleProp,
+  type TextInputInstance,
+  type ViewInstance,
   type ViewStyle,
 } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { Gutter, MaxContentWidth, Space } from '@/constants/theme';
+import { useTabActive } from '@/components/tab-bar';
+import { CanvasGlow, Gutter, Lamp, MaxContentWidth, Space } from '@/constants/theme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 
-const GRAIN = require('@/assets/images/grain.png');
-
-/** Film grain over the paper, light mode only. Decorative, behind everything. */
+/**
+ * Behind every full screen. Velvet draws the canvas glow (the only background
+ * gradient in the app) and the lamp over it, which breathes. Cream is a flat
+ * canvas: no gradient, no lamp. Decorative, behind everything.
+ */
 export function Grain() {
   const scheme = useScheme();
-  if (scheme === 'dark') return null;
+  const { width, height } = useWindowDimensions();
+  const id = useId().replace(/[^a-zA-Z0-9]/g, '');
+  // The web reports a zero-size window at first; the gradients' stops would be NaN.
+  if (scheme !== 'dark' || !width || !height) return null;
   return (
-    <Image
-      source={GRAIN}
-      resizeMode="repeat"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+    <View
+      style={StyleSheet.absoluteFill}
       pointerEvents="none"
-      style={styles.grain}
-    />
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <Svg width={width} height={height}>
+        <Defs>
+          <RadialGradient
+            id={`canvas${id}`}
+            cx="50%"
+            cy={`${CanvasGlow.cy * 100}%`}
+            rx={`${CanvasGlow.rx * 100}%`}
+            ry={`${CanvasGlow.ry * 100}%`}>
+            {CanvasGlow.stops.map((color, i) => (
+              <Stop key={i} offset={CanvasGlow.offsets[i]} stopColor={color} />
+            ))}
+          </RadialGradient>
+        </Defs>
+        <Rect width={width} height={height} fill={`url(#canvas${id})`} />
+      </Svg>
+      <BreathingLamp width={width} height={height} gradient={`lamp${id}`} />
+    </View>
   );
+}
+
+/** One breath in or out. */
+const BREATH_MS = 3500;
+
+/**
+ * The lamp: a warm ellipse over the canvas that breathes, opacity .55 to 1 and
+ * scale 1 to 1.06 over 7 s, forever. Holds still under Reduce Motion, and pauses
+ * on a tab page that's off screen.
+ */
+function BreathingLamp({ width, height, gradient }: { width: number; height: number; gradient: string }) {
+  const reduced = useReduceMotion();
+  const showing = useTabActive();
+  const breath = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) {
+      cancelAnimation(breath);
+      breath.set(1);
+      return;
+    }
+    if (!showing) {
+      cancelAnimation(breath);
+      return;
+    }
+    // Breathes in from wherever it paused, so a page you swipe back to doesn't jump.
+    const easing = Easing.inOut(Easing.ease);
+    const from = breath.get();
+    breath.set(
+      withSequence(
+        withTiming(1, { duration: BREATH_MS * (1 - from), easing }),
+        withRepeat(withTiming(0, { duration: BREATH_MS, easing }), -1, true),
+      ),
+    );
+  }, [reduced, showing, breath]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.55 + 0.45 * breath.get(),
+    transform: [{ scale: 1 + 0.06 * breath.get() }],
+  }));
+  // The overlay reaches 20% past every edge, as in the mockups, so scaling never shows its rim.
+  const w = width * 1.4;
+  const h = height * 1.4;
+  return (
+    <Animated.View style={[styles.lamp, { left: -width * 0.2, top: -height * 0.2, width: w, height: h }, style]}>
+      <Svg width={w} height={h}>
+        <Defs>
+          <RadialGradient
+            id={gradient}
+            cx="50%"
+            cy={`${((Lamp.cy * height + height * 0.2) / h) * 100}%`}
+            rx={`${((Lamp.rx * width) / w) * 100}%`}
+            ry={`${((Lamp.ry * height) / h) * 100}%`}>
+            <Stop offset="0" stopColor={Lamp.color} stopOpacity={Lamp.opacity} />
+            <Stop offset={Lamp.fadeAt} stopColor={Lamp.color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect width={w} height={h} fill={`url(#${gradient})`} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** Room left between a revealed field and the edge of what you can see. */
+const REVEAL_MARGIN = Space.md;
+/** Lets the keyboard's room settle into the layout before a field is measured. */
+const REVEAL_DELAY = 60;
+
+const RevealContext = createContext<((input: TextInputInstance | null) => void) | null>(null);
+const RevealViewContext = createContext<((view: ViewInstance, animated: boolean) => void) | null>(null);
+
+/**
+ * Inside a scrolling Screen: call it with a field as it gains focus (or grows
+ * while you type) and the screen scrolls it clear of the keyboard and footer.
+ * Null outside one.
+ */
+export function useRevealField() {
+  return use(RevealContext);
+}
+
+/**
+ * Inside a scrolling Screen: call it with a view that just appeared, like a
+ * question below the fold, and the screen scrolls it into view. Null outside one.
+ */
+export function useRevealView() {
+  return use(RevealViewContext);
+}
+
+/** Scrolls `scroller` so `view` sits inside `viewport`, by the least it takes. */
+function bringIntoView(
+  viewport: ViewInstance | null,
+  scroller: ScrollViewInstance | null,
+  scrollY: number,
+  view: ViewInstance | TextInputInstance,
+  animated: boolean,
+) {
+  if (!viewport || !scroller) return;
+  viewport.measureInWindow((_vx, viewTop, _vw, viewHeight) => {
+    view.measureInWindow((_x, top, _w, height) => {
+      const visibleTop = viewTop + REVEAL_MARGIN;
+      const visibleBottom = viewTop + viewHeight - REVEAL_MARGIN;
+      // Below the fold: bring its bottom up, where the caret of a growing bio is.
+      const below = top + height - visibleBottom;
+      const delta = below > 0 ? below : top < visibleTop ? top - visibleTop : 0;
+      if (delta === 0) return;
+      scroller.scrollTo({ y: Math.max(0, scrollY + delta), animated });
+    });
+  });
+}
+
+/**
+ * Keeps the focused field in view. The keyboard avoider only shrinks the scroll
+ * area, so without this a field low on the page stays hidden under the footer
+ * while you type into it.
+ */
+function useFieldReveal(enabled: boolean) {
+  const viewportRef = useRef<ViewInstance>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollY = useRef(0);
+  const target = useRef<TextInputInstance | null>(null);
+
+  function scrollIntoView() {
+    const input = target.current;
+    if (!input || !input.isFocused()) return;
+    bringIntoView(viewportRef.current, scrollRef.current, scrollY.current, input, true);
+  }
+
+  useEffect(() => {
+    if (!enabled || Platform.OS === 'web') return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      clearTimeout(timer);
+      timer = setTimeout(scrollIntoView, REVEAL_DELAY);
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [enabled]);
+
+  function reveal(input: TextInputInstance | null) {
+    target.current = input;
+    // On a first focus the keyboard is still coming up: keyboardDidShow measures then.
+    // Moving between fields, it's already up and the layout is final.
+    if (Platform.OS !== 'web' && Keyboard.isVisible()) setTimeout(scrollIntoView, REVEAL_DELAY);
+  }
+
+  function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    scrollY.current = event.nativeEvent.contentOffset.y;
+  }
+
+  /** A view that just appeared: scrolled to once it has laid out. */
+  function revealView(view: ViewInstance, animated: boolean) {
+    setTimeout(() => bringIntoView(viewportRef.current, scrollRef.current, scrollY.current, view, animated), REVEAL_DELAY);
+  }
+
+  return { viewportRef, scrollRef, onScroll, reveal, revealView };
 }
 
 type ScreenProps = {
@@ -44,6 +237,10 @@ type ScreenProps = {
   footerStyle?: 'bar' | 'plain';
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Drawn full bleed behind the content, like the welcome screen's video. */
+  background?: ReactNode;
+  /** Pull to refresh, for a scrolling screen: the spinner shows until the promise settles. */
+  onRefresh?: () => Promise<unknown>;
 };
 
 export function Screen({
@@ -52,15 +249,27 @@ export function Screen({
   footerStyle = 'bar',
   scroll = false,
   contentStyle,
+  background,
+  onRefresh,
 }: ScreenProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const { viewportRef, scrollRef, onScroll, reveal, revealView } = useFieldReveal(scroll);
+  const [refreshing, setRefreshing] = useState(false);
   // The bottom inset belongs to whatever sits lowest: the footer, or the content.
   const bottom = Math.max(insets.bottom, Space.md);
+
+  function refresh() {
+    if (!onRefresh) return;
+    setRefreshing(true);
+    const done = () => setRefreshing(false);
+    onRefresh().then(done, done);
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: theme.page }]}>
       <Grain />
+      {background}
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.fill}
@@ -69,23 +278,44 @@ export function Screen({
           // The keyboard covers the home-indicator inset, so the footer sits 12 above it, not 34.
           keyboardVerticalOffset={footer ? -(bottom - Space.sm) : 0}>
           {scroll ? (
-            <ScrollView
-              style={styles.fill}
-              contentContainerStyle={[
-                styles.content,
-                !footer && { paddingBottom: bottom + Space.lg },
-                contentStyle,
-              ]}
-              keyboardShouldPersistTaps="handled"
-              // On web a click starts a scroll gesture, so any dismiss mode would blur every field.
-              // On-drag rather than interactive: the footer can't follow an interactive drag.
-              keyboardDismissMode={Platform.select({
-                ios: 'on-drag',
-                android: 'on-drag',
-                default: 'none',
-              })}>
-              {children}
-            </ScrollView>
+            <RevealContext value={reveal}>
+            <RevealViewContext value={revealView}>
+              <View ref={viewportRef} style={styles.fill}>
+                <ScrollView
+                  ref={scrollRef}
+                  onScroll={onScroll}
+                  scrollEventThrottle={16}
+                  style={styles.fill}
+                  contentContainerStyle={[
+                    styles.content,
+                    !footer && { paddingBottom: bottom + Space.lg },
+                    contentStyle,
+                  ]}
+                  keyboardShouldPersistTaps="handled"
+                  // The web has no pull gesture to answer.
+                  refreshControl={
+                    onRefresh && Platform.OS !== 'web' ? (
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={refresh}
+                        tintColor={theme.accent}
+                        colors={[theme.accent]}
+                        progressBackgroundColor={theme.sheet}
+                      />
+                    ) : undefined
+                  }
+                  // On web a click starts a scroll gesture, so any dismiss mode would blur every field.
+                  // On-drag rather than interactive: the footer can't follow an interactive drag.
+                  keyboardDismissMode={Platform.select({
+                    ios: 'on-drag',
+                    android: 'on-drag',
+                    default: 'none',
+                  })}>
+                  {children}
+                </ScrollView>
+              </View>
+            </RevealViewContext>
+            </RevealContext>
           ) : (
             <View
               style={[
@@ -123,15 +353,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  grain: {
+  lamp: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0.03,
   },
   safeArea: {
     flex: 1,

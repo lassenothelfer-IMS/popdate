@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 
 import type { Room } from '@/api';
-import { Motion } from '@/constants/theme';
+import { popHoldMs } from '@/features/game/pop-news';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 
 /**
- * The last pop that happened while this screen was open. `holding` is true for
- * Motion.hold after it, while the room shows the pop before the next phase.
+ * The last pop that happened while this screen was open. `holding` is true
+ * while the room plays the pop (popHoldMs) before the next phase. `own` is the
+ * chooser's own pop, which was already held to full and starts at the burst.
  */
-export type PopBeat = { id: string; holding: boolean };
+export type PopBeat = { id: string; holding: boolean; own: boolean };
 
 /**
  * Tells a pop you just saw from one that was already there. Pops that are in the
@@ -23,6 +25,7 @@ export function usePopBeat(room: Room | null | undefined) {
   const [known, setKnown] = useState<readonly string[] | null>(null);
   const [beat, setBeat] = useState<PopBeat | null>(null);
   const [match, setMatch] = useState<{ id: string; inBeat: boolean } | null>(null);
+  const reduced = useReduceMotion();
 
   // Adjusts state while rendering, so the frame that shows the new room data
   // already holds the beat (no flash of the next phase).
@@ -36,7 +39,7 @@ export function usePopBeat(room: Room | null | undefined) {
     } else {
       const fresh = popped.filter((id) => !known.includes(id));
       if (fresh.length > 0) {
-        next = { id: fresh[fresh.length - 1], holding: true };
+        next = { id: fresh[fresh.length - 1], holding: true, own: false };
         setKnown([...known, ...fresh]);
         setBeat(next);
       }
@@ -47,18 +50,21 @@ export function usePopBeat(room: Room | null | undefined) {
   }
 
   const holdingId = beat?.holding ? beat.id : null;
+  const holdMs = popHoldMs(!!beat?.own, reduced);
   useEffect(() => {
     if (!holdingId) return;
     const timer = setTimeout(() => {
-      setBeat((current) => (current?.id === holdingId ? { id: holdingId, holding: false } : current));
-    }, Motion.hold);
+      setBeat((current) =>
+        current?.id === holdingId ? { ...current, holding: false } : current,
+      );
+    }, holdMs);
     return () => clearTimeout(timer);
-  }, [holdingId]);
+  }, [holdingId, holdMs]);
 
   /** Starts the beat on press, before the server confirms the pop. */
   function start(id: string) {
     setKnown((current) => (current && !current.includes(id) ? [...current, id] : current));
-    setBeat({ id, holding: true });
+    setBeat({ id, holding: true, own: true });
   }
 
   /** Rolls a started beat back when the pop failed. */
@@ -68,5 +74,5 @@ export function usePopBeat(room: Room | null | undefined) {
   }
 
   const matchInBeat = !!room?.matchId && match?.id === room.matchId && match.inBeat;
-  return { beat, matchInBeat, start, cancel };
+  return { beat, matchInBeat, holdMs, start, cancel };
 }

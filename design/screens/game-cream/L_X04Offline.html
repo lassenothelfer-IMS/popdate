@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=390, initial-scale=1">
+<title>Cream: Connection lost and empty queue</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gloock&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#B5332A}a:hover{color:#8F281F}
+.pd-blink{animation:pd-blink 1.6s ease-in-out infinite}
+@keyframes pd-blink{0%,100%{opacity:1}50%{opacity:.35}}
+.pd-shimmer{background:linear-gradient(90deg,#FFFDFA 0%,#E9DDC8 50%,#FFFDFA 100%);background-size:200% 100%;animation:pd-shimmer 1.6s linear infinite}
+@keyframes pd-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+.pd-root{isolation:isolate}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(1){animation-delay:40ms}.pd-root > *:nth-child(2){animation-delay:110ms}.pd-root > *:nth-child(3){animation-delay:180ms}.pd-root > *:nth-child(4){animation-delay:250ms}.pd-root > *:nth-child(5){animation-delay:320ms}.pd-root > *:nth-child(6){animation-delay:390ms}.pd-root > *:nth-child(7){animation-delay:460ms}.pd-root > *:nth-child(8){animation-delay:530ms}.pd-root > *:nth-child(9){animation-delay:600ms}
+.pd-root > .pd-fx{animation:none}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.pd-root a[href],.pd-root button{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms,box-shadow 180ms;-webkit-tap-highlight-color:transparent}
+.pd-root a[href]:active,.pd-root button:active{transform:scale(.97)}
+.pd-root a[href]:hover,.pd-root button:hover{opacity:.92}
+.pd-root [style*="height: 3px"]{transform-origin:left center;animation:pd-fill 600ms cubic-bezier(.22,1,.36,1) both;animation-delay:calc(200ms + var(--i,0)*40ms)}
+@keyframes pd-fill{from{transform:scaleX(.2);opacity:.4}to{transform:none;opacity:1}}
+.pd-root input,.pd-root textarea{transition:box-shadow 200ms}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+
+.pd-root a[href][style*="background: #1C1917"],.pd-root button[style*="background: #1C1917"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(28,25,23,.18),0 10px 24px -10px rgba(28,25,23,.45)}
+.pd-root a[href][style*="background: #CF3A2F"]{box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 14px 32px -10px rgba(240,105,92,.6)}
+.pd-glow{position:absolute;inset:-20%;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 50% 62%,rgba(255,138,110,.16) 0%,rgba(255,138,110,0) 70%);animation:pd-breathe 7s ease-in-out infinite;z-index:0}
+@keyframes pd-breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+.pd-root > *:not(.pd-fx){position:relative}
+</style>
+<style>html,body{background:#0A0306;margin:0} body{display:flex;justify-content:center;padding:24px 0} .pd-root{border-radius:44px;box-shadow:0 30px 80px rgba(0,0,0,.6)}</style>
+</head>
+<body>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F3E9DA; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1C1917; box-sizing: border-box"><svg class="pd-fx pd-grain" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.05;mix-blend-mode:multiply;z-index:5"><filter id="pdg"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter><rect width="100%" height="100%" filter="url(#pdg)"></rect></svg>
+  <div style="position: absolute; left: 20px; right: 20px; top: 56px; display: flex; align-items: center; justify-content: center; gap: 8px; height: 36px; border-radius: 999px; background: #E9DDC8; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.14)">
+    <span class="pd-blink" style="width: 7px; height: 7px; border-radius: 50%; background: #E2B566"></span>
+    <span style="font-size: 13px; font-weight: 600">Reconnecting. Your balloon is safe for 20s.</span>
+  </div>
+  <div style="position: absolute; left: 20px; right: 20px; top: 104px; font-size: 12px; color: #8C8378">Connection lost mid round. The room is frozen for everyone for up to 20 seconds, then the round continues without your answer.</div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 160px; display: flex; flex-direction: column; gap: 10px">
+    <div style="font-size: 12px; color: #8C8378">Loading, skeleton on velvet, never a spinner</div>
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div class="pd-shimmer" style="height: 28px; width: 60%; border-radius: 8px"></div>
+      <div class="pd-shimmer" style="height: 16px; width: 85%; border-radius: 6px"></div>
+      <div class="pd-shimmer" style="height: 200px; border-radius: 22px; margin-top: 6px"></div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 470px; display: flex; flex-direction: column; gap: 10px">
+    <div style="font-size: 12px; color: #8C8378">Nobody in line near you, Home card variant</div>
+    <div style="position: relative; height: 230px; border-radius: 22px; overflow: hidden; background: #FFFDFA; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.08)">
+      <svg width="160" height="200" viewBox="0 0 120 132" aria-hidden="true" style="display: inline-block; overflow: visible; position: absolute; right: -30px; top: -20px; opacity: .5;"><defs><radialGradient id="vb8E1430" cx="34%" cy="26%" r="78%"><stop offset="0" stop-color="#E57A8E"/><stop offset=".42" stop-color="#8E1430"/><stop offset="1" stop-color="#2E020B"/></radialGradient></defs><path d="M60 7.5C31 7.5 12.5 30 12.5 58c0 32 25 57 42 61.5h11c17-4.5 42-29.5 42-61.5C107.5 30 89 7.5 60 7.5z" fill="url(#vb8E1430)"/><path d="M52 118h16l-8 12z" fill="#2E020B"/><ellipse cx="40" cy="36" rx="8" ry="15" transform="rotate(-28 40 36)" fill="#FFF3E6" opacity=".5"/><ellipse cx="88" cy="84" rx="4" ry="10" transform="rotate(30 88 84)" fill="#E9BE72" opacity=".22"/></svg>
+      <div style="position: absolute; left: 22px; top: 22px; right: 22px; display: flex; flex-direction: column; gap: 6px">
+        <div style="font-size: 13px; font-weight: 600; color: #5F574F">Quiet in Zürich right now</div>
+        <div style="font-family: 'Fraunces', serif; font-weight: 500; font-size: 28px; line-height: 32px; letter-spacing: -0.015em; width: 220px">Rooms fill fastest<br>after 8pm.</div>
+        <div style="font-size: 14px; color: #5F574F; margin-top: 4px">Get in line anyway and we'll buzz you when five more show up.</div>
+      </div>
+      <a href="L_Queue.html" style="position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; justify-content: center; height: 48px; border-radius: 14px; background: #E9DDC8; color: #1C1917; font-size: 15px; font-weight: 600; text-decoration: none; box-shadow: inset 0 0 0 1px rgba(28,25,23,0.14)">Wait in line</a>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 740px; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 14px; background: #F5E1DC; box-shadow: inset 0 0 0 1px rgba(255,154,140,0.25)">
+    <span style="font-size: 14px; color: #1C1917">Couldn't send your answer.</span>
+    <a href="L_Round.html" style="font-size: 14px; font-weight: 600; color: #B5332A; text-decoration: none">Retry</a>
+  </div>
+</div>
+</body>
+</html>

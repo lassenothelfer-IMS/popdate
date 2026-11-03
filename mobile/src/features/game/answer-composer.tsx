@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
@@ -15,6 +15,11 @@ const MAX_ANSWER_LENGTH = 280;
 const COUNTER_FROM = 240;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */
 const SPOKEN_COUNTS = [0, 10, 20, MAX_ANSWER_LENGTH - COUNTER_FROM];
+/**
+ * A typed answer goes out this long before time is up on the phone's clock, so it
+ * still counts when the clock runs a little off or the network is slow.
+ */
+const AUTO_SEND_BEFORE = 3500;
 /** One line of answer. The field grows from here as the answer wraps. */
 const FIELD_HEIGHT = 52;
 /** About four lines, then the field scrolls. */
@@ -39,6 +44,8 @@ type AnswerComposerProps = {
   onSend: (text: string) => Promise<void>;
   onFocus?: () => void;
   popperName: string;
+  /** When answers close. Whatever you've typed by then is sent for you. */
+  deadline: number | null;
 };
 
 /** The answer field and an ink send button, side by side in the footer bar. */
@@ -48,6 +55,7 @@ export function AnswerComposer({
   onSend,
   onFocus,
   popperName,
+  deadline,
 }: AnswerComposerProps) {
   const theme = useTheme();
   const scheme = useScheme();
@@ -69,6 +77,17 @@ export function AnswerComposer({
     spokenCount.current = reached;
   }
 
+  // Time's nearly up and you typed something but didn't send it: send it, rather than
+  // the room seeing "No answer".
+  const sendBeforeTimeUp = useEffectEvent(() => {
+    void handleSend();
+  });
+  useEffect(() => {
+    if (deadline === null) return;
+    const timer = setTimeout(sendBeforeTimeUp, Math.max(0, deadline - Date.now() - AUTO_SEND_BEFORE));
+    return () => clearTimeout(timer);
+  }, [deadline]);
+
   async function handleSend() {
     if (!text.trim() || sending) return;
     setSending(true);
@@ -85,20 +104,27 @@ export function AnswerComposer({
     <View style={styles.composer}>
       <View style={styles.row}>
         <View
-          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.borderStrong }]}>
+          style={[styles.box, { backgroundColor: theme.field, borderColor: theme.outline }]}>
           <TextInput
             accessibilityLabel={t('game.yourAnswer')}
             placeholder={t('game.answerPlaceholder', { name: popperName })}
-            placeholderTextColor={theme.textTertiary}
+            placeholderTextColor={theme.textFaint}
             keyboardAppearance={scheme}
-            selectionColor={theme.text}
+            selectionColor={theme.gold}
             // Read when the field gets focus, once the count shows.
             accessibilityHint={text.length >= COUNTER_FROM ? countLeft(t, left) : undefined}
             value={text}
             onChangeText={changeText}
             onFocus={onFocus}
             maxLength={MAX_ANSWER_LENGTH}
+            // One answer, no line breaks: it wraps as it grows, and Return sends it.
+            // Submit keeps the keyboard up, so a send that fails can be tried again.
             multiline
+            returnKeyType="send"
+            submitBehavior="submit"
+            // The web's textarea only sends on Enter with this set; native reads submitBehavior.
+            blurOnSubmit={Platform.OS === 'web' ? true : undefined}
+            onSubmitEditing={() => void handleSend()}
             // A web textarea opens two rows tall; start at one, like the field on the canvas.
             rows={Platform.OS === 'web' ? 1 : undefined}
             editable={!sending}

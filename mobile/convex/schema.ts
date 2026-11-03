@@ -3,6 +3,8 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 
 export const gender = v.union(v.literal('woman'), v.literal('man'));
+/** Who someone wants to meet: one side of the room, or either. */
+export const interest = v.union(v.literal('woman'), v.literal('man'), v.literal('everyone'));
 
 export const waitlistPhone = v.union(v.literal('iphone'), v.literal('android'));
 export const waitlistLanguage = v.union(v.literal('en'), v.literal('de'), v.literal('fr'), v.literal('it'));
@@ -36,12 +38,19 @@ export default defineSchema({
     /** YYYY-MM-DD */
     birthDate: v.string(),
     gender,
-    wantsToMeet: gender,
+    wantsToMeet: interest,
+    /** How they describe their gender, like `nonbinary`; `gender` is their side of the room. */
+    genderIdentity: v.optional(v.string()),
+    genderDetails: v.optional(v.string()),
+    sexuality: v.optional(v.string()),
+    /** Up to three answers from their rooms, pinned to the profile. */
+    pinnedAnswers: v.optional(v.array(v.object({ question: v.string(), answer: v.string() }))),
     city: v.string(),
-    heightCm: v.number(),
+    /** Optional, like job and bio (which are empty strings when left out). */
+    heightCm: v.optional(v.number()),
     job: v.string(),
     bio: v.string(),
-    /** Exactly 6 files, in order (position 1 to 6). */
+    /** 4 to 6 files, in order (position 1 to 6). */
     photos: v.array(v.id('_storage')),
     termsAcceptedAt: v.string(),
   }).index('by_user', ['userId']),
@@ -95,7 +104,7 @@ export default defineSchema({
   queue: defineTable({
     userId: v.id('users'),
     gender,
-    wantsToMeet: gender,
+    wantsToMeet: interest,
     joinedAt: v.number(),
     roomId: v.optional(v.id('rooms')),
   })
@@ -122,7 +131,21 @@ export default defineSchema({
     winnerId: v.optional(v.id('users')),
     matchId: v.optional(v.id('matches')),
     createdAt: v.number(),
+    /** When the room finished, for your history. */
+    endedAt: v.optional(v.number()),
   }).index('by_popper', ['popperId']),
+
+  /** A chooser's second chance for the runner-up of their room. */
+  secondChances: defineTable({
+    roomId: v.id('rooms'),
+    fromId: v.id('users'),
+    toId: v.id('users'),
+    status: v.union(v.literal('sent'), v.literal('accepted'), v.literal('declined')),
+    createdAt: v.number(),
+  })
+    .index('by_from', ['fromId'])
+    .index('by_to', ['toId'])
+    .index('by_room', ['roomId']),
 
   /** The contestants of a room. The popper is `rooms.popperId`. */
   roomPlayers: defineTable({
@@ -132,6 +155,8 @@ export default defineSchema({
     popped: v.boolean(),
     poppedInRound: v.optional(v.number()),
     left: v.boolean(),
+    /** Set when they left while still holding a balloon; leaving after a pop doesn't set it. */
+    leftInRound: v.optional(v.number()),
   })
     .index('by_room', ['roomId'])
     .index('by_user', ['userId']),

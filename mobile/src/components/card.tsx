@@ -14,13 +14,13 @@ type CardProps = ViewProps & {
  * A flat group of content. One container level per screen: don't nest cards,
  * and don't wrap something in a card just to give it a box.
  */
-export function Card({ tone = 'surface', selected = false, style, children, ...rest }: CardProps) {
+export function Card({ tone = 'field', selected = false, style, children, ...rest }: CardProps) {
   const theme = useTheme();
   return (
     <View
       style={[
         styles.card,
-        { backgroundColor: selected ? theme.accentWash : theme[tone] },
+        { backgroundColor: selected ? theme.accentWash : theme[tone], borderColor: theme.border },
         style,
       ]}
       {...rest}>
@@ -29,7 +29,7 @@ export function Card({ tone = 'surface', selected = false, style, children, ...r
         // An overlay, so marking a card never moves its content.
         <View
           pointerEvents="none"
-          style={[styles.ring, { borderColor: theme.accent }]}
+          style={[styles.ring, { borderColor: theme.inverse }]}
         />
       ) : null}
     </View>
@@ -40,6 +40,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
+    borderWidth: StyleSheet.hairlineWidth,
     padding: Space.md,
   },
   ring: {

@@ -4,7 +4,7 @@ import type { RoomPlayer } from '@/api';
 import { Avatar } from '@/components/avatar';
 import type { PhotoTone } from '@/components/photo';
 import { ThemedText } from '@/components/themed-text';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
 const AVATAR_SIZE = 64;
@@ -12,13 +12,12 @@ const AVATAR_SIZE = 64;
 const AVATAR_GAP = 14;
 
 /**
- * The popper holds no seat, so their tile is neutral (the canvas's --me-t): their
- * initial on surface, one step brighter by night so it still stands off the page.
+ * The popper holds no seat, so their tile is neutral: their initial in cream on
+ * plush, like every avatar.
  */
 export function useNeutralTone(): PhotoTone {
   const theme = useTheme();
-  const scheme = useScheme();
-  return { color: theme.text, tint: scheme === 'dark' ? theme.surfacePressed : theme.surface };
+  return { color: theme.text, tint: theme.surface };
 }
 
 /** The person everyone is trying to win, above the question, for contestants and watchers. */
@@ -31,10 +30,11 @@ export function PopperPresence({ popper }: { popper: RoomPlayer }) {
       accessible
       accessibilityLabel={t('game.isChoosingLabel', { name: popper.name, age: popper.age })}>
       <Avatar name={popper.name} uri={popper.photos[0]} tone={tone} size={AVATAR_SIZE} />
+      {/* "Alina, 32" over "is choosing", like the contestants' "Sam, 28". */}
       <View style={styles.copy}>
-        <ThemedText type="task">{t('game.isChoosing', { name: popper.name })}</ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {popper.age}
+        <ThemedText type="task">{t('common.nameAge', { name: popper.name, age: popper.age })}</ThemedText>
+        <ThemedText type="footnote" themeColor="textTertiary">
+          {t('game.isChoosingLine')}
         </ThemedText>
       </View>
     </View>

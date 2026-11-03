@@ -9,6 +9,7 @@ import type {
   BlockedPerson,
   Contestant,
   Gender,
+  Interest,
   Match,
   Message,
   PopdateApi,
@@ -18,17 +19,49 @@ import type {
   Profile,
   ProfileDraft,
   Question,
+  QueueStats,
   QueueStatus,
   Room,
+  RoomSummary,
+  SecondChance,
   RoomPlayer,
   RoomStatus,
 } from '@/api/types';
+import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
 import { ageFromBirthDate } from '@/utils/birth-date';
+import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { maskProfanity } from '@/utils/profanity';
 
+/** Your mock profile and settings outlive a reload, so you don't start over each time. */
+const PROFILE_KEY = 'popdate.mockProfile';
+const SETTINGS_KEY = 'popdate.mockSettings';
+const HISTORY_KEY = 'popdate.mockHistory';
+const MATCHES_KEY = 'popdate.mockMatches';
+const BLOCKED_KEY = 'popdate.mockBlocked';
+const ROOMS_KEY = 'popdate.mockRooms';
+/** Each chat is kept under its own key, so a new message only rewrites that one chat. */
+const messagesKey = (matchId: string) => `popdate.mockMessages.${matchId}`;
+/** How many past rooms the mock keeps. */
+const HISTORY_LIMIT = 50;
+/** How many messages of each chat the mock keeps, newest last. */
+const MESSAGES_LIMIT = 200;
+/** A runner-up can get a second chance this long after the room ends, like on the server. */
+const SECOND_CHANCE_MS = 7 * 24 * 60 * 60_000;
+/** The server still takes an answer this long after the deadline, for slow connections. */
+const ANSWER_GRACE_MS = 3_000;
+
 const LOBBY_SIZE = 6;
+
+/** A bot's side for someone who wants to meet `interest`: either one for everyone. */
+function sideFor(interest: Interest): Gender {
+  return interest === 'everyone' ? pickRandom<Gender>(['woman', 'man']) : interest;
+}
 const ANSWER_MS = 60_000;
 const POP_REMINDER_MS = 30_000;
+/** The popper's time to pick a question before one is picked for them. */
+const PICK_MS = 30_000;
+/** After the reminder, the time until a random balloon pops so the room never stalls. */
+const POP_LIMIT_MS = 30_000;
 const QUESTION_OPTIONS_PER_ROUND = 5;
 
 const QUESTIONS: Question[] = [
@@ -50,6 +83,157 @@ const QUESTIONS: Question[] = [
   'What are you irrationally scared of?',
 ].map((text, index) => ({ id: `q${index + 1}`, text }));
 
+/** What bots say to each question, so their answers fit what was asked. */
+const BOT_ANSWERS_BY_QUESTION: Record<string, string[]> = {
+  // What would your friends say is your worst habit?
+  q1: [
+    'Honestly? My snooze button addiction.',
+    'Always late, but worth the wait.',
+    'Overthinking every text before I send it.',
+    'Sending memes instead of replying properly.',
+    'Leaving ten browser tabs open. Forever.',
+    'Saying "five more minutes" and meaning an hour.',
+    'Eating their fries when they look away.',
+  ],
+  // What's the most spontaneous thing you've ever done?
+  q2: [
+    'I once booked a flight the same morning. No regrets.',
+    'Took a night train to Vienna on a Tuesday.',
+    'Dyed my hair blue after one glass of wine.',
+    'Said yes to a road trip with people I met that day.',
+    'Quit my job and went to Portugal for a month.',
+    'Jumped into the lake in October. Very cold.',
+    'Adopted a cat I only went to look at.',
+  ],
+  // What does your perfect Sunday look like?
+  q3: [
+    'A long walk, a good coffee and zero plans.',
+    'Brunch that turns into dinner.',
+    'Pancakes, a book and nowhere to be.',
+    'Hiking early, napping late.',
+    'Farmers market, then cooking way too much food.',
+    'Rain outside, a movie marathon inside.',
+  ],
+  // What's a red flag you secretly have?
+  q4: [
+    'I reply to texts three days later.',
+    "I have strong opinions about other people's playlists.",
+    'I keep every receipt. Every single one.',
+    'I narrate my life to my plants.',
+    'I judge people by how they load a dishwasher.',
+    'I never finish a series. Never.',
+  ],
+  // What's the last thing that made you laugh really hard?
+  q5: [
+    'My dad trying to send a voice message.',
+    'A dog in a raincoat refusing to walk.',
+    'My friend falling off a paddleboard in slow motion.',
+    "A typo in my boss's email. I still laugh.",
+    "My little sister's impression of me.",
+    'A pigeon stealing a whole croissant at the station.',
+  ],
+  // Which song plays when you walk into a room?
+  q6: [
+    'Something by ABBA, obviously.',
+    'The Rocky theme, but slightly off-key.',
+    'Mr. Brightside. Every time.',
+    'Lo-fi beats, I am very chill.',
+    'Dancing Queen, no discussion.',
+    'Eye of the Tiger, but I trip on the doorframe.',
+  ],
+  // What's your most controversial food opinion?
+  q7: [
+    "Pineapple on pizza, and I'll die on that hill.",
+    'Fondue is overrated. Please stay.',
+    'Cereal is a soup.',
+    'Ketchup on pasta is fine, actually.',
+    'Avocado toast is just salad on bread.',
+    'Cold pizza beats warm pizza.',
+  ],
+  // What would you do with a free week and no money?
+  q8: [
+    'Hike every trail around here I have never done.',
+    'Finally read the pile of books by my bed.',
+    "Couch surf at every friend's place in Switzerland.",
+    'A road trip with no destination, if someone has a car.',
+    'Learn to cook something properly, like bread.',
+    'Swim in the lake every single day.',
+  ],
+  // What's something you're weirdly good at?
+  q9: [
+    "I'm weirdly good at parallel parking.",
+    'Guessing the ending of every movie.',
+    'Remembering birthdays. All of them.',
+    'Folding fitted sheets. Yes, really.',
+    'Finding four-leaf clovers.',
+    'Packing a suitcase like it is Tetris.',
+  ],
+  // What's your go-to karaoke song?
+  q10: [
+    'Bohemian Rhapsody, all the parts.',
+    "I Will Survive. I'm dramatic.",
+    'Wonderwall, sorry in advance.',
+    'Total Eclipse of the Heart, with full emotions.',
+    'Anything by Queen, I know every word.',
+    'I hide behind a friend and do the backing vocals.',
+  ],
+  // What's the best date you've ever been on?
+  q11: [
+    'Street food and a sunset by the river.',
+    'Got lost on a hike and found a tiny restaurant.',
+    'A cooking class where we burned everything.',
+    'Board games until the café kicked us out.',
+    'A picnic that turned into a thunderstorm. Still great.',
+    'Ice skating, badly, then hot chocolate.',
+  ],
+  // Cats or dogs? Defend your answer.
+  q12: [
+    'Dogs. They are always happy to see you.',
+    'Cats. They respect my need for alone time.',
+    'Dogs, because I talk to them more than to people.',
+    'Cats, they judge me and I deserve it.',
+    'Both. I refuse to choose.',
+    'Dogs. Hiking with a dog is the best thing ever.',
+  ],
+  // What's a dealbreaker for you?
+  q13: [
+    'Being rude to waiters.',
+    'Not liking music. Any music.',
+    'Someone who never asks a question back.',
+    'Always on the phone at dinner.',
+    'No sense of humor about themselves.',
+    'Hating dogs. Sorry.',
+  ],
+  // What would your ex say about you?
+  q14: [
+    'That I was always late, but worth the wait.',
+    'Probably that I talk too much. Fair.',
+    'That I made great pasta. At least that.',
+    'That I hog the blanket.',
+    'Too adventurous for them, I guess.',
+    'That I was nice, just not the one.',
+  ],
+  // What's your biggest ick?
+  q15: [
+    'Clapping when the plane lands.',
+    'Chewing with their mouth open.',
+    'Calling the waiter "boss".',
+    'Wet socks. On anyone.',
+    'People who walk slowly in a group of four.',
+    'Saying "I am not like other people".',
+  ],
+  // What are you irrationally scared of?
+  q16: [
+    'Pigeons. Do not ask.',
+    'Deep water where I cannot see the bottom.',
+    'Escalators that stop suddenly.',
+    'Butterflies. Too unpredictable.',
+    'The phone ringing with an unknown number.',
+    'Balloons, which is awkward here.',
+  ],
+};
+
+/** For a question without its own set. */
 const BOT_ANSWERS = [
   'Honestly? My snooze button addiction.',
   "Pineapple on pizza, and I'll die on that hill.",
@@ -82,7 +266,7 @@ const DEFAULT_SETTINGS: Settings = {
   language: 'system',
   region: null,
   units: 'metric',
-  appearance: 'system',
+  appearance: 'dark',
   commentFilter: true,
   notifications: { roomLive: true, newMatch: true, messages: true },
 };
@@ -117,12 +301,42 @@ type ServerRoom = {
   questionOptions: Question[];
   usedQuestionIds: Set<string>;
   deadline: number | null;
+  /** When this round's answers were due, so one sent right at the end still counts. */
+  answerDeadline: number | null;
   popReminder: boolean;
   winnerId: string | null;
   matchId: string | null;
   timers: ReturnType<typeof setTimeout>[];
   listeners: Set<(room: Room | null) => void>;
 };
+
+/** A finished room as kept on the device, so its recap still opens after a restart. */
+type SavedRoom = Omit<ServerRoom, 'seats' | 'usedQuestionIds' | 'timers' | 'listeners'> & {
+  seats: (Omit<Seat, 'answers'> & { answers: [number, string][] })[];
+  usedQuestionIds: string[];
+};
+
+function saveRoom(room: ServerRoom): SavedRoom {
+  const { seats, usedQuestionIds, timers, listeners, ...rest } = room;
+  void timers;
+  void listeners;
+  return {
+    ...rest,
+    seats: seats.map((seat) => ({ ...seat, answers: [...seat.answers] })),
+    usedQuestionIds: [...usedQuestionIds],
+  };
+}
+
+function loadRoom(saved: SavedRoom): ServerRoom {
+  return {
+    ...saved,
+    answerDeadline: saved.answerDeadline ?? null,
+    seats: saved.seats.map((seat) => ({ ...seat, answers: new Map(seat.answers) })),
+    usedQuestionIds: new Set(saved.usedQuestionIds),
+    timers: [],
+    listeners: new Set(),
+  };
+}
 
 function randomId() {
   return Math.random().toString(36).slice(2, 10);
@@ -155,6 +369,8 @@ class MockServer implements PopdateApi {
   private queue: QueueStatus = { state: 'idle' };
   private queueListeners = new Set<(status: QueueStatus) => void>();
   private queueTimer: ReturnType<typeof setInterval> | null = null;
+  /** Bots in line right now, besides you. Home shows it, and your queue starts from it. */
+  private lineWaiting = randomInt(1, LOBBY_SIZE - 2);
   private rooms = new Map<string, ServerRoom>();
   private matches: Match[] = [];
   private usedBotNames = new Set<string>();
@@ -165,21 +381,82 @@ class MockServer implements PopdateApi {
   private messageListeners = new Map<string, Set<(messages: Message[]) => void>>();
 
   nextRole: MockRole = 'random';
+  /** Rooms you played, newest first, kept on the device. */
+  private history: RoomSummary[] = [];
+  /** Second chances: your runner-ups, the ones you sent, the ones sent to you. */
+  private chances: SecondChance[] = [];
+  /** Finished rooms you played, newest first, kept so their recap outlives a restart. */
+  private finishedRooms: SavedRoom[] = [];
+  /** Timers outside a room (second chances, the selfie review, bot replies), cleared on sign-out. */
+  private timers = new Set<ReturnType<typeof setTimeout>>();
+  /** What was kept on the device from the last launch, read once. */
+  private restored: Promise<void> | null = null;
+
+  private restore() {
+    this.restored ??= (async () => {
+      const [profile, settings, history, matches, blocked, rooms] = await Promise.all([
+        readJson<Profile>(PROFILE_KEY),
+        readJson<Settings>(SETTINGS_KEY),
+        readJson<RoomSummary[]>(HISTORY_KEY),
+        readJson<Match[]>(MATCHES_KEY),
+        readJson<BlockedPerson[]>(BLOCKED_KEY),
+        readJson<SavedRoom[]>(ROOMS_KEY),
+      ]);
+      if (history) this.history = history;
+      if (matches) this.matches = matches;
+      if (blocked) this.blocked = blocked;
+      if (rooms) {
+        this.finishedRooms = rooms;
+        for (const saved of rooms) {
+          if (!this.rooms.has(saved.id)) this.rooms.set(saved.id, loadRoom(saved));
+        }
+      }
+      const chats = await Promise.all(this.matches.map((match) => readJson<Message[]>(messagesKey(match.id))));
+      this.matches.forEach((match, i) => {
+        const saved = chats[i];
+        if (saved && !this.messages.has(match.id)) this.messages.set(match.id, saved);
+      });
+      if (profile) {
+        this.profile = profile;
+        this.userId = profile.id;
+      }
+      if (settings) this.settings = { ...this.settings, ...settings };
+    })();
+    return this.restored;
+  }
+
+  /** Like setTimeout, but sign-out clears it, so nothing lands in the next account. */
+  private later(ms: number, run: () => void) {
+    const timer = setTimeout(() => {
+      this.timers.delete(timer);
+      run();
+    }, ms);
+    this.timers.add(timer);
+  }
 
   async signIn() {
+    await this.restore();
     this.userId ??= `user-${randomId()}`;
     return this.userId;
   }
 
   async getMyProfile() {
+    await this.restore();
     return this.profile;
+  }
+
+  preparePhoto() {
+    // Nothing to upload: the mock keeps the photos on the phone.
   }
 
   async saveProfile(draft: ProfileDraft) {
     const userId = await this.signIn();
-    if (draft.photos.length !== 6) throw new Error('A profile needs exactly 6 photos.');
+    if (draft.photos.length < MIN_PHOTOS || draft.photos.length > MAX_PHOTOS) {
+      throw new Error('A profile needs 4 to 6 photos.');
+    }
     if (ageFromBirthDate(draft.birthDate) < 18) throw new Error('You need to be 18 or older.');
     this.profile = { ...draft, id: userId };
+    await writeJson(PROFILE_KEY, this.profile);
     return this.profile;
   }
 
@@ -188,7 +465,9 @@ class MockServer implements PopdateApi {
   async joinQueue() {
     if (!this.profile) throw new Error('Finish your profile before you play.');
     this.clearQueueTimer();
-    this.setQueue({ state: 'searching', found: 1, needed: LOBBY_SIZE });
+    // The people Home said were waiting are already there, with you on top.
+    const waiting = Math.min(this.lineWaiting, LOBBY_SIZE - 2);
+    this.setQueue({ state: 'searching', found: 1 + waiting, needed: LOBBY_SIZE });
     this.queueTimer = setInterval(() => {
       if (this.queue.state !== 'searching') return;
       const found = this.queue.found + 1;
@@ -197,14 +476,22 @@ class MockServer implements PopdateApi {
         return;
       }
       this.clearQueueTimer();
+      // Your room took the line, so only a few new people are waiting.
+      this.lineWaiting = randomInt(1, 2);
       const room = this.createRoom();
       this.setQueue({ state: 'matched', roomId: room.id });
     }, 700);
   }
 
   async leaveQueue() {
+    // Too late once your room formed: you keep your seat and the app takes you there.
+    if (this.queue.state === 'matched') {
+      const room = this.rooms.get(this.queue.roomId);
+      if (room && this.isPlaying(room)) return room.id;
+    }
     this.clearQueueTimer();
     this.setQueue({ state: 'idle' });
+    return null;
   }
 
   watchQueue(onChange: (status: QueueStatus) => void) {
@@ -228,15 +515,26 @@ class MockServer implements PopdateApi {
   // Rooms
 
   watchRoom(roomId: string, onChange: (room: Room | null) => void) {
-    const room = this.rooms.get(roomId);
-    if (!room) {
-      onChange(null);
-      return () => {};
+    let room = this.rooms.get(roomId);
+    let stopped = false;
+    const attach = (found: ServerRoom) => {
+      room = found;
+      found.listeners.add(onChange);
+      onChange(this.toView(found));
+    };
+    if (room) attach(room);
+    else {
+      // Right after a restart, a finished room may still be loading from the device.
+      void this.restore().then(() => {
+        if (stopped) return;
+        const found = this.rooms.get(roomId);
+        if (found) attach(found);
+        else onChange(null);
+      });
     }
-    room.listeners.add(onChange);
-    onChange(this.toView(room));
     return () => {
-      room.listeners.delete(onChange);
+      stopped = true;
+      room?.listeners.delete(onChange);
     };
   }
 
@@ -254,10 +552,15 @@ class MockServer implements PopdateApi {
     const seat = room.seats.find((s) => s.player.id === this.userId);
     const answer = text.trim();
     if (!seat || !isActive(seat)) throw new Error("You can't answer in this round.");
-    if (room.status !== 'answering') throw new Error('Answer time is over.');
+    // Like the server, an answer sent just as time runs out still counts.
+    const justLate =
+      room.status === 'popping' &&
+      room.answerDeadline !== null &&
+      Date.now() <= room.answerDeadline + ANSWER_GRACE_MS;
+    if (room.status !== 'answering' && !justLate) throw new Error('Answer time is over.');
     if (seat.answers.has(room.round)) throw new Error('You already answered.');
     if (!answer || answer.length > 280) throw new Error('Answers are 1 to 280 characters.');
-    seat.answers.set(room.round, answer);
+    seat.answers.set(room.round, maskProfanity(answer));
     this.emit(room);
     this.endAnsweringIfEveryoneAnswered(room);
   }
@@ -275,11 +578,14 @@ class MockServer implements PopdateApi {
     const room = this.rooms.get(roomId);
     if (!room || room.status === 'finished') return;
 
+    // Already popped, you leave as popped; only leaving while still in counts as left.
+    this.recordHistory(room, { left: this.isPlaying(room) });
     if (room.popper.id === this.userId) {
       // Without a popper the room can't go on.
       this.clearTimers(room);
       room.status = 'finished';
       room.deadline = null;
+      this.keepFinishedRoom(room);
       this.emit(room);
       return;
     }
@@ -302,14 +608,198 @@ class MockServer implements PopdateApi {
     this.emit(room);
   }
 
+  watchConnection(onChange: (online: boolean) => void) {
+    // The mock lives on the phone, so only the web can tell it's offline.
+    const target = typeof window !== 'undefined' && 'addEventListener' in window ? window : null;
+    const update = () => onChange(typeof navigator === 'undefined' || navigator.onLine !== false);
+    update();
+    target?.addEventListener('online', update);
+    target?.addEventListener('offline', update);
+    return () => {
+      target?.removeEventListener('online', update);
+      target?.removeEventListener('offline', update);
+    };
+  }
+
+  async getActiveRoom() {
+    for (const room of this.rooms.values()) {
+      if (this.isPlaying(room)) return room.id;
+    }
+    return null;
+  }
+
+  /** Whether you're still in this room: its popper, or a balloon that hasn't popped. */
+  private isPlaying(room: ServerRoom) {
+    if (room.status === 'finished') return false;
+    if (room.popper.id === this.userId) return true;
+    const seat = room.seats.find((s) => s.player.id === this.userId);
+    return !!seat && isActive(seat);
+  }
+
   // Matches
 
   async listMatches() {
+    await this.restore();
     return [...this.matches].reverse();
   }
 
   async getMatch(matchId: string) {
+    await this.restore();
     return this.matches.find((match) => match.id === matchId) ?? null;
+  }
+
+  async unmatch(matchId: string) {
+    this.matches = this.matches.filter((match) => match.id !== matchId);
+    this.messages.delete(matchId);
+    void writeJson(MATCHES_KEY, this.matches);
+    void removeJson(messagesKey(matchId));
+    // The Rooms card and the recap stop offering a chat that's gone.
+    if (this.history.some((entry) => entry.matchId === matchId)) {
+      this.history = this.history.map((entry) =>
+        entry.matchId === matchId ? { ...entry, matchId: null, matchName: null } : entry,
+      );
+      void writeJson(HISTORY_KEY, this.history);
+    }
+    for (const room of this.rooms.values()) {
+      if (room.matchId !== matchId) continue;
+      room.matchId = null;
+      if (room.status === 'finished') this.keepFinishedRoom(room);
+      this.emit(room);
+    }
+  }
+
+  async listRoomHistory() {
+    await this.restore();
+    return structuredClone(this.history);
+  }
+
+  async getQueueStats(): Promise<QueueStats> {
+    // The mock's line is made of bots: it drifts a little each time you look,
+    // and stays short of a full room so joining still has a seat to fill.
+    this.lineWaiting = Math.min(LOBBY_SIZE - 2, Math.max(1, this.lineWaiting + randomInt(-1, 1)));
+    return { waiting: this.lineWaiting, roomsLastHour: randomInt(2, 9) };
+  }
+
+  async listSecondChances() {
+    // Past their week, second chances are gone; blocked people never show up.
+    this.chances = this.chances.filter((c) => !this.isExpired(c));
+    return structuredClone(this.chances.filter((c) => !this.isBlocked(c.person.id)));
+  }
+
+  async sendSecondChance(roomId: string, userId: string) {
+    const chance = this.chances.find(
+      (c) => c.roomId === roomId && c.person.id === userId && c.state === 'almost',
+    );
+    if (!chance) throw new Error('That second chance is no longer open.');
+    if (this.isExpired(chance)) throw new Error('That second chance has passed.');
+    if (this.isBlocked(userId)) throw new Error("You can't send this one.");
+    chance.state = 'sent';
+    // The bot thinks it over, then says yes.
+    this.later(randomInt(4000, 9000), () => {
+      if (!this.chances.some((c) => c.id === chance.id)) return;
+      this.chances = this.chances.filter((c) => c.id !== chance.id);
+      if (!this.isBlocked(chance.person.id)) this.addMatch(roomId, chance.person);
+    });
+  }
+
+  async answerSecondChance(id: string, accept: boolean) {
+    const chance = this.chances.find((c) => c.id === id && c.state === 'incoming');
+    if (!chance || this.isExpired(chance) || this.isBlocked(chance.person.id)) {
+      throw new Error('That second chance is no longer open.');
+    }
+    this.chances = this.chances.filter((c) => c.id !== id);
+    return accept ? this.addMatch(chance.roomId, chance.person) : null;
+  }
+
+  private isExpired(chance: SecondChance) {
+    return Date.parse(chance.createdAt) + SECOND_CHANCE_MS < Date.now();
+  }
+
+  private isBlocked(userId: string) {
+    return this.blocked.some((person) => person.id === userId);
+  }
+
+  private addMatch(roomId: string, other: Match['other']) {
+    const match: Match = {
+      id: `match-${randomId()}`,
+      roomId,
+      other: { ...other },
+      createdAt: new Date().toISOString(),
+    };
+    this.matches.push(match);
+    void writeJson(MATCHES_KEY, this.matches);
+    return structuredClone(match);
+  }
+
+  /** The room as it ended for you, once: kept for your history and stats. */
+  private recordHistory(room: ServerRoom, { left = false } = {}) {
+    if (!this.userId || this.history.some((entry) => entry.roomId === room.id)) return;
+    const iAmPopper = room.popper.id === this.userId;
+    const seat = room.seats.find((s) => s.player.id === this.userId);
+    if (!iAmPopper && !seat) return;
+    const match = room.matchId ? this.matches.find((m) => m.id === room.matchId) : null;
+    const questions = [...room.usedQuestionIds].map(
+      (id) => QUESTIONS.find((question) => question.id === id)?.text ?? '',
+    );
+    const entry: RoomSummary = {
+      roomId: room.id,
+      endedAt: new Date().toISOString(),
+      role: iAmPopper ? 'popper' : 'contestant',
+      outcome: left ? 'left' : iAmPopper ? 'chose' : room.winnerId === this.userId ? 'won' : 'popped',
+      poppedInRound: seat?.poppedInRound ?? null,
+      totalRounds: room.seats.length - 1,
+      popperName: room.popper.name,
+      matchName: match?.other.name ?? null,
+      matchId: match?.id ?? null,
+      rounds: questions.map((question, i) => ({ question, answer: seat?.answers.get(i + 1) ?? null })),
+    };
+    this.history = [entry, ...this.history].slice(0, HISTORY_LIMIT);
+    void writeJson(HISTORY_KEY, this.history);
+  }
+
+  /** After a room: the chooser's runner-up can get a second chance, either way round. */
+  private offerSecondChance(room: ServerRoom) {
+    const popped = room.seats.filter((s) => s.popped && !s.left);
+    const last = Math.max(0, ...popped.map((s) => s.poppedInRound ?? 0));
+    const runnerUp = popped.find((s) => s.poppedInRound === last);
+    if (!runnerUp || !room.winnerId) return;
+    const card = (player: Player) => ({
+      id: player.id,
+      name: player.name,
+      age: player.age,
+      photo: player.photos[0],
+    });
+    if (room.popper.id === this.userId) {
+      if (this.isBlocked(runnerUp.player.id)) return;
+      this.chances.push({
+        id: `chance-${randomId()}`,
+        roomId: room.id,
+        person: card(runnerUp.player),
+        state: 'almost',
+        createdAt: new Date().toISOString(),
+      });
+    } else if (runnerUp.player.id === this.userId && Math.random() < 0.5) {
+      // Sometimes the chooser comes back for you.
+      this.later(randomInt(5000, 10000), () => {
+        if (this.isBlocked(room.popper.id)) return;
+        this.chances.push({
+          id: `chance-${randomId()}`,
+          roomId: room.id,
+          person: card(room.popper),
+          state: 'incoming',
+          createdAt: new Date().toISOString(),
+        });
+      });
+    }
+  }
+
+  /** Keeps a finished room on the device, newest first, so its recap opens after a restart. */
+  private keepFinishedRoom(room: ServerRoom) {
+    const known = this.finishedRooms.some((saved) => saved.id === room.id);
+    this.finishedRooms = known
+      ? this.finishedRooms.map((saved) => (saved.id === room.id ? saveRoom(room) : saved))
+      : [saveRoom(room), ...this.finishedRooms].slice(0, HISTORY_LIMIT);
+    void writeJson(ROOMS_KEY, this.finishedRooms);
   }
 
   // Account
@@ -328,6 +818,10 @@ class MockServer implements PopdateApi {
     this.setQueue({ state: 'idle' });
     this.rooms.forEach((room) => this.clearTimers(room));
     this.rooms.clear();
+    this.timers.forEach(clearTimeout);
+    this.timers.clear();
+    const chats = new Set([...this.matches.map((match) => match.id), ...this.messages.keys()]);
+    chats.forEach((matchId) => void removeJson(messagesKey(matchId)));
     this.userId = null;
     this.profile = null;
     this.matches = [];
@@ -335,16 +829,27 @@ class MockServer implements PopdateApi {
     this.blocked = [];
     this.verification = 'none';
     this.settings = { ...DEFAULT_SETTINGS, notifications: { ...DEFAULT_SETTINGS.notifications } };
+    void removeJson(PROFILE_KEY);
+    void removeJson(SETTINGS_KEY);
+    void removeJson(HISTORY_KEY);
+    void removeJson(MATCHES_KEY);
+    void removeJson(BLOCKED_KEY);
+    void removeJson(ROOMS_KEY);
+    this.history = [];
+    this.chances = [];
+    this.finishedRooms = [];
   }
 
   // Settings
 
   async getSettings() {
+    await this.restore();
     return structuredClone(this.settings);
   }
 
   async saveSettings(settings: Settings) {
     this.settings = structuredClone(settings);
+    await writeJson(SETTINGS_KEY, this.settings);
     return structuredClone(this.settings);
   }
 
@@ -364,20 +869,22 @@ class MockServer implements PopdateApi {
     if (!photoUri) throw new Error('Take a selfie first.');
     this.verification = 'pending';
     // A person reviews it on the real server; the mock approves after a few seconds.
-    setTimeout(() => {
+    this.later(4000, () => {
       if (this.verification === 'pending') this.verification = 'verified';
-    }, 4000);
+    });
     return this.verification;
   }
 
   // Safety
 
   async listBlocked() {
+    await this.restore();
     return [...this.blocked];
   }
 
   async block(userId: string) {
-    if (this.blocked.some((person) => person.id === userId)) return;
+    await this.restore();
+    if (this.isBlocked(userId)) return;
     const known = this.findPerson(userId);
     this.blocked.push({
       id: userId,
@@ -386,10 +893,13 @@ class MockServer implements PopdateApi {
       photo: known?.photo ?? 'mock://blocked',
       blockedAt: new Date().toISOString(),
     });
+    void writeJson(BLOCKED_KEY, this.blocked);
   }
 
   async unblock(userId: string) {
+    await this.restore();
     this.blocked = this.blocked.filter((person) => person.id !== userId);
+    void writeJson(BLOCKED_KEY, this.blocked);
   }
 
   async report(userId: string, reason: ReportReason, details?: string) {
@@ -411,6 +921,7 @@ class MockServer implements PopdateApi {
   // Chat
 
   async listMessages(matchId: string) {
+    await this.restore();
     this.requireMatch(matchId);
     return [...(this.messages.get(matchId) ?? [])];
   }
@@ -420,27 +931,32 @@ class MockServer implements PopdateApi {
     listeners.add(onChange);
     this.messageListeners.set(matchId, listeners);
     onChange([...(this.messages.get(matchId) ?? [])]);
+    // Right after a restart the chat may still be loading from the device.
+    void this.restore().then(() => {
+      if (listeners.has(onChange)) onChange([...(this.messages.get(matchId) ?? [])]);
+    });
     return () => {
       listeners.delete(onChange);
     };
   }
 
   async sendMessage(matchId: string, text: string) {
+    await this.restore();
     const match = this.requireMatch(matchId);
     const trimmed = text.trim();
     if (!trimmed) throw new Error('Write something first.');
     if (trimmed.length > MAX_MESSAGE_LENGTH) throw new Error('That message is too long.');
-    if (this.blocked.some((person) => person.id === match.other.id)) {
+    if (this.isBlocked(match.other.id)) {
       throw new Error("You blocked this person, so you can't message them.");
     }
     const message = this.addMessage(matchId, this.userId ?? 'me', trimmed);
     // The other person is a bot: it answers now and then, after a little while.
     if (Math.random() < 0.8) {
-      setTimeout(() => {
-        if (this.matches.some((m) => m.id === matchId)) {
+      this.later(randomInt(1500, 4000), () => {
+        if (this.matches.some((m) => m.id === matchId) && !this.isBlocked(match.other.id)) {
           this.addMessage(matchId, match.other.id, pickRandom(BOT_REPLIES));
         }
-      }, randomInt(1500, 4000));
+      });
     }
     return message;
   }
@@ -454,8 +970,9 @@ class MockServer implements PopdateApi {
       text: maskProfanity(text),
       sentAt: new Date().toISOString(),
     };
-    const list = [...(this.messages.get(matchId) ?? []), message];
+    const list = [...(this.messages.get(matchId) ?? []), message].slice(-MESSAGES_LIMIT);
     this.messages.set(matchId, list);
+    void writeJson(messagesKey(matchId), list);
     this.messageListeners.get(matchId)?.forEach((listener) => listener([...list]));
     return message;
   }
@@ -484,9 +1001,9 @@ class MockServer implements PopdateApi {
     let contestants: Player[];
     if (role === 'popper') {
       popper = self;
-      contestants = Array.from({ length: LOBBY_SIZE - 1 }, () => this.makeBot(me.wantsToMeet));
+      contestants = Array.from({ length: LOBBY_SIZE - 1 }, () => this.makeBot(sideFor(me.wantsToMeet)));
     } else {
-      popper = this.makeBot(me.wantsToMeet);
+      popper = this.makeBot(sideFor(me.wantsToMeet));
       const others = Array.from({ length: LOBBY_SIZE - 2 }, () => this.makeBot(me.gender));
       contestants = shuffle([self, ...others]);
     }
@@ -507,6 +1024,7 @@ class MockServer implements PopdateApi {
       questionOptions: [],
       usedQuestionIds: new Set(),
       deadline: null,
+      answerDeadline: null,
       popReminder: false,
       winnerId: null,
       matchId: null,
@@ -537,17 +1055,17 @@ class MockServer implements PopdateApi {
     this.clearTimers(room);
     room.status = 'picking';
     room.question = null;
-    room.deadline = null;
+    room.deadline = Date.now() + PICK_MS;
+    room.answerDeadline = null;
     room.popReminder = false;
     const unused = QUESTIONS.filter((q) => !room.usedQuestionIds.has(q.id));
     room.questionOptions = shuffle(unused).slice(0, QUESTION_OPTIONS_PER_ROUND);
     this.emit(room);
 
-    if (room.popper.isBot) {
-      this.after(room, randomInt(2000, 3500), () => {
-        this.startAnswering(room, pickRandom(room.questionOptions));
-      });
-    }
+    // A bot picks in a few seconds; an idle person gets one picked for them.
+    this.after(room, room.popper.isBot ? randomInt(2000, 3500) : PICK_MS, () => {
+      this.startAnswering(room, pickRandom(room.questionOptions));
+    });
   }
 
   private startAnswering(room: ServerRoom, question: Question) {
@@ -557,18 +1075,21 @@ class MockServer implements PopdateApi {
     room.questionOptions = [];
     room.usedQuestionIds.add(question.id);
     room.deadline = Date.now() + ANSWER_MS;
+    room.answerDeadline = room.deadline;
     this.emit(room);
 
     this.after(room, ANSWER_MS, () => this.startPopping(room));
-    for (const seat of room.seats) {
-      if (!seat.player.isBot || !isActive(seat)) continue;
+    // Each bot takes a different answer that fits this question.
+    const answers = shuffle(BOT_ANSWERS_BY_QUESTION[question.id] ?? BOT_ANSWERS);
+    room.seats.filter((seat) => seat.player.isBot && isActive(seat)).forEach((seat, i) => {
+      const answer = answers[i % answers.length];
       this.after(room, randomInt(3000, 15000), () => {
         if (room.status !== 'answering' || !isActive(seat)) return;
-        seat.answers.set(room.round, pickRandom(BOT_ANSWERS));
+        seat.answers.set(room.round, answer);
         this.emit(room);
         this.endAnsweringIfEveryoneAnswered(room);
       });
-    }
+    });
   }
 
   private endAnsweringIfEveryoneAnswered(room: ServerRoom) {
@@ -586,7 +1107,12 @@ class MockServer implements PopdateApi {
 
     this.after(room, POP_REMINDER_MS, () => {
       room.popReminder = true;
+      room.deadline = Date.now() + POP_LIMIT_MS;
       this.emit(room);
+      // Past the limit a random balloon pops, so five people never wait forever.
+      this.after(room, POP_LIMIT_MS, () => {
+        if (room.status === 'popping') this.pop(room, pickRandom(room.seats.filter(isActive)));
+      });
     });
     if (room.popper.isBot) {
       this.after(room, randomInt(3500, 6000), () => {
@@ -625,8 +1151,12 @@ class MockServer implements PopdateApi {
         createdAt: new Date().toISOString(),
       };
       this.matches.push(match);
+      void writeJson(MATCHES_KEY, this.matches);
       room.matchId = match.id;
     }
+    this.recordHistory(room);
+    this.offerSecondChance(room);
+    this.keepFinishedRoom(room);
     this.emit(room);
   }
 

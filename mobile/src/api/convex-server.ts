@@ -1,6 +1,7 @@
 import { ConvexReactClient } from 'convex/react';
 import type { FunctionReference } from 'convex/server';
 import { ConvexError } from 'convex/values';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
@@ -35,6 +36,9 @@ const IMAGE_TYPES: Record<string, string> = {
   heif: 'image/heif',
 };
 
+/** How long signing in may wait on Convex Auth before it counts as failed. */
+const AUTH_TIMEOUT = 15_000;
+
 /** A file's type from its blob, or from the file name when the phone doesn't say. */
 function imageType(uri: string, blob: Blob) {
   if (blob.type.startsWith('image/')) return blob.type;
@@ -60,6 +64,8 @@ export class ConvexServer implements PopdateApi {
   private authListeners = new Set<() => void>();
   /** Photo URL to file id, so editing a profile resends kept photos instead of uploading them again. */
   private photoIds = new Map<string, string>();
+  /** Uploads started as photos were picked, by their local URI. */
+  private pendingUploads = new Map<string, { upload: Promise<Id<'_storage'>>; cancel: () => void }>();
 
   constructor(url: string) {
     this.client = new ConvexReactClient(url, { unsavedChangesWarning: false });
@@ -81,12 +87,18 @@ export class ConvexServer implements PopdateApi {
     this.authListeners.forEach((listener) => listener());
   }
 
+  /** Waits for Convex Auth to reach a state, and gives up after a while, so a sign-in never hangs. */
   private waitForAuth(check: (auth: { loading: boolean; authenticated: boolean }) => boolean) {
     const done = () => this.actions !== null && check(this.auth);
     if (done()) return Promise.resolve();
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.authListeners.delete(listener);
+        reject(new Error("Couldn't sign in. Try again."));
+      }, AUTH_TIMEOUT);
       const listener = () => {
         if (!done()) return;
+        clearTimeout(timer);
         this.authListeners.delete(listener);
         resolve();
       };
@@ -133,15 +145,42 @@ export class ConvexServer implements PopdateApi {
     return unsubscribe;
   }
 
+  preparePhoto(uri: string) {
+    if (this.pendingUploads.has(uri) || this.photoIds.has(uri)) return;
+    const controller = new AbortController();
+    const upload = this.upload(uri, controller.signal);
+    const pending = { upload, cancel: () => controller.abort() };
+    this.pendingUploads.set(uri, pending);
+    // A failed early upload is forgotten, and saving tries that photo again.
+    upload.catch(() => {
+      if (this.pendingUploads.get(uri) === pending) this.pendingUploads.delete(uri);
+    });
+  }
+
+  /**
+   * Drops the early uploads of photos that are no longer in the form (removed,
+   * or past the last slot), so they stop using the phone's data. Not part of
+   * `PopdateApi`: the mock has nothing to drop.
+   */
+  forgetPhotos(keep: readonly string[]) {
+    for (const [uri, pending] of this.pendingUploads) {
+      if (keep.includes(uri)) continue;
+      pending.cancel();
+      this.pendingUploads.delete(uri);
+    }
+  }
+
   /** Uploads one local photo to Convex file storage and returns its file id. */
-  private async upload(uri: string): Promise<Id<'_storage'>> {
+  private async upload(uri: string, signal?: AbortSignal): Promise<Id<'_storage'>> {
     const uploadUrl = await this.mutation(api.profiles.generateUploadUrl, {});
-    const source = uri.startsWith('mock://') ? PLACEHOLDER_PHOTO : uri;
+    const source = uri.startsWith('mock://') ? PLACEHOLDER_PHOTO : await shrinkPhoto(uri, signal);
+    if (signal?.aborted) throw new Error('The photo was removed.');
     const blob = await (await fetch(source)).blob();
     const response = await fetch(uploadUrl, {
       method: 'POST',
       headers: { 'Content-Type': imageType(source, blob) },
       body: blob,
+      signal,
     });
     if (!response.ok) throw new Error('A photo did not upload. Try again.');
     const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
@@ -181,6 +220,8 @@ export class ConvexServer implements PopdateApi {
     await this.actions?.signOut().catch(() => {});
     await this.waitForAuth((auth) => !auth.loading && !auth.authenticated);
     this.photoIds.clear();
+    // Uploads still under way belonged to the old account: stop them.
+    this.forgetPhotos([]);
   }
 
   async getMyProfile(): Promise<Profile | null> {
@@ -189,8 +230,14 @@ export class ConvexServer implements PopdateApi {
   }
 
   async saveProfile(draft: ProfileDraft): Promise<Profile> {
+    this.forgetPhotos(draft.photos);
     const photos = await Promise.all(
-      draft.photos.map(async (uri) => (this.photoIds.get(uri) as Id<'_storage'>) ?? this.upload(uri)),
+      draft.photos.map(
+        async (uri) =>
+          (this.photoIds.get(uri) as Id<'_storage'>) ??
+          this.pendingUploads.get(uri)?.upload ??
+          this.upload(uri),
+      ),
     );
     const saved = await this.mutation(api.profiles.saveProfile, {
       name: draft.name,
@@ -198,9 +245,13 @@ export class ConvexServer implements PopdateApi {
       gender: draft.gender,
       wantsToMeet: draft.wantsToMeet,
       city: draft.city,
-      heightCm: draft.heightCm,
+      heightCm: draft.heightCm ?? undefined,
       job: draft.job,
       bio: draft.bio,
+      genderIdentity: draft.genderIdentity,
+      genderDetails: draft.genderDetails,
+      sexuality: draft.sexuality,
+      pinnedAnswers: draft.pinnedAnswers,
       photos,
     });
     return this.keepPhotoIds(saved);
@@ -218,7 +269,23 @@ export class ConvexServer implements PopdateApi {
   }
 
   async leaveQueue() {
-    await this.mutation(api.queue.leaveQueue, {});
+    // The room you were already seated in when a lobby formed, or null when you're out.
+    const roomId: unknown = await this.mutation(api.queue.leaveQueue, {});
+    return typeof roomId === 'string' ? roomId : null;
+  }
+
+  watchConnection(onChange: (online: boolean) => void) {
+    // Offline only once it had connected and then lost the socket; a first connect is just loading.
+    const update = () => {
+      const state = this.client.connectionState();
+      onChange(state.isWebSocketConnected || !state.hasEverConnected);
+    };
+    update();
+    return this.client.subscribeToConnectionState(update);
+  }
+
+  async getActiveRoom() {
+    return this.query(api.rooms.active, {});
   }
 
   watchQueue(onChange: (status: QueueStatus) => void) {
@@ -255,6 +322,31 @@ export class ConvexServer implements PopdateApi {
 
   async getMatch(matchId: string): Promise<Match | null> {
     return await this.query(api.matches.get, { matchId });
+  }
+
+  async unmatch(matchId: string) {
+    await this.mutation(api.matches.unmatch, { matchId });
+  }
+
+  async listRoomHistory() {
+    return await this.query(api.history.list, {});
+  }
+
+  async getQueueStats() {
+    return await this.query(api.queue.stats, {});
+  }
+
+  async listSecondChances() {
+    return await this.query(api.secondChances.list, {});
+  }
+
+  async sendSecondChance(roomId: string, userId: string) {
+    await this.mutation(api.secondChances.send, { roomId, userId });
+  }
+
+  async answerSecondChance(id: string, accept: boolean) {
+    const matchId = await this.mutation(api.secondChances.answer, { id, accept });
+    return matchId ? await this.getMatch(matchId) : null;
   }
 
   // Settings
@@ -307,11 +399,58 @@ export class ConvexServer implements PopdateApi {
     return await this.query(api.chat.list, { matchId });
   }
 
-  watchMessages(matchId: string, onChange: (messages: Message[]) => void) {
-    return this.watch(api.chat.list, { matchId }, onChange, () => onChange([]));
+  watchMessages(matchId: string, onChange: (messages: Message[]) => void, onError?: () => void) {
+    return this.watch(api.chat.list, { matchId }, onChange, () => (onError ? onError() : onChange([])));
   }
 
   async sendMessage(matchId: string, text: string): Promise<Message> {
     return await this.mutation(api.chat.send, { matchId, text });
   }
+}
+
+/** Photos are shown at most this wide, so nothing wider is uploaded. */
+const PHOTO_MAX_WIDTH = 1440;
+/** Photos shrunk at the same time. Each decode of a 12 MP original is large, so six at once can run out of memory. */
+const SHRINK_AT_ONCE = 2;
+
+let shrinking = 0;
+const waitingToShrink: (() => void)[] = [];
+
+/** Runs `task` once one of the shrink slots is free; a finished task hands its slot to the next. */
+async function inShrinkTurn<T>(task: () => Promise<T>): Promise<T> {
+  if (shrinking < SHRINK_AT_ONCE) shrinking++;
+  else await new Promise<void>((resolve) => waitingToShrink.push(resolve));
+  try {
+    return await task();
+  } finally {
+    const next = waitingToShrink.shift();
+    if (next) next();
+    else shrinking--;
+  }
+}
+
+/**
+ * A picked photo as a JPEG at most 1440 px wide: around 300 KB instead of a
+ * 3 MB HEIC original, so a profile uploads quickly even on mobile data. The
+ * original is downsampled while it's decoded, so it's never in memory at full
+ * size. One that can't be read is tried once more, then fails: uploading the
+ * original instead would send a huge HEIC.
+ */
+async function shrinkPhoto(uri: string, signal?: AbortSignal): Promise<string> {
+  return inShrinkTurn(async () => {
+    for (let attempt = 1; ; attempt++) {
+      if (signal?.aborted) throw new Error('The photo was removed.');
+      try {
+        const image = await ImageManipulator.manipulate(uri, { maxWidth: PHOTO_MAX_WIDTH }).renderAsync();
+        try {
+          const { uri: shrunk } = await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 });
+          return shrunk;
+        } finally {
+          image.release();
+        }
+      } catch {
+        if (attempt >= 2) throw new Error("A photo couldn't be read. Try another one.");
+      }
+    }
+  });
 }

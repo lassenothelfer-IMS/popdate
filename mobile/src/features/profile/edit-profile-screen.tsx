@@ -1,33 +1,50 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useNavigation, usePreventRemove } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 
+import type { Interest } from '@/api';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
-import { Icon } from '@/components/icon';
+import { Rise } from '@/components/rise';
+import { Section } from '@/components/section';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Space } from '@/constants/theme';
-import { BackButton } from '@/features/onboarding/back-button';
-import { DetailsSection, PhotoSection, useProfileForm } from '@/features/profile/profile-form';
-import { useTheme } from '@/hooks/use-theme';
+import { useToast } from '@/components/toast';
+import { MinTouch, Space } from '@/constants/theme';
+import {
+  GenderSection,
+  MeetPicker,
+  resolvedSide,
+  type IdentityChoice,
+} from '@/features/profile/gender-section';
+import { identityOf } from '@/features/profile/identity';
+import {
+  DetailsSection,
+  PhotoSection,
+  saveFailedMessage,
+  useProfileForm,
+} from '@/features/profile/profile-form';
+import { confirmStep } from '@/features/chat/prompts';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
 
-/** How long "Saved" stays on the button before the screen closes. */
-const SAVED_PAUSE = 700;
+/** How long the "Saved" toast shows before the screen closes. */
+const SAVED_PAUSE = 900;
 
 function goBack() {
   if (router.canGoBack()) router.back();
   else router.replace('/home');
 }
 
-/** Your profile after setup: the same photos and details, prefilled, saved in place. */
+/**
+ * Edit profile (P01): Cancel, the title and Save in a bar at the top, then the
+ * same photos and details as setup, prefilled and saved in place.
+ */
 export function EditProfileScreen() {
   const t = useT();
-  const theme = useTheme();
   const { profile, saveProfile } = useSession();
+  const { show, toast } = useToast();
   const form = useProfileForm(
     profile
       ? {
@@ -36,13 +53,41 @@ export function EditProfileScreen() {
           heightCm: profile.heightCm,
           job: profile.job,
           bio: profile.bio,
+          genderDetails: profile.genderDetails,
+          sexuality: profile.sexuality,
           photos: profile.photos,
         }
       : null,
   );
+  const [identity, setIdentity] = useState<IdentityChoice>(() => ({
+    identity: profile ? identityOf(profile) : null,
+    side: profile?.gender ?? null,
+  }));
+  const [wantsToMeet, setWantsToMeet] = useState<Interest | null>(profile?.wantsToMeet ?? null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Closing with unsaved edits (Cancel, the swipe down, Android's back) asks first.
+  const navigation = useNavigation();
+  const dirty =
+    profile !== null &&
+    (form.changed ||
+      identity.identity !== identityOf(profile) ||
+      resolvedSide(identity) !== profile.gender ||
+      wantsToMeet !== profile.wantsToMeet);
+  // While saving, the sheet stays until the save is through, so a failure is never shown to nobody.
+  usePreventRemove((dirty && !saved) || saving, ({ data }) => {
+    if (saving) return;
+    void confirmStep({
+      title: t('profile.discardTitle'),
+      message: t('profile.discardMessage'),
+      confirmLabel: t('profile.discard'),
+      cancelLabel: t('profile.keepEditing'),
+    }).then((discard) => {
+      if (discard) navigation.dispatch(data.action);
+    });
+  });
 
   // "Saved" shows for a beat, then the screen closes. Leaving sooner cancels it.
   useEffect(() => {
@@ -53,99 +98,123 @@ export function EditProfileScreen() {
 
   if (!profile) return <Redirect href="/" />;
 
-  const { details, changed } = form;
-  const canSave = details !== null && changed;
-  const missing = details ? null : form.missing('save');
+  const { details } = form;
+  const side = resolvedSide(identity);
+  const identityChanged = identity.identity !== identityOf(profile) || side !== profile.gender;
+  const changed = form.changed || identityChanged || wantsToMeet !== profile.wantsToMeet;
+  const canSave =
+    details !== null && side !== null && wantsToMeet !== null && changed && !saving && !saved;
+  const missing = !details ? form.missing('save') : side === null ? t('profile.pickSide') : null;
 
   async function handleSave() {
-    if (!profile || !details) return;
+    if (!profile || !details || !side || !wantsToMeet) return;
     setSaving(true);
     setError(null);
     try {
       // Onboarding's answers are gone after setup; the profile still holds them.
       await saveProfile(details, {
         birthDate: profile.birthDate,
-        gender: profile.gender,
-        wantsToMeet: profile.wantsToMeet,
+        gender: side,
+        wantsToMeet,
+        genderIdentity: identity.identity ?? undefined,
         termsAcceptedAt: profile.termsAcceptedAt,
       });
       setSaving(false);
       setSaved(true);
       haptics.success();
-      AccessibilityInfo.announceForAccessibility(t('common.saved'));
-    } catch {
-      const message = t('profile.saveFailed');
+      show(t('common.saved'));
+    } catch (failure) {
+      const message = saveFailedMessage(t, failure);
       setError(message);
-      haptics.error();
       AccessibilityInfo.announceForAccessibility(message);
       setSaving(false);
     }
   }
 
   return (
-    <Screen
-      scroll
-      footer={
-        <>
-          {error ? (
+    <View style={styles.flex}>
+      <Screen scroll>
+        <Rise index={0} style={styles.bar}>
+          <Button
+            title={t('common.cancel')}
+            variant="plain"
+            fullWidth={false}
+            disabled={saving}
+            onPress={goBack}
+          />
+          <ThemedText type="headline" accessibilityRole="header">
+            {t('settings.editProfile')}
+          </ThemedText>
+          <Button
+            title={t('common.save')}
+            size="small"
+            fullWidth={false}
+            disabled={!canSave}
+            loading={saving}
+            accessibilityHint={canSave ? undefined : (missing ?? t('profile.noChanges'))}
+            onPress={() => void handleSave()}
+          />
+        </Rise>
+
+        {error ? (
+          <View style={styles.note}>
             <ErrorLine message={error} />
-          ) : missing && !saved ? (
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.footerNote}>
-              {missing}
+          </View>
+        ) : missing ? (
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.note}>
+            {missing}
+          </ThemedText>
+        ) : null}
+
+        <Rise index={1}>
+          <PhotoSection form={form} style={styles.photosSection} />
+        </Rise>
+        <Rise index={2}>
+          <DetailsSection form={form} style={styles.aboutSection} />
+          <GenderSection
+            form={form}
+            identity={{ value: identity, onChange: setIdentity }}
+            style={styles.aboutSection}
+          />
+          <Section title={t('onboarding.titleMeet')} style={[styles.meetSection, styles.aboutSection]}>
+            <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={t('onboarding.titleMeet')} />
+            <ThemedText type="footnote" themeColor="textTertiary">
+              {t('onboarding.subtitleMeet')}
             </ThemedText>
-          ) : null}
-          {saved ? (
-            <Button
-              title={t('common.saved')}
-              icon={<Icon name="check" size={17} color={theme.onInverse} />}
-            />
-          ) : (
-            <Button
-              title={t('common.save')}
-              disabled={!canSave}
-              loading={saving}
-              onPress={handleSave}
-              accessibilityHint={
-                canSave ? undefined : (missing ?? t('profile.noChanges'))
-              }
-            />
-          )}
-        </>
-      }>
-      <View style={styles.back}>
-        <BackButton onPress={goBack} />
-      </View>
-
-      <ThemedText type="display" accessibilityRole="header" style={styles.title}>
-        {t('profile.title')}
-      </ThemedText>
-      <ThemedText themeColor="textSecondary" style={styles.intro}>
-        {t('profile.intro')}
-      </ThemedText>
-
-      <PhotoSection form={form} style={styles.photosSection} />
-      <DetailsSection form={form} style={styles.aboutSection} />
-    </Screen>
+          </Section>
+          <ThemedText type="caption" themeColor="textTertiary" style={styles.locked}>
+            {t('profile.birthdayLocked')}
+          </ThemedText>
+        </Rise>
+      </Screen>
+      {toast}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  back: {
-    paddingTop: Space.xxs,
+  flex: {
+    flex: 1,
   },
-  title: {
-    marginTop: Space.md,
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: MinTouch,
   },
-  intro: {
-    marginTop: 10,
+  note: {
+    marginTop: Space.xs,
   },
   photosSection: {
-    marginTop: 24,
+    marginTop: Space.md,
   },
   aboutSection: {
-    marginTop: 24,
+    marginTop: Space.lg,
   },
-  footerNote: {
-    textAlign: 'center',
+  meetSection: {
+    gap: 16,
+  },
+  locked: {
+    marginTop: 14,
   },
 });

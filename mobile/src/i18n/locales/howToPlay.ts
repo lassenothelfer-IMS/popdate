@@ -4,12 +4,7 @@ import type { Strings } from '@/i18n/types';
 export const howToPlay: Strings = {
   en: {
     title: 'How to play',
-    step1: 'One person chooses, and five hold balloons.',
-    step2: 'Everyone answers the same question.',
-    step3: 'Each round, one more photo appears and one balloon pops.',
-    step4: 'The last balloon left is the match.',
     stepLabel: 'Step %{number} of %{total}: %{text}',
-    sampleQuestion: "What's your idea of a perfect Sunday?",
     roundOf: 'Round %{round} of %{total}',
     choosingTitle: "If you're choosing",
     choosingBody:
@@ -21,12 +16,7 @@ export const howToPlay: Strings = {
   },
   de: {
     title: 'So wird gespielt',
-    step1: 'Eine Person wählt, fünf halten Ballone.',
-    step2: 'Alle beantworten dieselbe Frage.',
-    step3: 'Jede Runde erscheint ein weiteres Foto, und ein Ballon platzt.',
-    step4: 'Der letzte Ballon, der übrig bleibt, ist das Match.',
     stepLabel: 'Schritt %{number} von %{total}: %{text}',
-    sampleQuestion: 'Wie sieht dein perfekter Sonntag aus?',
     roundOf: 'Runde %{round} von %{total}',
     choosingTitle: 'Wenn du wählst',
     choosingBody:
@@ -38,13 +28,7 @@ export const howToPlay: Strings = {
   },
   fr: {
     title: 'Comment jouer',
-    step1: 'Une personne choisit, cinq tiennent un ballon.',
-    step2: 'Tout le monde répond à la même question.',
-    step3: 'À chaque manche, une photo de plus apparaît et un ballon éclate.',
-    step4: "Le dernier ballon qui reste, c'est le match.",
     stepLabel: 'Étape %{number} sur %{total} : %{text}',
-    // A no-break space keeps the question mark on the word's line.
-    sampleQuestion: 'À quoi ressemble ton dimanche idéal ?',
     roundOf: 'Manche %{round} sur %{total}',
     choosingTitle: 'Si tu choisis',
     choosingBody:
@@ -56,12 +40,7 @@ export const howToPlay: Strings = {
   },
   it: {
     title: 'Come si gioca',
-    step1: 'Una persona sceglie, cinque tengono un palloncino.',
-    step2: 'Tutti rispondono alla stessa domanda.',
-    step3: 'A ogni round appare una foto in più e scoppia un palloncino.',
-    step4: "L'ultimo palloncino rimasto è il match.",
     stepLabel: 'Passo %{number} di %{total}: %{text}',
-    sampleQuestion: "Com'è la tua domenica perfetta?",
     roundOf: 'Round %{round} di %{total}',
     choosingTitle: 'Se sei tu a scegliere',
     choosingBody:

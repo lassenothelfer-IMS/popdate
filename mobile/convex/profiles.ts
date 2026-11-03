@@ -8,7 +8,11 @@ import { fail } from './lib/errors';
 import { ageFromBirthDate, getProfile, photoUrls } from './lib/people';
 import { rateLimit } from './lib/rateLimit';
 import { claimImage, deleteImage } from './lib/uploads';
-import { gender } from './schema';
+import { gender, interest } from './schema';
+
+const MIN_PHOTOS = 4;
+const MAX_PHOTOS = 6;
+const MAX_PINNED = 3;
 
 /**
  * Your profile in the `Profile` shape, plus `photoIds`: the app keeps those to
@@ -21,8 +25,12 @@ async function profileView(ctx: QueryCtx, profile: Doc<'profiles'>) {
     birthDate: profile.birthDate,
     gender: profile.gender,
     wantsToMeet: profile.wantsToMeet,
+    genderIdentity: profile.genderIdentity,
+    genderDetails: profile.genderDetails,
+    sexuality: profile.sexuality,
+    pinnedAnswers: profile.pinnedAnswers ?? [],
     city: profile.city,
-    heightCm: profile.heightCm,
+    heightCm: profile.heightCm ?? null,
     job: profile.job,
     bio: profile.bio,
     photos: await photoUrls(ctx, profile.photos),
@@ -57,6 +65,13 @@ function text(value: string, label: string, max: number) {
   return trimmed;
 }
 
+/** Like `text`, but empty is fine: the profile shows nothing for it. */
+function optionalText(value: string | undefined, label: string, max: number) {
+  const trimmed = (value ?? '').trim();
+  if (trimmed.length > max) fail(`Your ${label} is too long.`);
+  return trimmed;
+}
+
 function checkBirthDate(birthDate: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);
   const [y, m, d] = match ? match.slice(1).map(Number) : [];
@@ -74,9 +89,13 @@ export const saveProfile = mutation({
     name: v.string(),
     birthDate: v.string(),
     gender,
-    wantsToMeet: gender,
+    wantsToMeet: interest,
+    genderIdentity: v.optional(v.string()),
+    genderDetails: v.optional(v.string()),
+    sexuality: v.optional(v.string()),
+    pinnedAnswers: v.optional(v.array(v.object({ question: v.string(), answer: v.string() }))),
     city: v.string(),
-    heightCm: v.number(),
+    heightCm: v.optional(v.number()),
     job: v.string(),
     bio: v.string(),
     photos: v.array(v.id('_storage')),
@@ -86,11 +105,15 @@ export const saveProfile = mutation({
     await rateLimit(ctx, `saveProfile:${userId}`, 30, 60 * 60_000);
 
     checkBirthDate(args.birthDate);
-    if (!Number.isInteger(args.heightCm) || args.heightCm < 100 || args.heightCm > 250) {
+    const { heightCm } = args;
+    if (heightCm !== undefined && (!Number.isInteger(heightCm) || heightCm < 100 || heightCm > 250)) {
       fail('Enter a height between 100 and 250 cm.');
     }
-    if (args.photos.length !== 6 || new Set(args.photos).size !== 6) {
-      fail('A profile needs exactly 6 photos.');
+    const pins = args.pinnedAnswers ?? [];
+    if (pins.length > MAX_PINNED) fail(`Pin up to ${MAX_PINNED} answers.`);
+    const count = args.photos.length;
+    if (count < MIN_PHOTOS || count > MAX_PHOTOS || new Set(args.photos).size !== count) {
+      fail('A profile needs 4 to 6 photos.');
     }
     for (const photo of args.photos) await claimImage(ctx, userId, photo);
 
@@ -101,10 +124,17 @@ export const saveProfile = mutation({
       birthDate: args.birthDate,
       gender: args.gender,
       wantsToMeet: args.wantsToMeet,
+      genderIdentity: optionalText(args.genderIdentity, 'gender', 40) || undefined,
+      genderDetails: optionalText(args.genderDetails, 'gender details', 60) || undefined,
+      sexuality: optionalText(args.sexuality, 'sexuality', 40) || undefined,
+      pinnedAnswers: pins.map((pin) => ({
+        question: optionalText(pin.question, 'question', 200),
+        answer: optionalText(pin.answer, 'answer', 300),
+      })),
       city: text(args.city, 'city', 80),
-      heightCm: args.heightCm,
-      job: text(args.job, 'job or school', 80),
-      bio: text(args.bio, 'bio', 500),
+      heightCm,
+      job: optionalText(args.job, 'job or school', 80),
+      bio: optionalText(args.bio, 'bio', 500),
       photos: args.photos,
       // Recorded by the server the first time, so it can't be backdated.
       termsAcceptedAt: existing?.termsAcceptedAt ?? new Date().toISOString(),

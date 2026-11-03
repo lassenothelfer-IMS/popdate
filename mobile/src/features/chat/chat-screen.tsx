@@ -1,6 +1,5 @@
 import { Redirect, router } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Platform,
@@ -14,41 +13,78 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
-import { api, type Match, type Message, type ReportReason } from '@/api';
+import { api, type Match, type Message, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
+import { Chip } from '@/components/chip';
 import { ErrorLine } from '@/components/error-line';
+import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
+import { Skeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MinTouch, Motion, Space } from '@/constants/theme';
+import { Ease, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { ChatComposer } from '@/features/chat/chat-composer';
-import { MessageList } from '@/features/chat/message-list';
-import { acknowledge, confirmStep, useChoice } from '@/features/chat/prompts';
-import { BackButton } from '@/features/onboarding/back-button';
+import { MessageList, type Seed } from '@/features/chat/message-list';
+import { CheckInSheet } from '@/features/chat/check-in-sheet';
+import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useFilterText, useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
 
-/** The reasons in the order the report sheet lists them. */
-const REPORT_REASONS: { reason: ReportReason; key: string }[] = [
-  { reason: 'harassment', key: 'chat.reasonHarassment' },
-  { reason: 'inappropriate', key: 'chat.reasonInappropriate' },
-  { reason: 'fake', key: 'chat.reasonFake' },
-  { reason: 'underage', key: 'chat.reasonUnderage' },
-  { reason: 'spam', key: 'chat.reasonSpam' },
-  { reason: 'other', key: 'chat.reasonOther' },
-];
+/** The seed's pieces are always these, so the first open knows to rise them in before the room loads. */
+const SEED_KEYS = ['seed-pill', 'seed-question', 'seed-answer'] as const;
+
+/**
+ * The room's last round at the top of the chat: who asked what, and the answer
+ * that kept the last balloon. The room only keeps its final round, so earlier
+ * rounds can't be seeded yet.
+ */
+function seedFromRoom(room: Room | null | undefined, myId: string, t: Translate): Seed | null {
+  if (!room || room.status !== 'finished' || !room.question) return null;
+  const winner = room.contestants.find((contestant) => contestant.id === room.winnerId);
+  const round = room.round;
+  const askedByMe = room.popper.id === myId;
+  const entries: Seed['entries'] = [
+    {
+      key: SEED_KEYS[1],
+      mine: askedByMe,
+      label: askedByMe ? t('chat.youAsked', { round }) : t('chat.theyAsked', { name: room.popper.name, round }),
+      text: room.question.text,
+      question: true,
+    },
+  ];
+  if (winner?.answer) {
+    const answeredByMe = winner.id === myId;
+    entries.push({
+      key: SEED_KEYS[2],
+      mine: answeredByMe,
+      label: answeredByMe ? t('chat.youAnswered') : t('chat.theyAnswered', { name: winner.name }),
+      text: winner.answer,
+      question: false,
+    });
+  }
+  return { pill: t('chat.seedPill', { count: room.totalRounds }), entries };
+}
 
 /** Within this distance of the end, a new message scrolls into view; further up, you're reading. */
 const NEAR_END = 80;
 
 /** The first messages and the empty state arrive together, instead of popping in. */
 const contentIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+
+/** Date ideas offered while a chat is young, until this many messages. */
+const DATE_IDEAS_UNTIL = 8;
+const DATE_IDEAS = ['Coffee', 'Walk', 'Drinks', 'Dinner'] as const;
+
+/** A quick load shows nothing instead of blocks that blink, as on LoadingScreen. */
+const SKELETON_DELAY_MS = 400;
+/** Messages that haven't come after this long count as failed, with a way to try again. */
+const MESSAGES_TIMEOUT_MS = 10_000;
 
 /** Back to wherever the chat was opened from; after a reload, Home. */
 function leave() {
@@ -84,7 +120,10 @@ export function ChatScreen({ matchId }: { matchId: string }) {
       <Screen
         contentStyle={styles.centered}
         footerStyle="plain"
-        footer={<Button title={t('chat.backHome')} onPress={leave} />}>
+        // Says where it goes: back if there's somewhere to go back to, else Home.
+        footer={
+          <Button title={router.canGoBack() ? t('common.back') : t('chat.backHome')} onPress={leave} />
+        }>
         <ThemedText themeColor="textSecondary" style={styles.centeredText}>
           {t('chat.notFound')}
         </ThemedText>
@@ -125,7 +164,13 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const filter = useFilterText();
   const { locale, region } = useSettings();
   const room = useRoom(match.roomId);
-  const { choose, sheet } = useChoice();
+  // Report, block or unmatch; any of the last two closes the chat.
+  const people = usePersonActions({ onGone: leave });
+  const [checkingIn, setCheckingIn] = useState(false);
+  /** Bumped by Try again, which watches the messages afresh. */
+  const [attempt, setAttempt] = useState(0);
+  /** The messages took too long to come. */
+  const [stalled, setStalled] = useState(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   /** True while you're at the newest message, so new ones scroll into view. */
   const nearEnd = useRef(true);
@@ -133,16 +178,15 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const scrolledOnce = useRef(false);
   /** Null until the first list arrives, so the empty state never flashes. */
   const [messages, setMessages] = useState<Message[] | null>(null);
-  const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   /** Their latest message, for Android's and the web's live region. */
   const [heard, setHeard] = useState<string | null>(null);
+  /** What was on screen when the chat opened: only that rises in. */
+  const [firstOpen, setFirstOpen] = useState<ReadonlySet<string> | null>(null);
 
   const { name, age } = match.other;
   const tone = seatFor(seats, match.other.id);
-  const formatTime = makeTimeFormat(locale, region);
+  const formatTime = useMemo(() => makeTimeFormat(locale, region), [locale, region]);
+  const seed = seedFromRoom(room, myId, t);
   // You were the one picked when you're the room's winner; otherwise you chose together.
   const winner = room?.winnerId != null && room.winnerId === myId;
   const emptyLine = t(winner ? 'chat.emptyWinner' : 'chat.emptyTogether', { name });
@@ -160,10 +204,14 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   useEffect(() => {
     /** Messages already on screen; the first list is read by the screen reader itself. */
     let seen: Set<string> | null = null;
-    return api.watchMessages(match.id, (list) => {
+    const timer = setTimeout(() => setStalled(true), MESSAGES_TIMEOUT_MS);
+    const unwatch = api.watchMessages(match.id, (list) => {
+      clearTimeout(timer);
+      setStalled(false);
       setMessages(list);
       if (seen === null) {
         seen = new Set(list.map((message) => message.id));
+        setFirstOpen(new Set([...SEED_KEYS, ...seen]));
         return;
       }
       for (const message of list) {
@@ -171,8 +219,20 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         seen.add(message.id);
         if (message.senderId !== myId) hearIncoming(message);
       }
+    }, () => {
+      clearTimeout(timer);
+      setStalled(true);
     });
-  }, [match.id, myId]);
+    return () => {
+      clearTimeout(timer);
+      unwatch();
+    };
+  }, [match.id, myId, attempt]);
+
+  function retry() {
+    setStalled(false);
+    setAttempt((count) => count + 1);
+  }
 
   function scrollToEnd(animated: boolean) {
     scrollRef.current?.scrollToEnd({ animated: animated && !reduced });
@@ -183,114 +243,50 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
     nearEnd.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - NEAR_END;
   }
 
-  async function send() {
-    const text = draft;
-    if (!text.trim() || sending) return;
-    setSending(true);
-    setError(null);
+  function send(text: string) {
     // Your own message always scrolls into view, even if you were reading further up.
     nearEnd.current = true;
-    try {
-      await api.sendMessage(match.id, text);
-      haptics.light();
-      // Keep anything typed while it was sending.
-      setDraft((current) => (current.startsWith(text) ? current.slice(text.length) : current));
-    } catch {
-      fail(t('chat.sendFailed'));
-    } finally {
-      setSending(false);
-    }
+    return api.sendMessage(match.id, text);
   }
 
-  function fail(message: string) {
-    setError(message);
-    haptics.error();
-    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
-  }
-
-  async function openOptions() {
-    if (busy) return;
-    const picked = await choose({
-      title: t('common.nameAge', { name, age }),
-      choices: [{ label: t('chat.report') }, { label: t('chat.block'), destructive: true }],
-    });
-    if (picked === 0) await report();
-    if (picked === 1) await block();
-  }
-
-  async function report() {
-    const picked = await choose({
-      title: t('chat.reportTitle', { name }),
-      message: t('chat.reportMessage', { name }),
-      choices: REPORT_REASONS.map(({ key }) => ({ label: t(key) })),
-    });
-    if (picked === null) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.report(match.other.id, REPORT_REASONS[picked].reason);
-      haptics.success();
-      acknowledge(t('chat.reported'));
-    } catch {
-      fail(t('chat.reportFailed'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function block() {
-    const confirmed = await confirmStep({
-      title: t('chat.blockTitle', { name }),
-      message: t('chat.blockMessage', { name }),
-      confirmLabel: t('chat.block'),
-      cancelLabel: t('common.cancel'),
-    });
-    if (!confirmed) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await api.block(match.other.id);
-      haptics.medium();
-      leave();
-    } catch {
-      fail(t('chat.blockFailed', { name }));
-      setBusy(false);
-    }
+  function openOptions() {
+    void people.open({ id: match.other.id, name, age, matchId: match.id }, [
+      { label: t('checkin.title'), onPress: () => setCheckingIn(true) },
+    ]);
   }
 
   return (
     <Screen
       contentStyle={styles.content}
-      footer={
-        <>
-          {error ? <ErrorLine message={error} /> : null}
-          <ChatComposer
-            value={draft}
-            onChangeText={setDraft}
-            onSend={send}
-            sending={sending}
-            name={name}
-          />
-        </>
-      }>
-      <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <View style={styles.back}>
-          <BackButton onPress={leave} />
-        </View>
+      footer={<ChatFooter name={name} messageCount={messages?.length ?? null} onSend={send} />}>
+      <View style={styles.header}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+          onPress={leave}
+          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          style={({ pressed }) => [styles.iconButton, styles.back, pressed && styles.pressed]}>
+          <Icon name="back" size={20} color={theme.text} />
+        </Pressable>
         <View
           accessible
           accessibilityRole="header"
-          accessibilityLabel={t('common.nameAge', { name, age })}
+          accessibilityLabel={`${t('common.nameAge', { name, age })}, ${t('chat.matchedAt', { time: formatTime(match.createdAt) })}`}
           style={styles.person}>
           <Avatar name={name} uri={match.other.photo} tone={tone} size={40} />
-          <ThemedText type="row" numberOfLines={1} style={styles.name}>
-            {t('common.nameAge', { name, age })}
-          </ThemedText>
+          <View style={styles.name}>
+            <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
+              {t('common.nameAge', { name, age })}
+            </ThemedText>
+            <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1}>
+              {t('chat.matchedAt', { time: formatTime(match.createdAt) })}
+            </ThemedText>
+          </View>
         </View>
-        <OptionsButton
+        <MoreButton
           label={t('chat.options')}
           hint={t('chat.optionsHint', { name })}
-          disabled={busy}
+          disabled={people.busy}
           onPress={openOptions}
         />
       </View>
@@ -313,23 +309,32 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         onLayout={() => {
           if (nearEnd.current) scrollToEnd(false);
         }}>
-        {messages === null ? null : messages.length === 0 ? (
+        {messages === null ? (
+          stalled ? (
+            <View style={styles.empty}>
+              <ErrorLine message={t('chat.loadFailed')} />
+              <Button title={t('common.tryAgain')} variant="tinted" fullWidth={false} onPress={retry} />
+            </View>
+          ) : (
+            <MessagesLoading label={t('chat.loading')} />
+          )
+        ) : messages.length === 0 && !seed ? (
           <Animated.View entering={contentIn} style={styles.empty}>
             <Avatar name={name} uri={match.other.photo} tone={tone} size={64} />
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.centeredText}>
+            <ThemedText type="body" themeColor="textSecondary" style={styles.centeredText}>
               {emptyLine}
             </ThemedText>
           </Animated.View>
         ) : (
-          <Animated.View entering={contentIn}>
-            <MessageList
-              messages={messages}
-              myId={myId}
-              name={name}
-              filter={filter}
-              formatTime={formatTime}
-            />
-          </Animated.View>
+          <MessageList
+            messages={messages}
+            myId={myId}
+            name={name}
+            filter={filter}
+            formatTime={formatTime}
+            seed={seed}
+            firstOpen={firstOpen}
+          />
         )}
       </ScrollView>
 
@@ -340,46 +345,135 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         </ThemedText>
       ) : null}
 
-      {sheet}
+      {people.element}
+      <CheckInSheet
+        visible={checkingIn}
+        name={name}
+        matchId={match.id}
+        onClose={() => setCheckingIn(false)}
+      />
     </Screen>
   );
 }
 
-/** The ellipsis in the header's corner: report or block. */
-function OptionsButton({
-  label,
-  hint,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  hint: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const theme = useTheme();
+type ChatFooterProps = {
+  name: string;
+  /** How many messages there are, or null while they load. */
+  messageCount: number | null;
+  /** Sends one message; rejects if it didn't go through. */
+  onSend: (text: string) => Promise<unknown>;
+};
+
+/**
+ * Under the messages: a send error, date ideas while the chat is young, and the
+ * composer. The draft lives here, so typing doesn't redraw the messages above.
+ */
+function ChatFooter({ name, messageCount, onSend }: ChatFooterProps) {
+  const t = useT();
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function send() {
+    const text = draft;
+    if (!text.trim() || sending) return;
+    setSending(true);
+    setError(null);
+    onSend(text).then(
+      () => {
+        setSending(false);
+        haptics.light();
+        // Keep anything typed while it was sending.
+        setDraft((current) => (current.startsWith(text) ? current.slice(text.length) : current));
+      },
+      () => {
+        setSending(false);
+        fail(t('chat.sendFailed'));
+      },
+    );
+  }
+
+  function fail(message: string) {
+    setError(message);
+    haptics.error();
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+  }
+
+  // Early on, a few date ideas sit over the composer; a tap drafts one to edit and send.
+  const showIdeas = messageCount !== null && messageCount < DATE_IDEAS_UNTIL && !draft;
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={hint}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-      style={({ pressed }) => [styles.options, (pressed || disabled) && styles.pressed]}>
-      <SymbolView
-        name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
-        size={20}
-        tintColor={theme.text}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
-    </Pressable>
+    <>
+      {error ? <ErrorLine message={error} /> : null}
+      {showIdeas ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.ideas}
+          accessibilityLabel={t('chat.ideasLabel')}>
+          {DATE_IDEAS.map((idea) => (
+            <Chip
+              key={idea}
+              label={t(`chat.idea${idea}`)}
+              selected={false}
+              onPress={() => setDraft(t(`chat.idea${idea}Message`))}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+      <ChatComposer value={draft} onChangeText={setDraft} onSend={send} sending={sending} name={name} />
+    </>
+  );
+}
+
+/** While the messages load: a few bubble-shaped blocks, theirs and yours, after a short pause. */
+function MessagesLoading({ label }: { label: string }) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setVisible(true), SKELETON_DELAY_MS);
+    return () => clearTimeout(id);
+  }, []);
+
+  if (!visible) return null;
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityLabel={label} style={styles.loading}>
+      <Skeleton style={[styles.bubbleSkeleton, styles.theirsSkeleton, styles.wide]} />
+      <Skeleton style={[styles.bubbleSkeleton, styles.mineSkeleton, styles.narrow]} />
+      <Skeleton style={[styles.bubbleSkeleton, styles.theirsSkeleton, styles.middle]} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    gap: 10,
+  },
+  // About one line of bubble: 10 above and below a 21 pt line.
+  bubbleSkeleton: {
+    height: 41,
+    borderRadius: Radius.xl,
+  },
+  theirsSkeleton: {
+    alignSelf: 'flex-start',
+  },
+  mineSkeleton: {
+    alignSelf: 'flex-end',
+  },
+  wide: {
+    width: '62%',
+  },
+  narrow: {
+    width: '48%',
+  },
+  middle: {
+    width: '55%',
+  },
+  ideas: {
+    gap: Space.xs,
+    paddingBottom: Space.xs,
+  },
   centered: {
     flexGrow: 1,
     alignItems: 'center',
@@ -394,34 +488,38 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
   },
+  // The handoff's chat header: back, a 40 pt avatar, name over when you matched, options.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xs,
+    gap: Space.sm,
     minHeight: 56,
     paddingHorizontal: Gutter,
     paddingBottom: Space.xs,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  back: {
+  iconButton: {
+    width: MinTouch,
+    height: MinTouch,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  // The chevron lines up with the gutter.
+  back: {
+    marginLeft: -12,
   },
   person: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Space.sm,
   },
   name: {
     flexShrink: 1,
+    gap: 1,
   },
-  // The glyph lines up with the gutter; the touch area stays 44pt.
-  options: {
-    width: MinTouch,
-    height: MinTouch,
-    marginRight: -Space.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+  nameText: {
+    fontSize: 16,
+    lineHeight: 20,
   },
   pressed: {
     opacity: 0.6,

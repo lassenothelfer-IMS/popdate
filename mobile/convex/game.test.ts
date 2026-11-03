@@ -3,10 +3,12 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { api } from './_generated/api';
 import type { Id } from './_generated/dataModel';
+import { ANSWER_GRACE_MS, ANSWER_MS, PICK_MS } from './lib/game';
 import schema from './schema';
 import { modules } from './test.setup';
 
 type Gender = 'woman' | 'man';
+type Interest = Gender | 'everyone';
 type Tester = ReturnType<typeof convexTest>;
 
 beforeEach(() => {
@@ -31,7 +33,7 @@ async function storePhotos(t: Tester, label: string) {
 }
 
 /** A signed-in player with a finished profile. */
-async function player(t: Tester, name: string, gender: Gender, wantsToMeet: Gender) {
+async function player(t: Tester, name: string, gender: Gender, wantsToMeet: Interest) {
   const userId = await t.run(async (ctx) => await ctx.db.insert('users', {}));
   const as = t.withIdentity({ subject: `${userId}|test-session` });
   await as.mutation(api.profiles.saveProfile, {
@@ -200,7 +202,7 @@ test('timers move answering on to popping and remind the popper, but never pop',
   await pickFirstQuestion(lena, roomId);
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'Only me' });
 
-  vi.advanceTimersByTime(60_001);
+  vi.advanceTimersByTime(ANSWER_MS + ANSWER_GRACE_MS + 1);
   await t.finishInProgressScheduledFunctions();
   let room = await view(lena, roomId);
   expect(room.status).toBe('popping');
@@ -247,8 +249,8 @@ test('profiles need 6 of your own photos and an 18+ birthday', async () => {
 
   const own = await storePhotos(t, 'Mia');
   await expect(
-    mia.mutation(api.profiles.saveProfile, { ...base, photos: own.slice(0, 5) }),
-  ).rejects.toThrow('A profile needs exactly 6 photos.');
+    mia.mutation(api.profiles.saveProfile, { ...base, photos: own.slice(0, 3) }),
+  ).rejects.toThrow('A profile needs 4 to 6 photos.');
   await expect(
     mia.mutation(api.profiles.saveProfile, { ...base, birthDate: '2015-05-05', photos: own }),
   ).rejects.toThrow('You need to be 18 or older.');
@@ -298,4 +300,215 @@ test('deleting an account removes the profile, matches, chat and sign-in records
   expect(left).toEqual({ user: null, profile: null, sessions: [], messages: [] });
   // The token Luca still holds no longer works.
   await expect(luca.as.mutation(api.queue.joinQueue, {})).rejects.toThrow('Sign in first.');
+});
+
+type Player = Awaited<ReturnType<typeof player>>;
+
+/** Lena picks, everyone still in answers, and Lena pops `loser`. */
+async function playRound(lena: Player, roomId: string, answering: Player[], loser: Player) {
+  await pickFirstQuestion(lena, roomId);
+  for (const p of answering) await p.as.mutation(api.rooms.postAnswer, { roomId, text: p.id });
+  await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: loser.id });
+}
+
+async function historyOf(p: Player, roomId: string) {
+  const rooms = await p.as.query(api.history.list, {});
+  return rooms.find((room) => room.roomId === roomId)!;
+}
+
+test('only the chooser and the winner see the match in their history, and unmatching keeps the outcome', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await playRound(lena, roomId, [luca, noah], noah);
+
+  expect(await historyOf(lena, roomId)).toMatchObject({ outcome: 'chose', matchName: 'Luca' });
+  expect(await historyOf(luca, roomId)).toMatchObject({ outcome: 'won', matchName: 'Lena' });
+  const popped = await historyOf(noah, roomId);
+  expect(popped).toMatchObject({ outcome: 'popped', poppedInRound: 1, matchId: null, matchName: null });
+
+  const matchId = (await historyOf(lena, roomId)).matchId!;
+  await lena.as.mutation(api.matches.unmatch, { matchId });
+  expect(await historyOf(lena, roomId)).toMatchObject({ outcome: 'chose', matchId: null, matchName: null });
+  expect(await historyOf(luca, roomId)).toMatchObject({ outcome: 'won', matchId: null, matchName: null });
+});
+
+test('history keeps a pop that came before leaving, and tells it apart from leaving while still in', async () => {
+  process.env.LOBBY_SIZE = '4';
+  const t = convexTest(schema, modules);
+  const lena = await player(t, 'Lena', 'woman', 'man');
+  const luca = await player(t, 'Luca', 'man', 'woman');
+  const noah = await player(t, 'Noah', 'man', 'woman');
+  const ben = await player(t, 'Ben', 'man', 'woman');
+  for (const p of [lena, luca, noah, ben]) await p.as.mutation(api.queue.joinQueue, {});
+  const status = await lena.as.query(api.queue.status, {});
+  const roomId = status.state === 'matched' ? status.roomId : '';
+
+  await playRound(lena, roomId, [luca, noah, ben], noah);
+  // Noah taps "Play another room" after his pop; Ben walks out while still in.
+  await noah.as.mutation(api.rooms.leaveRoom, { roomId });
+  await ben.as.mutation(api.rooms.leaveRoom, { roomId });
+
+  expect(await historyOf(noah, roomId)).toMatchObject({ outcome: 'popped', poppedInRound: 1 });
+  expect(await historyOf(ben, roomId)).toMatchObject({ outcome: 'left', poppedInRound: 2 });
+  expect(await historyOf(luca, roomId)).toMatchObject({ outcome: 'won' });
+});
+
+test('when the chooser leaves, contestants still in are popped in the round the room stopped', async () => {
+  const { lena, luca, roomId } = await startRoom();
+  await lena.as.mutation(api.rooms.leaveRoom, { roomId });
+  expect(await historyOf(lena, roomId)).toMatchObject({ outcome: 'left' });
+  expect(await historyOf(luca, roomId)).toMatchObject({
+    outcome: 'popped',
+    poppedInRound: 1,
+    matchId: null,
+  });
+});
+
+test('leaving the queue after a room formed keeps your seat and hands back the room', async () => {
+  const { t, lena, roomId } = await startRoom();
+  expect(await lena.as.mutation(api.queue.leaveQueue, {})).toBe(roomId);
+  expect(await lena.as.query(api.queue.status, {})).toEqual({ state: 'matched', roomId });
+
+  const mia = await player(t, 'Mia', 'woman', 'man');
+  await mia.as.mutation(api.queue.joinQueue, {});
+  expect(await mia.as.mutation(api.queue.leaveQueue, {})).toBeNull();
+  expect(await mia.as.query(api.queue.status, {})).toEqual({ state: 'idle' });
+});
+
+test('the queue only counts people who could share a room with you', async () => {
+  const t = convexTest(schema, modules);
+  const women = [
+    await player(t, 'Lena', 'woman', 'man'),
+    await player(t, 'Mia', 'woman', 'man'),
+    await player(t, 'Ava', 'woman', 'man'),
+  ];
+  for (const p of women) await p.as.mutation(api.queue.joinQueue, {});
+  // Three women who want men can never fill a room together.
+  expect(await women[0].as.query(api.queue.status, {})).toMatchObject({ found: 1, needed: 3 });
+
+  const max = await player(t, 'Max', 'man', 'man');
+  await max.as.mutation(api.queue.joinQueue, {});
+  expect(await women[0].as.query(api.queue.status, {})).toMatchObject({ found: 1 });
+  expect(await max.as.query(api.queue.status, {})).toMatchObject({ found: 1 });
+});
+
+test('the chooser is drawn from everyone in the lobby who fits the others', async () => {
+  const t = convexTest(schema, modules);
+  const lena = await player(t, 'Lena', 'woman', 'everyone');
+  const mia = await player(t, 'Mia', 'woman', 'everyone');
+  const ava = await player(t, 'Ava', 'woman', 'everyone');
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+  try {
+    for (const p of [lena, mia, ava]) await p.as.mutation(api.queue.joinQueue, {});
+  } finally {
+    random.mockRestore();
+  }
+  const status = await lena.as.query(api.queue.status, {});
+  const room = await view(ava, status.state === 'matched' ? status.roomId : '');
+  // Not the longest-waiting player: the draw picked the last of the three.
+  expect(room.me.role).toBe('popper');
+});
+
+test('answers sent just after the deadline still land during the grace', async () => {
+  const { t, lena, luca, noah, roomId } = await startRoom();
+  await pickFirstQuestion(lena, roomId);
+  const deadline = (await view(lena, roomId)).deadline!;
+
+  vi.advanceTimersByTime(ANSWER_MS + ANSWER_GRACE_MS / 2);
+  await t.finishInProgressScheduledFunctions();
+  expect((await view(lena, roomId)).status).toBe('answering');
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'Just in time' });
+  // The deadline players see doesn't move.
+  expect((await view(lena, roomId)).deadline).toBe(deadline);
+
+  vi.advanceTimersByTime(ANSWER_GRACE_MS);
+  await t.finishInProgressScheduledFunctions();
+  expect((await view(lena, roomId)).status).toBe('popping');
+  await expect(noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'Too late' })).rejects.toThrow(
+    'Answer time is over.',
+  );
+});
+
+test('an idle chooser with no options still gets a question, and a room out of questions ends', async () => {
+  const first = await startRoom();
+  const roomId = await first.t.run(async (ctx) => ctx.db.normalizeId('rooms', first.roomId)!);
+  await first.t.run(async (ctx) => {
+    for (const question of await ctx.db.query('questions').collect()) {
+      await ctx.db.patch(question._id, { active: false });
+    }
+    await ctx.db.patch(roomId, { questionOptionIds: [] });
+  });
+  vi.advanceTimersByTime(PICK_MS + 1);
+  await first.t.finishInProgressScheduledFunctions();
+  const asked = await view(first.lena, first.roomId);
+  expect(asked.status).toBe('answering');
+  expect(asked.question).not.toBeNull();
+
+  const second = await startRoom();
+  const stuckId = await second.t.run(async (ctx) => ctx.db.normalizeId('rooms', second.roomId)!);
+  await second.t.run(async (ctx) => {
+    const all = await ctx.db.query('questions').collect();
+    await ctx.db.patch(stuckId, { questionOptionIds: [], usedQuestionIds: all.map((q) => q._id) });
+  });
+  vi.advanceTimersByTime(PICK_MS + 1);
+  await second.t.finishInProgressScheduledFunctions();
+  const ended = await view(second.lena, second.roomId);
+  expect(ended.status).toBe('finished');
+  expect(ended.winnerId).toBeNull();
+});
+
+test('a second chance can not be answered once it expired or after a block', async () => {
+  const blocked = await startRoom();
+  await playRound(blocked.lena, blocked.roomId, [blocked.luca, blocked.noah], blocked.noah);
+  await blocked.lena.as.mutation(api.secondChances.send, {
+    roomId: blocked.roomId,
+    userId: blocked.noah.id,
+  });
+  const [incoming] = await blocked.noah.as.query(api.secondChances.list, {});
+  expect(incoming.state).toBe('incoming');
+  await blocked.lena.as.mutation(api.safety.block, { userId: blocked.noah.id });
+  await expect(
+    blocked.noah.as.mutation(api.secondChances.answer, { id: incoming.id, accept: true }),
+  ).rejects.toThrow('That second chance is no longer open.');
+
+  const late = await startRoom();
+  await playRound(late.lena, late.roomId, [late.luca, late.noah], late.noah);
+  await late.lena.as.mutation(api.secondChances.send, { roomId: late.roomId, userId: late.noah.id });
+  const [chance] = await late.noah.as.query(api.secondChances.list, {});
+  vi.advanceTimersByTime(8 * 24 * 60 * 60_000);
+  expect(await late.noah.as.query(api.secondChances.list, {})).toEqual([]);
+  await expect(
+    late.noah.as.mutation(api.secondChances.answer, { id: chance.id, accept: true }),
+  ).rejects.toThrow('That second chance has passed.');
+});
+
+test('signing out removes your push tokens', async () => {
+  const { t, lena } = await startRoom();
+  await t.run(async (ctx) => {
+    await ctx.db.insert('pushTokens', { userId: lena.userId, token: 'ExponentPushToken[x]', updatedAt: 0 });
+  });
+  await lena.as.mutation(api.account.prepareSignOut, {});
+  const tokens = await t.run(
+    async (ctx) =>
+      await ctx.db
+        .query('pushTokens')
+        .withIndex('by_user', (q) => q.eq('userId', lena.userId))
+        .collect(),
+  );
+  expect(tokens).toEqual([]);
+});
+
+test('the chat loads only the newest 200 messages, oldest first', async () => {
+  const { t, lena, luca, noah, roomId } = await startRoom();
+  await playRound(lena, roomId, [luca, noah], noah);
+  const matchId = (await view(lena, roomId)).matchId!;
+  const id = await t.run(async (ctx) => ctx.db.normalizeId('matches', matchId)!);
+  await t.run(async (ctx) => {
+    for (let i = 0; i < 205; i++) {
+      await ctx.db.insert('messages', { matchId: id, senderId: lena.userId, text: `m${i}`, sentAt: i });
+    }
+  });
+  const messages = await luca.as.query(api.chat.list, { matchId });
+  expect(messages).toHaveLength(200);
+  expect(messages[0].text).toBe('m5');
+  expect(messages[199].text).toBe('m204');
 });
