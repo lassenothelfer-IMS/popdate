@@ -1,3 +1,4 @@
+import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Redirect, router, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -16,7 +17,7 @@ import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-nat
 import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-bar';
 import { Button } from '@/components/button';
 import { api, type PinnedAnswer, type VerificationStatus } from '@/api';
-import { Icon } from '@/components/icon';
+import { Icon, type IconName } from '@/components/icon';
 import { Photo } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
@@ -144,19 +145,16 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
           <HeroScrim />
           <View style={[styles.heroTop, { top: insets.top + Space.xs }]}>
             {asTab ? (
-              <GlassButton label={t('home.settings')} onPress={() => router.push('/settings' as Href)}>
-                <Icon name="gear" size={17} color={Velvet.cream} />
-              </GlassButton>
+              <GlassButton
+                label={t('home.settings')}
+                onPress={() => router.push('/settings' as Href)}
+                icon="gear"
+                iconSize={17}
+              />
             ) : (
-              <GlassButton label={t('common.back')} onPress={back}>
-                <Icon name="back" size={16} color={Velvet.cream} />
-              </GlassButton>
+              <GlassButton label={t('common.back')} onPress={back} icon="back" iconSize={16} />
             )}
-            <GlassButton label={t('home.profileEdit')} onPress={() => router.push('/profile')} pill>
-              <ThemedText type="kicker" style={styles.onPhoto}>
-                {t('home.profileEdit')}
-              </ThemedText>
-            </GlassButton>
+            <GlassButton label={t('home.profileEdit')} onPress={() => router.push('/profile')} />
           </View>
           <View style={styles.heroText}>
             <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -378,26 +376,34 @@ function HeroScrim() {
   );
 }
 
-/** A glass button over the photo: a circle with an icon, or a pill with its label. */
+/**
+ * A glass button over the photo: a circle with an icon, or a pill with its label.
+ * The icon takes the ink Button gives a glass label (theme text on real glass,
+ * accent text on the tinted fallback), so the gear reads like the Edit pill
+ * on any photo, in both themes.
+ */
 function GlassButton({
   label,
   onPress,
-  pill = false,
-  children,
+  icon,
+  iconSize = 17,
 }: {
   label: string;
   onPress: () => void;
-  pill?: boolean;
-  children: React.ReactNode;
+  icon?: IconName;
+  iconSize?: number;
 }) {
+  const theme = useTheme();
+  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
+  const ink = nativeGlass ? theme.text : theme.accentText;
   return (
     <Button
       title={label}
       variant="glass"
       size="small"
       fullWidth={false}
-      iconOnly={!pill}
-      icon={pill ? undefined : children}
+      iconOnly={icon !== undefined}
+      icon={icon ? <Icon name={icon} size={iconSize} color={ink} /> : undefined}
       onPress={onPress}
     />
   );
@@ -488,10 +494,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.xs,
     minHeight: MinTouch,
-  },
-  // The Edit label sits on dark glass in both themes.
-  onPhoto: {
-    color: Velvet.cream,
   },
   body: {
     paddingHorizontal: Gutter,

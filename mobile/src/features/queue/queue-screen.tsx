@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -22,12 +22,13 @@ import { ErrorLine } from '@/components/error-line';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { BrandBalloon, Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { BrandBalloon, Ease, Gutter, MaxContentWidth, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
-import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
+import { seatAt, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { useSession } from '@/state/session';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 import { PushPrompt } from '@/features/home/push-prompt';
@@ -53,6 +54,10 @@ const RING = 160;
 const RING_MS = 2600;
 /** The join order of the balloon colors. You are crimson; the others take the rest in order. */
 const OTHER_SEATS = [0, 1, 2, 3] as const;
+/** The role word at the count size, unless it needs less to fit on one line. */
+const WORD_SIZE = 112;
+/** On the web, which can't shrink text to fit: New York Light runs a little over half an em a letter. */
+const WORD_EM_PER_LETTER = 0.6;
 
 /** A balloon rises 140 pt into its seat, growing from .6, 300 ms after the one before. */
 const seatEntrances = new Map<number, InstanceType<typeof Keyframe>>();
@@ -361,14 +366,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             <ThemedText type="question" themeColor="textSecondary" style={styles.lead}>
               {beat.lead}
             </ThemedText>
-            <ThemedText
-              type="count"
-              accessibilityRole="header"
-              maxFontSizeMultiplier={1}
-              allowFontScaling={false}
-              style={styles.centered}>
-              {beat.word}
-            </ThemedText>
+            <RoleWord word={beat.word} />
             <ThemedText type="callout" themeColor="textSecondary" style={styles.headlineLine}>
               {beat.line}
             </ThemedText>
@@ -408,6 +406,40 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
         {beat ? null : <PushPrompt />}
       </Pressable>
     </Screen>
+  );
+}
+
+/**
+ * "choosing", "a balloon": as big as the line allows and never broken. iOS and
+ * Android shrink it to the width; the web gets a size from the screen width instead.
+ */
+function RoleWord({ word }: { word: string }) {
+  const { width } = useWindowDimensions();
+  const line = Math.min(width, MaxContentWidth) - Gutter * 2;
+  const fontSize =
+    Platform.OS === 'web'
+      ? Math.min(WORD_SIZE, Math.floor(line / (word.length * WORD_EM_PER_LETTER)))
+      : WORD_SIZE;
+  return (
+    <ThemedText
+      type="count"
+      accessibilityRole="header"
+      maxFontSizeMultiplier={1}
+      allowFontScaling={false}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.3}
+      style={[
+        styles.centered,
+        styles.word,
+        fontSize < WORD_SIZE && {
+          fontSize,
+          lineHeight: Math.ceil(fontSize * 1.15),
+          letterSpacing: -0.03 * fontSize,
+        },
+      ]}>
+      {word}
+    </ThemedText>
   );
 }
 
@@ -521,15 +553,24 @@ function RoomSeats({ room }: { room: Room }) {
   const theme = useTheme();
   const seats = useSeats();
   const t = useT();
+  const { profile } = useSession();
+  const choosing = room.me.role === 'popper';
+  // Your own seat shows your own first photo, as the tab bar does, or your initial.
+  const popperPhoto = choosing ? (profile?.photos[0] ?? room.popper.photos[0]) : room.popper.photos[0];
   return (
     <View
       style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
       <View style={styles.cardSeat}>
-        <Avatar name={room.popper.name} uri={room.popper.photos[0]} size={42} />
+        <Avatar
+          name={choosing ? (profile?.name ?? room.popper.name) : room.popper.name}
+          uri={popperPhoto}
+          tone={choosing ? youSeat(seats) : undefined}
+          size={42}
+        />
         <ThemedText type="captionStrong" numberOfLines={1}>
-          {room.me.role === 'popper' ? t('common.you') : room.popper.name}
+          {choosing ? t('common.you') : room.popper.name}
         </ThemedText>
       </View>
       {room.contestants.map((contestant, index) => {
@@ -588,6 +629,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 40,
+  },
+  word: {
+    alignSelf: 'stretch',
   },
   lead: {
     fontSize: 22,

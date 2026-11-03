@@ -92,15 +92,24 @@ export function cardWidthFor(height: number, pageWidth: number, textScale = 1) {
   return Math.max(Math.min(fit, max), Math.min(MIN_CARD_WIDTH, max));
 }
 
-/** The final two lean toward each other: -4 and 4 degrees, the left one a little lower. */
-const PAIR_TILT = 4;
-const PAIR_OVERLAP = 18;
-const PAIR_DROP = 20;
-
-/** The final two slide in from 60 pt either side, turning to their tilt, 150 ms apart. */
 /**
- * A pair card slides in from its side and settles into its tilt. The tilt itself
- * sits on the card inside, so this starts by undoing it and ends at none.
+ * The final two stand side by side, a gap apart, tilted -2 and 2 degrees, the left
+ * one a little lower. Each turns about its bottom edge, so the tops fan out into the
+ * gutters and the gap between them only widens upward: however tall an answer makes
+ * a card, the two never cover each other. The gap also holds the favorite's breath
+ * and its ring.
+ */
+const PAIR_TILT = 2;
+const PAIR_GAP = Space.sm;
+const PAIR_DROP = 12;
+/** Narrower than this, side by side, an answer wraps a word a line: the two stack instead. */
+const PAIR_MIN_WIDTH = 150;
+const PAIR_STACK_GAP = Space.lg;
+
+/**
+ * A pair card slides in from 60 pt at its side and settles into its tilt, 150 ms
+ * apart. The tilt itself sits on the card inside, so this starts by undoing it and
+ * ends at none.
  */
 function pairIn(side: -1 | 1) {
   return webSafeKeyframe(
@@ -227,21 +236,27 @@ export function AnswerCarousel({
   }
 
   if (pair && cards.length === 2) {
-    // Both in view at once: no track to swipe.
-    const pairWidth = Math.min(width, Math.floor((pageWidth - 2 * Gutter + PAIR_OVERLAP) / 2));
+    // Both in view at once: no track to swipe. Two equal cards with the gap between
+    // them, or, where two would be too narrow to read, one above the other.
+    const sideBySide = Math.min(width, Math.floor((pageWidth - 2 * Gutter - PAIR_GAP) / 2));
+    const stacked = sideBySide < PAIR_MIN_WIDTH;
+    const pairWidth = stacked ? width : sideBySide;
     return (
-      <View style={styles.pair}>
+      <View style={stacked ? styles.pairStacked : styles.pair}>
         {cards.map(({ contestant, seat, developed }, index) => (
           <Animated.View
             key={contestant.id}
             entering={reduced ? undefined : index === 0 ? leftIn : rightIn}
             style={{
-              marginLeft: index === 0 ? 0 : -PAIR_OVERLAP,
-              marginTop: index === 0 ? PAIR_DROP : 0,
+              marginTop: index === 0 && !stacked ? PAIR_DROP : 0,
               zIndex: contestant.id === markedId ? 1 : 0,
             }}>
             {/* The tilt lives here, apart from the entrance, so the entrance can't overwrite it. */}
-            <View style={{ transform: [{ rotate: `${index === 0 ? -PAIR_TILT : PAIR_TILT}deg` }] }}>
+            <View
+              style={{
+                transform: [{ rotate: `${index === 0 ? -PAIR_TILT : PAIR_TILT}deg` }],
+                transformOrigin: 'bottom',
+              }}>
               <AnswerCard
                 contestant={contestant}
                 seat={seat}
@@ -416,6 +431,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-start',
+    gap: PAIR_GAP,
+    paddingHorizontal: Gutter,
+    paddingVertical: RING + 4,
+  },
+  pairStacked: {
+    alignItems: 'center',
+    gap: PAIR_STACK_GAP,
     paddingHorizontal: Gutter,
     paddingVertical: RING + 4,
   },

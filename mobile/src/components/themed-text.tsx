@@ -80,7 +80,8 @@ const styles = StyleSheet.create({
     ...serif,
     fontWeight: 300,
     fontSize: 112,
-    lineHeight: 100,
+    // Room for New York's ascent: at 100 iOS cut off the top of the digits.
+    lineHeight: 128,
     letterSpacing: -3.36,
     fontVariant: ['lining-nums', 'tabular-nums'],
   },

@@ -103,6 +103,7 @@ export function RoomFooter(props: RoomFooterProps) {
       );
     case 'keep': {
       // The final pick: keep one, the other balloon pops. No hold here: the choice is the moment.
+      // Both buttons look alike, so neither reads as the one the app wants you to keep.
       const [a, b] = props.up;
       return (
         <Animated.View entering={reduced ? popButtonFade : popButtonIn} style={styles.popFooter}>
@@ -114,6 +115,7 @@ export function RoomFooter(props: RoomFooterProps) {
           <View style={styles.keepRow}>
             <View style={styles.flex}>
               <Button
+                variant="tinted"
                 title={t('game.keep', { name: a.name })}
                 accessibilityHint={t('game.popsHint', { name: b.name })}
                 onPress={() => props.onPop(b)}
