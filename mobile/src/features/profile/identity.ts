@@ -62,8 +62,9 @@ export function identityOf(profile: Pick<Profile, 'gender' | 'genderIdentity'>):
   return isIdentity(profile.genderIdentity) ? profile.genderIdentity : profile.gender;
 }
 
-function key(prefix: string, value: string) {
-  return `profile.${prefix}${value[0].toUpperCase()}${value.slice(1)}`;
+/** `key('identity', 'transWoman')` is `'profile.identityTransWoman'`, typed so a missing string fails to compile. */
+function key<P extends string, V extends string>(prefix: P, value: V) {
+  return `profile.${prefix}${value[0].toUpperCase()}${value.slice(1)}` as `profile.${P}${Capitalize<V>}`;
 }
 
 export function identityLabel(t: Translate, identity: Identity) {

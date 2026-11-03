@@ -5,14 +5,11 @@ import type { Doc } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { fail } from './lib/errors';
+import { MAX_PHOTOS, MAX_PINNED_ANSWERS, MIN_PHOTOS } from './lib/game';
 import { ageFromBirthDate, getProfile, photoUrls } from './lib/people';
 import { rateLimit } from './lib/rateLimit';
 import { claimImage, deleteImage } from './lib/uploads';
 import { gender, interest } from './schema';
-
-const MIN_PHOTOS = 4;
-const MAX_PHOTOS = 6;
-const MAX_PINNED = 3;
 
 /**
  * Your profile in the `Profile` shape, plus `photoIds`: the app keeps those to
@@ -110,10 +107,10 @@ export const saveProfile = mutation({
       fail('Enter a height between 100 and 250 cm.');
     }
     const pins = args.pinnedAnswers ?? [];
-    if (pins.length > MAX_PINNED) fail(`Pin up to ${MAX_PINNED} answers.`);
+    if (pins.length > MAX_PINNED_ANSWERS) fail(`Pin up to ${MAX_PINNED_ANSWERS} answers.`);
     const count = args.photos.length;
     if (count < MIN_PHOTOS || count > MAX_PHOTOS || new Set(args.photos).size !== count) {
-      fail('A profile needs 4 to 6 photos.');
+      fail(`A profile needs ${MIN_PHOTOS} to ${MAX_PHOTOS} photos.`);
     }
     for (const photo of args.photos) await claimImage(ctx, userId, photo);
 

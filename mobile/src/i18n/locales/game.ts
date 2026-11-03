@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const game: Strings = {
+export const game = {
   en: {
     loadingRoom: 'Loading the room',
     roomGone: "This room doesn't exist anymore.",
@@ -93,7 +93,7 @@ export const game: Strings = {
     stayWatch: 'Stay and watch',
     endedEarly: 'The room ended early',
     noMatch: 'No match this time.',
-    chooserLeft: '{{name}} left the room.',
+    chooserLeft: '%{name} left the room.',
     chooserLeftBody:
       "No chooser, no game. Nobody's balloon popped and this room won't count. Get back in line for the next one.",
     holderLeavesNote: 'If a holder leaves instead, their balloon pops and the room goes on.',
@@ -205,7 +205,7 @@ export const game: Strings = {
     stayWatch: 'Bleiben und zuschauen',
     endedEarly: 'Der Raum wurde vorzeitig beendet',
     noMatch: 'Diesmal kein Match.',
-    chooserLeft: '{{name}} hat den Raum verlassen.',
+    chooserLeft: '%{name} hat den Raum verlassen.',
     chooserLeftBody:
       'Ohne Wählende kein Spiel. Kein Ballon ist geplatzt, und dieser Raum zählt nicht. Stell dich für den nächsten wieder an.',
     holderLeavesNote: 'Geht stattdessen jemand mit Ballon, platzt dessen Ballon und der Raum geht weiter.',
@@ -320,7 +320,7 @@ export const game: Strings = {
     stayWatch: 'Rester et regarder',
     endedEarly: "La salle s'est terminée plus tôt",
     noMatch: 'Pas de match cette fois.',
-    chooserLeft: '{{name}} a quitté la salle.',
+    chooserLeft: '%{name} a quitté la salle.',
     chooserLeftBody:
       "Pas de personne qui choisit, pas de partie. Aucun ballon n'a éclaté et cette salle ne compte pas. Reprends ta place dans la file pour la prochaine.",
     holderLeavesNote: "Si quelqu'un avec un ballon part, son ballon éclate et la salle continue.",
@@ -435,7 +435,7 @@ export const game: Strings = {
     stayWatch: 'Resta a guardare',
     endedEarly: 'La stanza è finita in anticipo',
     noMatch: 'Nessun match stavolta.',
-    chooserLeft: '{{name}} ha lasciato la stanza.',
+    chooserLeft: '%{name} ha lasciato la stanza.',
     chooserLeftBody:
       'Senza chi sceglie, niente partita. Non è scoppiato nessun palloncino e questa stanza non conta. Rimettiti in coda per la prossima.',
     holderLeavesNote: 'Se invece esce qualcuno con un palloncino, il suo palloncino scoppia e la stanza continua.',
@@ -456,4 +456,4 @@ export const game: Strings = {
     roomSlowTitle: 'Stanza non raggiungibile',
     roomSlowBody: 'Controlla la connessione e riprova. Se la stanza è finita, puoi tornare alla home.',
   },
-};
+} satisfies Strings;

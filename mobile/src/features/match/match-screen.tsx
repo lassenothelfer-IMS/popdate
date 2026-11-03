@@ -19,6 +19,7 @@ import { useRoom } from '@/hooks/use-server';
 import { seatAt, seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
+import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
@@ -68,9 +69,14 @@ const titleIn = webSafeKeyframe(
     .delay(1300),
 );
 
+/** The counts that have a word: `match.n0` to `match.n10`. */
+type Spelled = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
 /** Counts up to ten are spelled out, as in "Out of five people"; past that, digits. */
 function numberWord(t: Translate, value: number) {
-  return Number.isInteger(value) && value >= 0 && value <= 10 ? t(`match.n${value}`) : String(value);
+  return Number.isInteger(value) && value >= 0 && value <= 10
+    ? t(`match.n${value as Spelled}`)
+    : String(value);
 }
 
 export function MatchScreen({ matchId }: { matchId: string }) {
@@ -132,6 +138,10 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
   // Opened again from Home, the screen is simply there.
   const fresh = role !== null;
   const animate = fresh && !reduced;
+
+  useEffect(() => {
+    track('match_opened');
+  }, [match.id]);
 
   useEffect(() => {
     if (!fresh || celebrated.current) return;

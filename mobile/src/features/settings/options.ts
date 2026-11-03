@@ -21,7 +21,7 @@ export function languageName(language: LanguageSetting, t: Translate) {
 /** A region's name in the app's language; one outside the list reads as "Other". */
 export function regionName(code: string, t: Translate) {
   return (REGIONS as readonly string[]).includes(code)
-    ? t(`settings.region${code}`)
+    ? t(`settings.region${code as (typeof REGIONS)[number]}`)
     : t('settings.regionOther');
 }
 

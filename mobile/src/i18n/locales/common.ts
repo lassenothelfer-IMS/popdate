@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Words every area uses. English is the source. */
-export const common: Strings = {
+export const common = {
   en: {
     back: 'Back',
     continue: 'Continue',
@@ -23,6 +23,8 @@ export const common: Strings = {
     signInFailedTitle: "Couldn't connect",
     signInFailedBody: 'Popdate could not reach the server. Check your connection and try again.',
     photoUnavailable: "Can't load photo",
+    errorScreenTitle: 'Something broke',
+    errorScreenBody: "Popdate ran into a problem it didn't expect. Try again to carry on.",
   },
   de: {
     back: 'Zurück',
@@ -45,6 +47,8 @@ export const common: Strings = {
     signInFailedTitle: 'Keine Verbindung',
     signInFailedBody: 'Popdate erreicht den Server nicht. Prüf deine Verbindung und versuch es nochmals.',
     photoUnavailable: 'Foto lässt sich nicht laden',
+    errorScreenTitle: 'Etwas ist kaputtgegangen',
+    errorScreenBody: 'Popdate ist auf ein unerwartetes Problem gestossen. Versuch es nochmals, um weiterzumachen.',
   },
   fr: {
     back: 'Retour',
@@ -67,6 +71,8 @@ export const common: Strings = {
     signInFailedTitle: 'Connexion impossible',
     signInFailedBody: 'Popdate n’arrive pas à joindre le serveur. Vérifie ta connexion et réessaie.',
     photoUnavailable: 'Photo impossible à charger',
+    errorScreenTitle: 'Quelque chose a cassé',
+    errorScreenBody: 'Popdate a rencontré un problème inattendu. Réessaie pour continuer.',
   },
   it: {
     back: 'Indietro',
@@ -89,5 +95,7 @@ export const common: Strings = {
     signInFailedTitle: 'Connessione non riuscita',
     signInFailedBody: 'Popdate non riesce a raggiungere il server. Controlla la connessione e riprova.',
     photoUnavailable: 'Impossibile caricare la foto',
+    errorScreenTitle: 'Qualcosa si è rotto',
+    errorScreenBody: 'Popdate ha incontrato un problema imprevisto. Riprova per continuare.',
   },
-};
+} satisfies Strings;

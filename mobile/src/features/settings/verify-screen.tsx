@@ -24,7 +24,7 @@ import { MinTouch, Radius, Space } from '@/constants/theme';
 import { goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { haptics } from '@/utils/haptics';
 
 const POLL_MS = 2000;
@@ -33,7 +33,7 @@ const isWeb = Platform.OS === 'web';
 
 const STATUS: Record<
   VerificationStatus,
-  { label: string; body: string | null; color: 'text' | 'success' | 'danger' }
+  { label: TranslationKey; body: TranslationKey | null; color: 'text' | 'success' | 'danger' }
 > = {
   none: { label: 'settings.statusNone', body: null, color: 'text' },
   pending: { label: 'settings.statusPending', body: 'settings.verifyPendingBody', color: 'text' },

@@ -15,7 +15,7 @@ import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
 
 /** How long you hold before the pop goes out. */
-const HOLD_MS = 2200;
+const HOLD_MS = 1000;
 /** Letting go early drains the fill. */
 const DRAIN_MS = 300;
 const HEIGHT = 52;
@@ -36,7 +36,7 @@ type HoldToPopButtonProps = {
 
 /**
  * The chooser's pop, right on the coral button: hold it and a lighter coral fills
- * the capsule over 2.2 s. Let go before it is full and it drains, nothing happens.
+ * the capsule over 1 s. Let go before it is full and it drains, nothing happens.
  * At full the pop goes out and the burst plays in the room. VoiceOver and TalkBack
  * pop with one activate action, a double-tap.
  */

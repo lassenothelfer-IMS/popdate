@@ -9,8 +9,8 @@ import { Ease, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme'
 import { announce } from '@/features/game/announce';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { MAX_ANSWER_LENGTH } from '@/shared/limits';
 
-const MAX_ANSWER_LENGTH = 280;
 /** Show how much room is left once the answer gets close to the limit. */
 const COUNTER_FROM = 240;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */

@@ -25,15 +25,15 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-## Get a fresh project
-
-When you're ready, run:
+## Checks
 
 ```bash
-npm run reset-project
+npm run typecheck   # TypeScript, no dev server needed
+npx expo lint       # ESLint
+npm test            # app unit tests and the Convex backend tests
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+CI runs the same three on every pull request (`.github/workflows/ci.yml`).
 
 ### Other setup steps
 

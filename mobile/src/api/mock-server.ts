@@ -27,7 +27,21 @@ import type {
   RoomPlayer,
   RoomStatus,
 } from '@/api/types';
-import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
+import { DEFAULT_SETTINGS } from '@/shared/settings';
+import {
+  ANSWER_GRACE_MS,
+  ANSWER_MS,
+  LOBBY_SIZE,
+  MAX_ANSWER_LENGTH,
+  MAX_MESSAGE_LENGTH,
+  MAX_PHOTOS,
+  MIN_PHOTOS,
+  PICK_MS,
+  POP_LIMIT_MS,
+  POP_REMINDER_MS,
+  QUESTION_OPTIONS_PER_ROUND,
+  SECOND_CHANCE_MS,
+} from '@/shared/limits';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { maskProfanity } from '@/utils/profanity';
@@ -45,25 +59,11 @@ const messagesKey = (matchId: string) => `popdate.mockMessages.${matchId}`;
 const HISTORY_LIMIT = 50;
 /** How many messages of each chat the mock keeps, newest last. */
 const MESSAGES_LIMIT = 200;
-/** A runner-up can get a second chance this long after the room ends, like on the server. */
-const SECOND_CHANCE_MS = 7 * 24 * 60 * 60_000;
-/** The server still takes an answer this long after the deadline, for slow connections. */
-const ANSWER_GRACE_MS = 3_000;
-
-const LOBBY_SIZE = 6;
 
 /** A bot's side for someone who wants to meet `interest`: either one for everyone. */
 function sideFor(interest: Interest): Gender {
   return interest === 'everyone' ? pickRandom<Gender>(['woman', 'man']) : interest;
 }
-const ANSWER_MS = 60_000;
-const POP_REMINDER_MS = 30_000;
-/** The popper's time to pick a question before one is picked for them. */
-const PICK_MS = 30_000;
-/** After the reminder, the time until a random balloon pops so the room never stalls. */
-const POP_LIMIT_MS = 30_000;
-const QUESTION_OPTIONS_PER_ROUND = 5;
-
 const QUESTIONS: Question[] = [
   'What would your friends say is your worst habit?',
   "What's the most spontaneous thing you've ever done?",
@@ -259,17 +259,6 @@ const BOT_NAMES: Record<Gender, string[]> = {
 };
 
 export type MockRole = 'random' | 'popper' | 'contestant';
-
-const MAX_MESSAGE_LENGTH = 1000;
-
-const DEFAULT_SETTINGS: Settings = {
-  language: 'system',
-  region: null,
-  units: 'metric',
-  appearance: 'dark',
-  commentFilter: true,
-  notifications: { roomLive: true, newMatch: true, messages: true },
-};
 
 const BOT_REPLIES = [
   'Haha, okay that answer of yours won me over.',
@@ -559,7 +548,9 @@ class MockServer implements PopdateApi {
       Date.now() <= room.answerDeadline + ANSWER_GRACE_MS;
     if (room.status !== 'answering' && !justLate) throw new Error('Answer time is over.');
     if (seat.answers.has(room.round)) throw new Error('You already answered.');
-    if (!answer || answer.length > 280) throw new Error('Answers are 1 to 280 characters.');
+    if (!answer || answer.length > MAX_ANSWER_LENGTH) {
+      throw new Error(`Answers are 1 to ${MAX_ANSWER_LENGTH} characters.`);
+    }
     seat.answers.set(room.round, maskProfanity(answer));
     this.emit(room);
     this.endAnsweringIfEveryoneAnswered(room);

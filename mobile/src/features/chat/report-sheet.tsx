@@ -10,11 +10,11 @@ import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { haptics } from '@/utils/haptics';
 
 /** The reasons in the order the sheet lists them (R01 in the handoff). */
-export const REPORT_REASONS: { reason: ReportReason; key: string }[] = [
+export const REPORT_REASONS: { reason: ReportReason; key: TranslationKey }[] = [
   { reason: 'fake', key: 'chat.reasonFake' },
   { reason: 'harassment', key: 'chat.reasonHarassment' },
   { reason: 'inappropriate', key: 'chat.reasonInappropriate' },

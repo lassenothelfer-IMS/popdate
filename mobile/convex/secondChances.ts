@@ -5,12 +5,10 @@ import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { fail } from './lib/errors';
+import { SECOND_CHANCE_MS } from './lib/game';
 import { getProfile, isBlockedEitherWay, personCard } from './lib/people';
 import { seatsOf } from './lib/room';
 import { schedulePush } from './push';
-
-/** A runner-up can get a second chance this long after the room ends. */
-const WINDOW_MS = 7 * 24 * 60 * 60_000;
 
 /** The contestant popped last in a room that ended in a match: the one who almost made it. */
 async function runnerUpOf(ctx: QueryCtx, room: Doc<'rooms'>) {
@@ -31,7 +29,7 @@ export const list = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const since = Date.now() - WINDOW_MS;
+    const since = Date.now() - SECOND_CHANCE_MS;
     const out = [];
 
     const myRooms = await ctx.db
@@ -86,7 +84,7 @@ export const send = mutation({
     const id = ctx.db.normalizeId('rooms', roomId);
     const room = id ? await ctx.db.get(id) : null;
     if (!room || room.popperId !== userId) fail('Only the chooser can send a second chance.');
-    if ((room.endedAt ?? room.createdAt) < Date.now() - WINDOW_MS) fail('That second chance has passed.');
+    if ((room.endedAt ?? room.createdAt) < Date.now() - SECOND_CHANCE_MS) fail('That second chance has passed.');
     const runnerUp = await runnerUpOf(ctx, room);
     if (!runnerUp || (runnerUp.userId as string) !== toUser) fail('That person was not your runner-up.');
     if (await isBlockedEitherWay(ctx, userId, runnerUp.userId)) fail("You can't send this one.");
@@ -121,7 +119,7 @@ export const answer = mutation({
     const row = rowId ? await ctx.db.get(rowId) : null;
     if (!row || row.toId !== userId || row.status !== 'sent') fail('That second chance is no longer open.');
     // Same window and blocks as `list`: an expired or blocked one is gone.
-    if (row.createdAt < Date.now() - WINDOW_MS) fail('That second chance has passed.');
+    if (row.createdAt < Date.now() - SECOND_CHANCE_MS) fail('That second chance has passed.');
     if (await isBlockedEitherWay(ctx, userId, row.fromId)) fail('That second chance is no longer open.');
     await ctx.db.patch(row._id, { status: accept ? 'accepted' : 'declined' });
     if (!accept) return null;

@@ -34,6 +34,7 @@ import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useFilterText, useSettings } from '@/state/settings';
+import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 
 /** The seed's pieces are always these, so the first open knows to rise them in before the room loads. */
@@ -246,7 +247,11 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   function send(text: string) {
     // Your own message always scrolls into view, even if you were reading further up.
     nearEnd.current = true;
-    return api.sendMessage(match.id, text);
+    const first = !messages?.some((message) => message.senderId === myId);
+    return api.sendMessage(match.id, text).then((sent) => {
+      if (first) track('first_message_sent');
+      return sent;
+    });
   }
 
   function openOptions() {

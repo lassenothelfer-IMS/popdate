@@ -21,7 +21,7 @@ import {
   showNotice,
   SwitchRow,
 } from '@/features/settings/settings-ui';
-import { deviceRegion, useT } from '@/i18n';
+import { deviceRegion, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
@@ -35,7 +35,7 @@ type NotificationKey = keyof Settings['notifications'];
 
 const isWeb = Platform.OS === 'web';
 
-const STATUS_KEYS: Record<VerificationStatus, string> = {
+const STATUS_KEYS: Record<VerificationStatus, TranslationKey> = {
   none: 'settings.statusNone',
   pending: 'settings.statusPending',
   verified: 'settings.statusVerified',

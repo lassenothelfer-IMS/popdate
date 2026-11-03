@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Balloon } from '@/components/balloon';
+import { Balloon, PoppedMark } from '@/components/balloon';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Fonts } from '@/constants/theme';
@@ -129,28 +129,23 @@ export function RoundsArt() {
   );
 }
 
-/** Four popped balloons that went soft, and the one left over: "Mia chose you." */
+/** The four popped seats, and the one balloon left over: "Mia chose you." */
 export function LastArt() {
-  const theme = useTheme();
   const seats = useSeats();
   const t = useT();
-  const deflated = [-20, 12, -8, 22];
   return (
     <ArtCard>
       <ThemedText type="kicker" style={styles.roomKicker}>
         {t('onboarding.lastKicker')}
       </ThemedText>
       <View style={styles.deflated}>
-        {deflated.map((angle, i) => (
-          <View key={angle} style={{ opacity: 0.22, transform: [{ scaleY: 0.45 }, { rotate: `${angle}deg` }] }}>
-            <Balloon color={seatAt(seats, i).color} size={22} />
-          </View>
+        {HOLDERS.map((name, i) => (
+          <PoppedMark key={name} color={seatAt(seats, i).color} size={22} />
         ))}
       </View>
       <View style={styles.lastBalloon}>
         <Balloon color={BrandBalloon.color} size={120} />
       </View>
-      <View style={[styles.lastString, { backgroundColor: theme.text }]} />
       <ThemedText style={[styles.lastLine, { fontFamily: Fonts.serif }]}>
         {t('onboarding.lastLine')}
       </ThemedText>
@@ -281,19 +276,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 14,
   },
+  // Centered between the kicker and the two-line sentence, with no string below.
   lastBalloon: {
     position: 'absolute',
     right: 40,
-    top: 52,
-  },
-  lastString: {
-    position: 'absolute',
-    right: 94,
-    top: 200,
-    width: 2,
-    height: 70,
-    transform: [{ rotate: '5deg' }],
-    transformOrigin: 'top',
+    top: 56,
   },
   lastLine: {
     position: 'absolute',

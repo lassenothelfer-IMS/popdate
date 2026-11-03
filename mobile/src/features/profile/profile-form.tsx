@@ -25,17 +25,21 @@ import { Section } from '@/components/section';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Gutter, MaxContentWidth, MinTouch, PhotoGlass, Radius, Velvet } from '@/constants/theme';
+import { useChoice } from '@/features/chat/prompts';
 import { asSexuality, type Sexuality } from '@/features/profile/identity';
 import { keepPickedPhoto, livePhoto } from '@/features/profile/photo-files';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
-import { useT, type Translate } from '@/i18n';
+import { useT, type Translate, type TranslationKey } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { readJson, writeJson } from '@/utils/device-store';
+import { haptics } from '@/utils/haptics';
 import { cmToFeetInches, feetInchesToCm, formatHeight } from '@/utils/units';
 
 /** Slots in the grid. Four photos are enough to play; the last two are optional. */
 export const PHOTO_COUNT = MAX_PHOTOS;
+/** One photo per round, in order. Photos past these are extras no round reveals. */
+const ROUND_PHOTOS = MIN_PHOTOS;
 /** The grid: three columns of 108 pt rows, 10 apart; the lead photo spans two by two. */
 const GRID_GAP = 10;
 const ROW_HEIGHT = 108;
@@ -49,7 +53,7 @@ const BIO_MAX = 300;
 type SlotSize = { width: number; height: number };
 type Detail = 'name' | 'city' | 'height' | 'job' | 'bio';
 
-const ADD_DETAIL: Record<Detail, string> = {
+const ADD_DETAIL: Record<Detail, TranslationKey> = {
   name: 'profile.addName',
   city: 'profile.addCity',
   height: 'profile.addHeight',
@@ -388,6 +392,23 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     convexServer?.forgetPhotos(next);
   }
 
+  /**
+   * Moves a photo to another place in the order. Its upload is keyed by its file, so nothing restarts.
+   * From the current list, since the menu that asks for it waits while photos may still arrive.
+   */
+  function movePhoto(from: number, to: number) {
+    if (from === to || to < 0 || to >= photos.length) return;
+    touched.current = true;
+    setPhotoError(null);
+    setPhotos((current) => {
+      if (from >= current.length || to >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+
   function changeHeight(part: 'cm' | 'feet' | 'inches', value: string) {
     touched.current = true;
     setTypedHeight({ ...height, [part]: digitsOnly(value) });
@@ -400,6 +421,7 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     picking,
     photoError,
     removePhoto,
+    movePhoto,
     name,
     setName: touching(setName),
     city,
@@ -449,6 +471,18 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
   // you on the neutral tile instead).
   const tone = youSeat(seats);
   const { photos } = form;
+  const { choose, sheet } = useChoice();
+
+  /** The menu for one photo: the moves that make sense from where it is. */
+  async function arrange(index: number) {
+    const moves = photoMoves(index, photos.length);
+    if (moves.length === 0) return;
+    const picked = await choose({
+      title: t('profile.photoMenuTitle', { position: index + 1 }),
+      choices: moves.map((move) => ({ label: t(MOVE_LABEL[move.name]) })),
+    });
+    if (picked !== null) form.movePhoto(index, moves[picked].to);
+  }
 
   function slot(index: number) {
     return (
@@ -457,12 +491,19 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
         index={index}
         size={index === 0 ? leadSize : smallSize}
         uri={photos[index]}
+        count={photos.length}
         isNext={index === photos.length}
         busy={form.picking}
         name={form.name.trim()}
         tone={tone}
         onAdd={form.addPhotos}
         onRemove={() => form.removePhoto(index)}
+        onArrange={() => void arrange(index)}
+        onMove={(to) => {
+          // The menu already ticks when you pick; VoiceOver's actions skip it, so they tick here.
+          haptics.light();
+          form.movePhoto(index, to);
+        }}
       />
     );
   }
@@ -483,7 +524,13 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
         {slot(4)}
         {slot(5)}
       </View>
+      {photos.length > 1 ? (
+        <ThemedText type="footnote" themeColor="textSecondary">
+          {t('profile.reorderHint')}
+        </ThemedText>
+      ) : null}
       {form.photoError ? <ErrorLine message={form.photoError} /> : null}
+      {sheet}
     </View>
   );
   if (bare) return grid;
@@ -498,8 +545,30 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
   );
 }
 
+type MoveName = 'makeFirst' | 'moveEarlier' | 'moveLater';
+
+const MOVE_LABEL: Record<MoveName, TranslationKey> = {
+  makeFirst: 'profile.makeFirst',
+  moveEarlier: 'profile.moveEarlier',
+  moveLater: 'profile.moveLater',
+};
+
+/**
+ * Where the photo at `index` can go: to the front, one earlier, one later.
+ * Photo 2 only gets "Make first", which is the same as one earlier.
+ */
+function photoMoves(index: number, count: number): { name: MoveName; to: number }[] {
+  const moves: { name: MoveName; to: number }[] = [];
+  if (index >= 1) moves.push({ name: 'makeFirst', to: 0 });
+  if (index >= 2) moves.push({ name: 'moveEarlier', to: index - 1 });
+  if (index < count - 1) moves.push({ name: 'moveLater', to: index + 1 });
+  return moves;
+}
+
 type PhotoSlotProps = {
   index: number;
+  /** How many photos are in the grid, for the moves this one can make. */
+  count: number;
   /** Measured from the grid: one column by one row, or two by two for the lead. */
   size: SlotSize;
   uri: string | undefined;
@@ -512,43 +581,82 @@ type PhotoSlotProps = {
   tone: PhotoTone;
   onAdd: () => void;
   onRemove: () => void;
+  /** Opens the menu to move this photo: a tap or a long press. */
+  onArrange: () => void;
+  /** Moves it straight away, for VoiceOver's actions. */
+  onMove: (to: number) => void;
 };
 
 /** One slot of the photo grid: filled, the next one to add, or a quiet numbered placeholder. */
-function PhotoSlot({ index, size, uri, isNext, busy, name, tone, onAdd, onRemove }: PhotoSlotProps) {
+function PhotoSlot({
+  index,
+  count,
+  size,
+  uri,
+  isNext,
+  busy,
+  name,
+  tone,
+  onAdd,
+  onRemove,
+  onArrange,
+  onMove,
+}: PhotoSlotProps) {
   const t = useT();
   const theme = useTheme();
   const position = index + 1;
   const lead = index === 0;
 
   if (uri) {
+    const round = index < ROUND_PHOTOS ? index + 1 : null;
+    const moves = photoMoves(index, count);
     return (
       <View style={[styles.slot, size]}>
-        <Photo
-          uri={uri}
-          name={name}
-          tone={tone}
-          initialSize={lead ? 56 : 32}
-          style={StyleSheet.absoluteFill}
-          accessibilityLabel={t('profile.yourPhoto', { position })}
-        />
-        {/* The order is the point of this grid, so every photo wears its number. The
-            lead says which round sees it, on the text color; the rest on dark glass. */}
-        <View
-          style={[
-            styles.number,
-            lead ? styles.leadTag : styles.smallTag,
-            { backgroundColor: lead ? theme.inverse : TAG_GLASS },
-          ]}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants">
-          <ThemedText
-            type="captionStrong"
-            maxFontSizeMultiplier={1.2}
-            style={[styles.tagText, { color: lead ? theme.onInverse : Velvet.cream }]}>
-            {lead ? t('profile.roundTag', { round: 1 }) : position}
-          </ThemedText>
-        </View>
+        {/* The photo itself opens the menu to move it; VoiceOver gets the moves as actions. */}
+        <PressableScale
+          accessibilityRole={moves.length > 0 ? 'button' : 'image'}
+          accessibilityLabel={
+            round
+              ? t('profile.yourPhotoRound', { position, round })
+              : t('profile.yourPhotoExtra', { position })
+          }
+          accessibilityHint={moves.length > 0 ? t('profile.reorderA11yHint') : undefined}
+          accessibilityActions={moves.map((move) => ({ name: move.name, label: t(MOVE_LABEL[move.name]) }))}
+          onAccessibilityAction={(event) => {
+            const move = moves.find((option) => option.name === event.nativeEvent.actionName);
+            if (move) onMove(move.to);
+          }}
+          // A lone photo has nowhere to go: no menu, but no "dimmed" for VoiceOver either.
+          onPress={moves.length > 0 ? onArrange : undefined}
+          onLongPress={moves.length > 0 ? onArrange : undefined}
+          containerStyle={StyleSheet.absoluteFill}
+          style={StyleSheet.absoluteFill}>
+          <Photo
+            uri={uri}
+            name={name}
+            tone={tone}
+            initialSize={lead ? 56 : 32}
+            style={StyleSheet.absoluteFill}
+          />
+          {/* The order is the point of this grid, so every photo says which round sees it,
+              or that it's an extra. The lead on the text color; the rest on dark glass. */}
+          <View
+            style={[
+              styles.number,
+              lead ? styles.leadTag : styles.smallTag,
+              { backgroundColor: lead ? theme.inverse : TAG_GLASS },
+            ]}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
+            <ThemedText
+              type="captionStrong"
+              maxFontSizeMultiplier={1.2}
+              numberOfLines={1}
+              style={[styles.tagText, { color: lead ? theme.onInverse : Velvet.cream }]}>
+              {round ? t('profile.roundTag', { round }) : t('profile.extraTag')}
+            </ThemedText>
+          </View>
+        </PressableScale>
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={t('profile.removePhoto', { position })}

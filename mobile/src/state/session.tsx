@@ -2,6 +2,7 @@ import { createContext, use, useEffect, useState, type ReactNode } from 'react';
 
 import { api, type Gender, type Interest, type Profile, type ProfileDraft } from '@/api';
 import { removeUnusedPhotos } from '@/features/profile/photo-files';
+import { identify } from '@/utils/analytics';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { registerPushIfAllowed } from '@/utils/push';
 import { resetRoomsPlayed } from '@/utils/rooms-played';
@@ -82,7 +83,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         const { existing, saved } = await withTimeout(
           (async () => {
-            await api.signIn();
+            const userId = await api.signIn();
+            // Events from here on belong to this account. Only its id, nothing personal.
+            identify(userId);
             const existing = await api.getMyProfile();
             // Still mid-sign-up: pick up where you left off.
             const saved = existing ? null : await readJson<OnboardingAnswers>(ONBOARDING_KEY);
@@ -134,13 +137,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   async function endSession(action: () => Promise<void>) {
     await action();
+    identify(null);
     setProfile(null);
     setOnboarding(null);
     // Hints such as "Swipe through the five" belong to the account, not the phone.
     void resetRoomsPlayed();
     // Start a fresh session, so the welcome screen works as on a first launch.
     try {
-      await withTimeout(api.signIn(), SIGN_IN_TIMEOUT);
+      identify(await withTimeout(api.signIn(), SIGN_IN_TIMEOUT));
       void registerPushIfAllowed();
     } catch {
       // Signed out, but no new session: the app offers to try again.
