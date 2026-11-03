@@ -388,6 +388,16 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     convexServer?.forgetPhotos(next);
   }
 
+  /** Swaps a photo with the one before it: photo N shows in round N, so the order matters. */
+  function movePhotoEarlier(index: number) {
+    if (index < 1 || index >= photos.length) return;
+    touched.current = true;
+    setPhotoError(null);
+    const next = [...photos];
+    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    setPhotos(next);
+  }
+
   function changeHeight(part: 'cm' | 'feet' | 'inches', value: string) {
     touched.current = true;
     setTypedHeight({ ...height, [part]: digitsOnly(value) });
@@ -400,6 +410,7 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     picking,
     photoError,
     removePhoto,
+    movePhotoEarlier,
     name,
     setName: touching(setName),
     city,
@@ -463,6 +474,7 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
         tone={tone}
         onAdd={form.addPhotos}
         onRemove={() => form.removePhoto(index)}
+        onMoveEarlier={() => form.movePhotoEarlier(index)}
       />
     );
   }
@@ -512,10 +524,22 @@ type PhotoSlotProps = {
   tone: PhotoTone;
   onAdd: () => void;
   onRemove: () => void;
+  onMoveEarlier: () => void;
 };
 
 /** One slot of the photo grid: filled, the next one to add, or a quiet numbered placeholder. */
-function PhotoSlot({ index, size, uri, isNext, busy, name, tone, onAdd, onRemove }: PhotoSlotProps) {
+function PhotoSlot({
+  index,
+  size,
+  uri,
+  isNext,
+  busy,
+  name,
+  tone,
+  onAdd,
+  onRemove,
+  onMoveEarlier,
+}: PhotoSlotProps) {
   const t = useT();
   const theme = useTheme();
   const position = index + 1;
@@ -557,6 +581,16 @@ function PhotoSlot({ index, size, uri, isNext, busy, name, tone, onAdd, onRemove
           style={[styles.removeCircle, { backgroundColor: theme.field }]}>
           <Icon name="close" size={10} color={theme.text} />
         </PressableScale>
+        {lead ? null : (
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.movePhotoEarlier', { position })}
+            onPress={onMoveEarlier}
+            containerStyle={styles.moveTarget}
+            style={[styles.removeCircle, { backgroundColor: theme.field }]}>
+            <Icon name="back" size={10} color={theme.text} />
+          </PressableScale>
+        )}
       </View>
     );
   }
@@ -865,6 +899,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
+    width: MinTouch,
+    height: MinTouch,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moveTarget: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
     width: MinTouch,
     height: MinTouch,
     alignItems: 'center',
