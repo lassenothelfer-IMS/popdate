@@ -10,8 +10,7 @@ export const PICK_MS = 30_000;
 /** After the reminder, how long until a random balloon pops so the room never stalls. */
 export const POP_LIMIT_MS = 30_000;
 export const QUESTION_OPTIONS_PER_ROUND = 5;
-export const MAX_ANSWER_LENGTH = 280;
-export const MAX_MESSAGE_LENGTH = 1000;
+export { MAX_ANSWER_LENGTH, MAX_MESSAGE_LENGTH } from '../../src/api/defaults';
 
 /**
  * Players per room, popper included. 6 is the real game. Set `LOBBY_SIZE` on the

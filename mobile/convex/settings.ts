@@ -1,6 +1,7 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 
+import { DEFAULT_SETTINGS } from '../src/api/defaults';
 import type { Doc } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 import { requireUserId } from './lib/auth';
@@ -14,15 +15,6 @@ const settingsFields = {
   appearance: v.union(v.literal('system'), v.literal('light'), v.literal('dark')),
   commentFilter: v.boolean(),
   notifications: v.object({ roomLive: v.boolean(), newMatch: v.boolean(), messages: v.boolean() }),
-};
-
-const DEFAULT_SETTINGS = {
-  language: 'system' as const,
-  region: null,
-  units: 'metric' as const,
-  appearance: 'system' as const,
-  commentFilter: true,
-  notifications: { roomLive: true, newMatch: true, messages: true },
 };
 
 function settingsView(row: Doc<'settings'>) {

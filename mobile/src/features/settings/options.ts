@@ -1,5 +1,5 @@
 import type { LanguageSetting } from '@/api';
-import type { Translate } from '@/i18n';
+import type { Translate, TranslationKey } from '@/i18n';
 
 /** Each language is named in itself, so you can find yours whatever the app is set to. */
 export const LANGUAGES: { value: Exclude<LanguageSetting, 'system'>; name: string }[] = [
@@ -21,7 +21,7 @@ export function languageName(language: LanguageSetting, t: Translate) {
 /** A region's name in the app's language; one outside the list reads as "Other". */
 export function regionName(code: string, t: Translate) {
   return (REGIONS as readonly string[]).includes(code)
-    ? t(`settings.region${code}`)
+    ? t(`settings.region${code}` as TranslationKey)
     : t('settings.regionOther');
 }
 

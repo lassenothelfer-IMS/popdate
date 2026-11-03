@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
+import { MAX_ANSWER_LENGTH } from '@/api/defaults';
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
@@ -10,7 +11,6 @@ import { announce } from '@/features/game/announce';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 
-const MAX_ANSWER_LENGTH = 280;
 /** Show how much room is left once the answer gets close to the limit. */
 const COUNTER_FROM = 240;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */

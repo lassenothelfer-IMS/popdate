@@ -4,7 +4,7 @@ import type { Strings } from '@/i18n/types';
  * Strings for the match moment, in every supported language. English is the source.
  * `n0` to `n10` spell a count out, as in "Out of five people, over four rounds."
  */
-export const match: Strings = {
+export const match = {
   en: {
     recapLoading: 'Loading the recap',
     recapGone: 'This room is over and its recap is gone.',
@@ -177,4 +177,4 @@ export const match: Strings = {
     recapHowItWent: 'Com’è andata',
     recapPopped: 'Scoppiato: %{names}',
   },
-};
+} satisfies Strings;

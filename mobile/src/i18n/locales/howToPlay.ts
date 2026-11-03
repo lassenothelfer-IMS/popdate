@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const howToPlay: Strings = {
+export const howToPlay = {
   en: {
     title: 'How to play',
     stepLabel: 'Step %{number} of %{total}: %{text}',
@@ -50,4 +50,4 @@ export const howToPlay: Strings = {
       'Rispondi come sei. Prima contano le tue parole, poi arrivano le foto, un round alla volta.',
     gotIt: 'Ho capito',
   },
-};
+} satisfies Strings;

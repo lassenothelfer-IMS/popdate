@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const profile: Strings = {
+export const profile = {
   en: {
     title: 'Your profile',
     intro:
@@ -433,4 +433,4 @@ export const profile: Strings = {
     discard: 'Scarta',
     keepEditing: 'Continua a modificare',
   },
-};
+} satisfies Strings;

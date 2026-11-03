@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Platform, StyleSheet, TextInput, View } from 'react-native';
 
+import { MAX_MESSAGE_LENGTH } from '@/api/defaults';
 import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
@@ -9,7 +10,6 @@ import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
 /** The server turns longer messages away. */
-export const MAX_MESSAGE_LENGTH = 1000;
 /** Show how much room is left once the message gets close to the limit. */
 const COUNTER_FROM = 900;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */

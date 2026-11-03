@@ -27,14 +27,12 @@ import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
-import { useT, type Translate } from '@/i18n';
+import { useT, type Translate, type TranslationKey } from '@/i18n';
 import { haptics } from '@/utils/haptics';
 import { PushPrompt } from '@/features/home/push-prompt';
 import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
 
-/** One chooser and five balloons. While searching, the server sends the real number. */
-const ROOM_SIZE = 6;
 /** How long the role beat holds before the room appears. A tap skips it. */
 const ROLE_BEAT_MS = 1500;
 /** With a screen reader on, the beat holds long enough for the role line to be read out. */
@@ -83,7 +81,7 @@ const idleIn = FadeIn.duration(Motion.state)
 
 /** "five" for 5, in the app's language; digits past ten. */
 function numberWord(t: Translate, value: number) {
-  return value >= 0 && value <= 10 ? t(`queue.number${value}`) : String(value);
+  return value >= 0 && value <= 10 ? t(`queue.number${value}` as TranslationKey) : String(value);
 }
 
 function capitalized(text: string) {
@@ -159,8 +157,8 @@ export function QueueScreen() {
   // The same element in both states, so the seats that already landed stay put.
   return (
     <FillingRoom
-      found={status.state === 'searching' ? status.found : ROOM_SIZE}
-      needed={status.state === 'searching' ? status.needed : ROOM_SIZE}
+      found={status.state === 'searching' ? status.found : status.needed}
+      needed={status.needed}
       roomId={status.state === 'matched' ? status.roomId : null}
     />
   );

@@ -19,7 +19,7 @@ import { LOCALES, type Locale, type Strings } from '@/i18n/types';
  * Every area registers under its own namespace, so a key reads like
  * `t('game.pickQuestion')` and two areas never collide.
  */
-const AREAS: Record<string, Strings> = {
+const AREAS = {
   chat,
   common,
   game,
@@ -34,7 +34,12 @@ const AREAS: Record<string, Strings> = {
   you,
   almost,
   checkin,
-};
+} satisfies Record<string, Strings>;
+
+/** Every real key, from the English tables, so a typo in `t('...')` fails the type-check. */
+export type TranslationKey = {
+  [Area in keyof typeof AREAS]: `${Area}.${keyof (typeof AREAS)[Area]['en'] & string}`;
+}[keyof typeof AREAS];
 
 const i18n = new I18n();
 i18n.defaultLocale = 'en';
@@ -60,7 +65,7 @@ export function deviceRegion(): string | null {
   return getLocales()[0]?.regionCode ?? null;
 }
 
-export type Translate = (key: string, options?: TranslateOptions) => string;
+export type Translate = (key: TranslationKey, options?: TranslateOptions) => string;
 
 const LocaleContext = createContext<Locale>('en');
 
@@ -84,6 +89,6 @@ export function useT(): Translate {
 }
 
 /** Outside React (announcements in callbacks, the mock): translate in a given language. */
-export function translate(locale: Locale, key: string, options?: TranslateOptions) {
+export function translate(locale: Locale, key: TranslationKey, options?: TranslateOptions) {
   return i18n.t(key, { locale, ...options });
 }

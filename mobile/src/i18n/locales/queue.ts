@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const queue: Strings = {
+export const queue = {
   en: {
     seatsReady: '%{found} of %{needed} ready.',
     leaveLine: 'Leave line',
@@ -162,4 +162,4 @@ export const queue: Strings = {
     number9: 'nove',
     number10: 'dieci',
   },
-};
+} satisfies Strings;

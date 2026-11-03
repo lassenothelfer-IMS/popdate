@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const game: Strings = {
+export const game = {
   en: {
     loadingRoom: 'Loading the room',
     roomGone: "This room doesn't exist anymore.",
@@ -456,4 +456,4 @@ export const game: Strings = {
     roomSlowTitle: 'Stanza non raggiungibile',
     roomSlowBody: 'Controlla la connessione e riprova. Se la stanza è finita, puoi tornare alla home.',
   },
-};
+} satisfies Strings;

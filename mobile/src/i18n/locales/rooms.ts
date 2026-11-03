@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** The Rooms tab: your history, and pinning answers to your profile. */
-export const rooms: Strings = {
+export const rooms = {
   en: {
     title: 'Your rooms',
     summary: { one: '1 room played, %{wins}.', other: '%{count} rooms played, %{wins}.' },
@@ -110,10 +110,10 @@ export const rooms: Strings = {
     recapInProgress: 'In questa stanza si sta ancora giocando. Il riepilogo arriva quando finisce.',
     openChat: 'Scrivi a %{name}',
   },
-};
+} satisfies Strings;
 
 /** The You tab: your numbers and pinned answers. */
-export const you: Strings = {
+export const you = {
   en: {
     statRooms: { one: 'room', other: 'rooms' },
     statLastBalloon: { one: 'win', other: 'wins' },
@@ -146,10 +146,10 @@ export const you: Strings = {
     pinnedTitle: 'Le tue risposte',
     pinnedEmpty: 'Fissa le risposte delle tue stanze e appariranno qui per chi ti conosce.',
   },
-};
+} satisfies Strings;
 
 /** Second chances, in Matches. */
-export const almost: Strings = {
+export const almost = {
   en: {
     title: 'Almost',
     runnerUp: 'Your runner-up. One second chance?',
@@ -202,10 +202,10 @@ export const almost: Strings = {
     explain: 'L’ultimo palloncino che hai fatto scoppiare può avere una seconda chance, per una settimana.',
     failed: 'Non è andata. Riprova.',
   },
-};
+} satisfies Strings;
 
 /** The safety check-in before a date, in chat. */
-export const checkin: Strings = {
+export const checkin = {
   en: {
     title: 'Safety check-in',
     body: "Meeting %{name}? We'll check in on you, and you can tell a friend where you'll be.",
@@ -270,4 +270,4 @@ export const checkin: Strings = {
     noPermissionBody: 'Attivale nelle Impostazioni per ricevere il check-in.',
     failed: 'Impossibile impostare il check-in. Riprova.',
   },
-};
+} satisfies Strings;

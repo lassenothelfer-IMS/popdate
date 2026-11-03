@@ -27,6 +27,7 @@ import type {
   RoomPlayer,
   RoomStatus,
 } from '@/api/types';
+import { DEFAULT_SETTINGS, MAX_ANSWER_LENGTH, MAX_MESSAGE_LENGTH } from '@/api/defaults';
 import { MAX_PHOTOS, MIN_PHOTOS } from '@/api/types';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
@@ -260,17 +261,6 @@ const BOT_NAMES: Record<Gender, string[]> = {
 
 export type MockRole = 'random' | 'popper' | 'contestant';
 
-const MAX_MESSAGE_LENGTH = 1000;
-
-const DEFAULT_SETTINGS: Settings = {
-  language: 'system',
-  region: null,
-  units: 'metric',
-  appearance: 'dark',
-  commentFilter: true,
-  notifications: { roomLive: true, newMatch: true, messages: true },
-};
-
 const BOT_REPLIES = [
   'Haha, okay that answer of yours won me over.',
   'So, coffee or a walk by the lake?',
@@ -479,7 +469,7 @@ class MockServer implements PopdateApi {
       // Your room took the line, so only a few new people are waiting.
       this.lineWaiting = randomInt(1, 2);
       const room = this.createRoom();
-      this.setQueue({ state: 'matched', roomId: room.id });
+      this.setQueue({ state: 'matched', roomId: room.id, needed: LOBBY_SIZE });
     }, 700);
   }
 
@@ -559,7 +549,9 @@ class MockServer implements PopdateApi {
       Date.now() <= room.answerDeadline + ANSWER_GRACE_MS;
     if (room.status !== 'answering' && !justLate) throw new Error('Answer time is over.');
     if (seat.answers.has(room.round)) throw new Error('You already answered.');
-    if (!answer || answer.length > 280) throw new Error('Answers are 1 to 280 characters.');
+    if (!answer || answer.length > MAX_ANSWER_LENGTH) {
+      throw new Error(`Answers are 1 to ${MAX_ANSWER_LENGTH} characters.`);
+    }
     seat.answers.set(room.round, maskProfanity(answer));
     this.emit(room);
     this.endAnsweringIfEveryoneAnswered(room);

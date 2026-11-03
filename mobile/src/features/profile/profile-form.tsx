@@ -28,7 +28,7 @@ import { Fonts, Gutter, MaxContentWidth, MinTouch, PhotoGlass, Radius, Velvet } 
 import { asSexuality, type Sexuality } from '@/features/profile/identity';
 import { keepPickedPhoto, livePhoto } from '@/features/profile/photo-files';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
-import { useT, type Translate } from '@/i18n';
+import { useT, type Translate, type TranslationKey } from '@/i18n';
 import type { ProfileDetails } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { readJson, writeJson } from '@/utils/device-store';
@@ -49,7 +49,7 @@ const BIO_MAX = 300;
 type SlotSize = { width: number; height: number };
 type Detail = 'name' | 'city' | 'height' | 'job' | 'bio';
 
-const ADD_DETAIL: Record<Detail, string> = {
+const ADD_DETAIL: Record<Detail, TranslationKey> = {
   name: 'profile.addName',
   city: 'profile.addCity',
   height: 'profile.addHeight',

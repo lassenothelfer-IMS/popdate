@@ -151,7 +151,7 @@ export type Room = {
 export type QueueStatus =
   | { state: 'idle' }
   | { state: 'searching'; found: number; needed: number }
-  | { state: 'matched'; roomId: string };
+  | { state: 'matched'; roomId: string; needed: number };
 
 export type Match = {
   id: string;

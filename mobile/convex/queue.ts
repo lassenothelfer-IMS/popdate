@@ -52,9 +52,9 @@ export const status = query({
           .unique()
       : null;
     if (!mine) return { state: 'idle' as const };
-    if (mine.roomId) return { state: 'matched' as const, roomId: mine.roomId as string };
-
     const needed = lobbySize();
+    if (mine.roomId) return { state: 'matched' as const, roomId: mine.roomId as string, needed };
+
     const others = (await waitingPlayers(ctx)).filter((row) => row.userId !== userId);
     return { state: 'searching' as const, found: roomReach(mine, others, needed), needed };
   },

@@ -366,7 +366,7 @@ test('when the chooser leaves, contestants still in are popped in the round the 
 test('leaving the queue after a room formed keeps your seat and hands back the room', async () => {
   const { t, lena, roomId } = await startRoom();
   expect(await lena.as.mutation(api.queue.leaveQueue, {})).toBe(roomId);
-  expect(await lena.as.query(api.queue.status, {})).toEqual({ state: 'matched', roomId });
+  expect(await lena.as.query(api.queue.status, {})).toEqual({ state: 'matched', roomId, needed: 3 });
 
   const mia = await player(t, 'Mia', 'woman', 'man');
   await mia.as.mutation(api.queue.joinQueue, {});

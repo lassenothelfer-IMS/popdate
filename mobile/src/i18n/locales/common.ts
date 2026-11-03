@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Words every area uses. English is the source. */
-export const common: Strings = {
+export const common = {
   en: {
     back: 'Back',
     continue: 'Continue',
@@ -90,4 +90,4 @@ export const common: Strings = {
     signInFailedBody: 'Popdate non riesce a raggiungere il server. Controlla la connessione e riprova.',
     photoUnavailable: 'Impossibile caricare la foto',
   },
-};
+} satisfies Strings;

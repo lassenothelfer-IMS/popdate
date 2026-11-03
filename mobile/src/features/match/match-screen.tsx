@@ -17,7 +17,7 @@ import { PhotoCard } from '@/features/match/photo-card';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatAt, seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
-import { useT, type Translate } from '@/i18n';
+import { useT, type Translate, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
@@ -70,7 +70,7 @@ const titleIn = webSafeKeyframe(
 
 /** Counts up to ten are spelled out, as in "Out of five people"; past that, digits. */
 function numberWord(t: Translate, value: number) {
-  return Number.isInteger(value) && value >= 0 && value <= 10 ? t(`match.n${value}`) : String(value);
+  return Number.isInteger(value) && value >= 0 && value <= 10 ? t(`match.n${value}` as TranslationKey) : String(value);
 }
 
 export function MatchScreen({ matchId }: { matchId: string }) {

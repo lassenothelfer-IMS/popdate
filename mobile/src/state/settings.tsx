@@ -1,19 +1,11 @@
 import { createContext, use, useEffect, useState, type ReactNode } from 'react';
 
 import { api, type Settings } from '@/api';
+import { DEFAULT_SETTINGS } from '@/api/defaults';
 import { deviceLocale, deviceRegion, LocaleProvider } from '@/i18n';
 import type { Locale } from '@/i18n/types';
 import { useSession } from '@/state/session';
 import { maskProfanity } from '@/utils/profanity';
-
-export const DEFAULT_SETTINGS: Settings = {
-  language: 'system',
-  region: null,
-  units: 'metric',
-  appearance: 'dark',
-  commentFilter: true,
-  notifications: { roomLive: true, newMatch: true, messages: true },
-};
 
 type SettingsState = {
   settings: Settings;

@@ -1,5 +1,5 @@
 import type { Gender, Profile } from '@/api';
-import type { Translate } from '@/i18n';
+import type { Translate, TranslationKey } from '@/i18n';
 
 /**
  * The genders you can pick, in the order they're offered. The first three are
@@ -63,7 +63,7 @@ export function identityOf(profile: Pick<Profile, 'gender' | 'genderIdentity'>):
 }
 
 function key(prefix: string, value: string) {
-  return `profile.${prefix}${value[0].toUpperCase()}${value.slice(1)}`;
+  return `profile.${prefix}${value[0].toUpperCase()}${value.slice(1)}` as TranslationKey;
 }
 
 export function identityLabel(t: Translate, identity: Identity) {
