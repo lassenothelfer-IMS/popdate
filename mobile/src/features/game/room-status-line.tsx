@@ -8,6 +8,7 @@ import { questionIn } from '@/features/game/room-motion';
 import type { RoomStatusLine as Kind } from '@/features/game/room-phase';
 import { CANVAS_SPACING, TIGHT_SPACING } from '@/features/game/reveal-layout';
 import { useT } from '@/i18n';
+import { numberWord } from '@/utils/number-word';
 
 type RoomStatusLineProps = {
   kind: Kind;
@@ -52,7 +53,7 @@ export function RoomStatusLine(props: RoomStatusLineProps) {
           </ThemedText>
           {showHints && !props.popReminder && props.upCount > 2 ? (
             <ThemedText type="footnote" themeColor="textTertiary">
-              {t('game.swipeHint')}
+              {t('game.swipeHint', { people: numberWord(t, props.upCount) })}
             </ThemedText>
           ) : null}
         </View>
