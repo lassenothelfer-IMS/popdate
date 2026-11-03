@@ -434,6 +434,10 @@ class MockServer implements PopdateApi {
     this.timers.add(timer);
   }
 
+  async getServerTime() {
+    return Date.now();
+  }
+
   async signIn() {
     await this.restore();
     this.userId ??= `user-${randomId()}`;

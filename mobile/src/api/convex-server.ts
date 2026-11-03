@@ -189,6 +189,10 @@ export class ConvexServer implements PopdateApi {
 
   // Account
 
+  async getServerTime() {
+    return await this.mutation(api.users.serverTime, {});
+  }
+
   async signIn() {
     await this.waitForAuth((auth) => !auth.loading);
     if (this.auth.authenticated) {

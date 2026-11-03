@@ -481,6 +481,12 @@ test('a second chance can not be answered once it expired or after a block', asy
   ).rejects.toThrow('That second chance has passed.');
 });
 
+test('the server tells phones its time', async () => {
+  const t = convexTest(schema, modules);
+  vi.setSystemTime(1_800_000_000_000);
+  expect(await t.mutation(api.users.serverTime, {})).toBe(1_800_000_000_000);
+});
+
 test('signing out removes your push tokens', async () => {
   const { t, lena } = await startRoom();
   await t.run(async (ctx) => {

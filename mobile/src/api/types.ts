@@ -213,6 +213,8 @@ export type Message = {
 /** One method per server function in the root README. */
 export interface PopdateApi {
   signIn(): Promise<string>;
+  /** The server's clock in epoch milliseconds: deadlines are in its time, not the phone's. */
+  getServerTime(): Promise<number>;
   getMyProfile(): Promise<Profile | null>;
   saveProfile(draft: ProfileDraft): Promise<Profile>;
   /**

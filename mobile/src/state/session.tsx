@@ -4,6 +4,7 @@ import { api, type Gender, type Interest, type Profile, type ProfileDraft } from
 import { removeUnusedPhotos } from '@/features/profile/photo-files';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { registerPushIfAllowed } from '@/utils/push';
+import { syncServerClock } from '@/utils/server-clock';
 import { resetRoomsPlayed } from '@/utils/rooms-played';
 
 /** Onboarding's answers, kept until the profile is saved, so a relaunch picks up there. */
@@ -96,6 +97,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setReady(true);
         // Push already allowed: make sure this account gets them.
         void registerPushIfAllowed();
+        void syncServerClock();
       } catch {
         if (!cancelled) setFailed(true);
       }

@@ -9,6 +9,7 @@ import { Ease, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme'
 import { announce } from '@/features/game/announce';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { serverNow } from '@/utils/server-clock';
 
 const MAX_ANSWER_LENGTH = 280;
 /** Show how much room is left once the answer gets close to the limit. */
@@ -84,7 +85,7 @@ export function AnswerComposer({
   });
   useEffect(() => {
     if (deadline === null) return;
-    const timer = setTimeout(sendBeforeTimeUp, Math.max(0, deadline - Date.now() - AUTO_SEND_BEFORE));
+    const timer = setTimeout(sendBeforeTimeUp, Math.max(0, deadline - serverNow() - AUTO_SEND_BEFORE));
     return () => clearTimeout(timer);
   }, [deadline]);
 
