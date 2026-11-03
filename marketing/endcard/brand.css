@@ -1,0 +1,13 @@
+/* Popdate's "Evening salon" type, from mobile/src/constants/theme.ts. */
+@font-face { font-family: Gloock; src: url(fonts/Gloock_400Regular.ttf); font-weight: 400; }
+@font-face { font-family: HankenGrotesk; src: url(fonts/HankenGrotesk_400Regular.ttf); font-weight: 400; }
+@font-face { font-family: HankenGrotesk; src: url(fonts/HankenGrotesk_500Medium.ttf); font-weight: 500; }
+@font-face { font-family: HankenGrotesk; src: url(fonts/HankenGrotesk_600SemiBold.ttf); font-weight: 600; }
+
+:root {
+  --page: #141210;
+  --text: #F3EEE7;
+  --text-secondary: #B9B0A5;
+  --accent: #F0695C;
+  --accent-deep: #CF3A2F;
+}
