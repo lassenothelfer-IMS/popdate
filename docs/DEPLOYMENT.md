@@ -86,7 +86,8 @@ Done when: the production URL exists, auth works, and a test sign-in from a dev 
   - Individual account: quickest, but the App Store shows the Account Holder's own legal name as the seller, and the account can't be handed to someone else later.
   - Organisation account: shows a company name, can add and remove people as the team changes, and is better for a dating app. It needs a registered company (or association) with a D-U-N-S number, which takes days to weeks.
   - Paywall earnings (phase 0.2) are paid to the Account Holder's bank account, so decide how they're shared before the first sale.
-- [ ] **Move the EAS project off Elias's account.** `mobile/app.json` lists the Expo owner `elihhh` and project id `f4648c9d-c8ad-4a8e-8f14-b63942d3b618`. If that's Elias's account, he owns the builds and signing credentials. Either ask him to transfer the project to an Expo organization the team controls (expo.dev → project settings → Transfer), or create a new project under our own account with `npx eas-cli@latest init` and update `owner` and `extra.eas.projectId` in `app.json`. Then add the others in expo.dev.
+- [x] **EAS project on a team account.** Done 3 Nov 2026: the project is now `@goodn8s-team/popdate` (id `6d969a16-8f03-40b0-ab56-6b10f2695343`), owned by Lasse's Expo organization `goodn8s-team`, instead of Elias's account `elihhh`. Any builds or credentials made on the old project stay there; new ones are made on this one.
+- [ ] Invite Jonas, Kian and Kevin to the `goodn8s-team` organization on expo.dev (Account settings → Members). Whoever runs builds needs the Developer role or higher.
 - [ ] App Store Connect: create the app with bundle id **`com.popdate.app`** (already in `app.json`), SKU, and primary language.
 
 ### 2.2 Point the builds at Convex
