@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Popdate · Join the waitlist</title>
+<meta name="description" content="Popdate is the balloon dating game, live on your phone. One person chooses, five hold balloons, one pops every round. Join the waitlist.">
+<meta property="og:title" content="Popdate · Be the last balloon.">
+<meta property="og:description" content="The balloon dating game, live on your phone. Join the waitlist.">
+<meta property="og:image" content="/icon.png">
+<meta name="theme-color" content="#141210">
+<link rel="icon" href="/icon.png">
+<link rel="stylesheet" href="/styles.css">
+<script src="/config.js" defer></script>
+<script src="/countries.js" defer></script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <a class="brand" href="/" aria-label="Popdate">
+    <svg viewBox="-1 -2.5 28.5 29.5" aria-hidden="true">
+      <defs>
+        <radialGradient id="body" cx="0.36" cy="0.3" r="0.78"><stop offset="0" stop-color="#F27A6E"/><stop offset="0.55" stop-color="#E2483B"/><stop offset="1" stop-color="#A92A21"/></radialGradient>
+      </defs>
+      <path d="M10.4 23.6h3.2l-1.6 2.4z" fill="#A92A21"/>
+      <path d="M12 1.5C6.2 1.5 2.5 6 2.5 11.6c0 6.4 5 11.4 8.4 12.3h2.2c3.4-.9 8.4-5.9 8.4-12.3C21.5 6 17.8 1.5 12 1.5z" fill="url(#body)"/>
+      <ellipse cx="8.2" cy="7.6" rx="1.7" ry="3.1" fill="#FFFDFA" fill-opacity="0.42" transform="rotate(-22 8.2 7.6)"/>
+      <g stroke="#F27A6E" stroke-width="0.95" stroke-linecap="round">
+        <line x1="17.35" y1="0.94" x2="18.57" y2="-1.36"/><line x1="21.63" y1="4.01" x2="24.54" y2="1.89"/><line x1="23.23" y1="9.02" x2="25.79" y2="8.57"/>
+      </g>
+    </svg>
+    Popdate
+  </a>
+
+  <section class="hero">
+    <p class="kicker">Coming soon · 18+</p>
+    <h1>Be the last <em>balloon.</em></h1>
+    <p class="lead">The balloon dating game, live on your phone. Get one email when rooms open near you.</p>
+  </section>
+
+  <ol class="steps">
+    <li><b>1</b> One person chooses. Five people hold balloons.</li>
+    <li><b>2</b> Everyone answers the same question, and one more photo shows each round.</li>
+    <li><b>3</b> One balloon pops per round. The last one left is the match.</li>
+  </ol>
+
+  <form id="join" class="card" novalidate>
+    <div class="field">
+      <label class="label" for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" placeholder="you@example.com" required>
+    </div>
+
+    <fieldset class="choices field">
+      <legend class="label">Your phone</legend>
+      <label class="choice"><input type="radio" name="phone" value="iphone" required><span>iPhone</span></label>
+      <label class="choice"><input type="radio" name="phone" value="android"><span>Android</span></label>
+    </fieldset>
+
+    <fieldset class="choices field">
+      <legend class="label">I am a</legend>
+      <label class="choice"><input type="radio" name="gender" value="woman" required><span>Woman</span></label>
+      <label class="choice"><input type="radio" name="gender" value="man"><span>Man</span></label>
+    </fieldset>
+
+    <fieldset class="choices field">
+      <legend class="label">I want to meet</legend>
+      <label class="choice"><input type="radio" name="wantsToMeet" value="man" required><span>Men</span></label>
+      <label class="choice"><input type="radio" name="wantsToMeet" value="woman"><span>Women</span></label>
+    </fieldset>
+
+    <div class="row field">
+      <div class="field">
+        <label class="label" for="country">Country</label>
+        <select id="country" name="country" autocomplete="country" required></select>
+      </div>
+      <div class="field">
+        <label class="label" for="city">City</label>
+        <input id="city" name="city" type="text" autocomplete="address-level2" maxlength="60" placeholder="Zurich" required>
+      </div>
+    </div>
+
+    <div class="honey" aria-hidden="true">
+      <label for="website">Leave this empty</label>
+      <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+    </div>
+
+    <label class="check"><input type="checkbox" name="adult" required> I'm 18 or older.</label>
+    <label class="check"><input type="checkbox" name="consent" required> <span>Email me when Popdate launches. I can unsubscribe anytime. See the <a href="/privacy">privacy policy</a>.</span></label>
+
+    <button class="primary" type="submit">Join the waitlist</button>
+    <p class="error" id="error" role="alert" aria-live="polite"></p>
+  </form>
+
+  <section class="card done" id="done" hidden tabindex="-1">
+    <div class="pop" aria-hidden="true">
+      <svg class="balloon" viewBox="0 0 24 27"><path d="M10.4 23.6h3.2l-1.6 2.4z" fill="#A92A21"/><path d="M12 1.5C6.2 1.5 2.5 6 2.5 11.6c0 6.4 5 11.4 8.4 12.3h2.2c3.4-.9 8.4-5.9 8.4-12.3C21.5 6 17.8 1.5 12 1.5z" fill="#E2483B"/><ellipse cx="8.2" cy="7.6" rx="1.7" ry="3.1" fill="#FFFDFA" fill-opacity="0.42" transform="rotate(-22 8.2 7.6)"/></svg>
+      <span class="ring"></span>
+      <span class="ray r0"></span><span class="ray r1"></span><span class="ray r2"></span><span class="ray r3"></span>
+      <span class="ray r4"></span><span class="ray r5"></span><span class="ray r6"></span><span class="ray r7"></span>
+    </div>
+    <h2>You're on the list.</h2>
+    <p>Check your inbox and tap the link to confirm your spot. Nothing there? Look in spam.</p>
+  </section>
+
+  <footer><a href="/privacy">Privacy</a><a href="/imprint">Imprint</a><span>© 2026 Popdate</span></footer>
+</div>
+</body>
+</html>

@@ -60,7 +60,9 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "backend": "convex dev",
-    "test:backend": "vitest run"
+    "test:backend": "vitest run",
+    "waitlist:stats": "convex run waitlist:stats",
+    "waitlist:export": "node scripts/export-waitlist.mjs"
   },
   "private": true
 }
