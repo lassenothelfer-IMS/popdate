@@ -13,9 +13,11 @@ export type Gender = 'woman' | 'man';
 /** Who you want to meet: one side of the room, or either. */
 export type Interest = Gender | 'everyone';
 
-/** The rooms reveal one photo per round over four rounds; up to two more are optional. */
-export const MIN_PHOTOS = 4;
-export const MAX_PHOTOS = 6;
+/**
+ * The game's limits live in one module the server shares; re-exported here for the app.
+ * A relative path, since Convex typechecks this file without the `@/` alias.
+ */
+export { MAX_PHOTOS, MAX_PINNED_ANSWERS, MIN_PHOTOS } from '../shared/limits';
 
 export type Profile = {
   id: string;
@@ -51,9 +53,6 @@ export type ProfileDraft = Omit<Profile, 'id'>;
 
 /** An answer you gave in a room, pinned to your profile with its question. */
 export type PinnedAnswer = { question: string; answer: string };
-
-/** At most this many answers can be pinned to a profile. */
-export const MAX_PINNED_ANSWERS = 3;
 
 /**
  * One room you played, for your history and stats. `outcome` from your side:

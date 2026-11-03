@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const settings: Strings = {
+export const settings = {
   en: {
     verifyCheckTitle: 'Selfie check',
     verifyFace: 'Face in the oval, then hold still.',
@@ -550,4 +550,4 @@ export const settings: Strings = {
     selfieLabel: 'Il tuo selfie',
     legalUpdated: 'Ultimo aggiornamento: %{date}',
   },
-};
+} satisfies Strings;

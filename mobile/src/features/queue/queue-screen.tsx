@@ -28,6 +28,7 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 import { PushPrompt } from '@/features/home/push-prompt';
 import { goHome } from '@/utils/navigation';
@@ -81,9 +82,12 @@ const idleIn = FadeIn.duration(Motion.state)
   .easing(Ease.out)
   .reduceMotion(ReduceMotion.Never);
 
+/** The counts that have a word: `queue.number0` to `queue.number10`. */
+type Spelled = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
 /** "five" for 5, in the app's language; digits past ten. */
 function numberWord(t: Translate, value: number) {
-  return value >= 0 && value <= 10 ? t(`queue.number${value}`) : String(value);
+  return value >= 0 && value <= 10 ? t(`queue.number${value as Spelled}`) : String(value);
 }
 
 function capitalized(text: string) {
@@ -205,6 +209,9 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   const [waited, setWaited] = useState(0);
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  /** When you got in line, for how long the wait took. Null if the room was already full on arrival. */
+  const joinedAt = useRef<number | null>(null);
+  const filled = useRef(false);
 
   const matched = roomId !== null;
   const beat = matched && room ? roleBeat(room, t) : null;
@@ -227,6 +234,20 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
     const id = setInterval(() => setWaited((seconds) => seconds + 1), 1000);
     return () => clearInterval(id);
   }, [matched]);
+
+  // The wait starts as the line opens and ends when the room fills.
+  useEffect(() => {
+    if (!roomId) {
+      if (joinedAt.current === null) {
+        joinedAt.current = Date.now();
+        track('queue_joined');
+      }
+      return;
+    }
+    if (joinedAt.current === null || filled.current) return;
+    filled.current = true;
+    track('lobby_filled', { waitedMs: Date.now() - joinedAt.current });
+  }, [roomId]);
 
   // The room is full: one success haptic with the role beat, then the room.
   useEffect(() => {
@@ -276,11 +297,16 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
       // A room can fill in the moment you leave. You stay seated, so you go to it.
       const formed = await api.leaveQueue();
       if (formed) {
+        if (joinedAt.current !== null && !filled.current) {
+          filled.current = true;
+          track('lobby_filled', { waitedMs: Date.now() - joinedAt.current });
+        }
         if (entered.current) return;
         entered.current = true;
         openRoom(formed);
         return;
       }
+      track('queue_cancelled', { waitedMs: joinedAt.current === null ? 0 : Date.now() - joinedAt.current });
       goHome();
     } catch {
       haptics.error();

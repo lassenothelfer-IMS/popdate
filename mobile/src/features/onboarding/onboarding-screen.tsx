@@ -42,7 +42,7 @@ import {
 import { testProfileDetails } from '@/features/profile/test-profile';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { ForcedScheme, useTheme } from '@/hooks/use-theme';
-import { useT } from '@/i18n';
+import { useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
@@ -60,13 +60,13 @@ const INTROS: Intro[] = ['rooms', 'rounds', 'last'];
 const QUESTIONS: Question[] = ['birthday', 'gender', 'meet', 'rules'];
 
 /** Translation keys of each question's title and the line under it. */
-const TITLES: Record<Question, string> = {
+const TITLES: Record<Question, TranslationKey> = {
   birthday: 'onboarding.titleBirthday',
   gender: 'onboarding.titleGender',
   meet: 'onboarding.titleMeet',
   rules: 'onboarding.titleTerms',
 };
-const SUBTITLES: Record<Question, string> = {
+const SUBTITLES: Record<Question, TranslationKey> = {
   birthday: 'onboarding.subtitleBirthday',
   gender: 'onboarding.subtitleGender',
   meet: 'onboarding.subtitleMeet',
@@ -74,7 +74,7 @@ const SUBTITLES: Record<Question, string> = {
 };
 
 /** Read by VoiceOver on Continue while the step isn't answered yet (translation keys). */
-const CONTINUE_HINTS: Record<Question, string> = {
+const CONTINUE_HINTS: Record<Question, TranslationKey> = {
   birthday: 'onboarding.hintBirthday',
   gender: 'onboarding.hintChoose',
   meet: 'onboarding.hintChoose',
@@ -82,9 +82,9 @@ const CONTINUE_HINTS: Record<Question, string> = {
 };
 
 /** The four house rules: a title and a line each (translation keys). */
-const RULES = [1, 2, 3, 4].map((n) => ({
-  title: `onboarding.rule${n}Title`,
-  body: `onboarding.rule${n}Body`,
+const RULES = ([1, 2, 3, 4] as const).map((n) => ({
+  title: `onboarding.rule${n}Title` as const,
+  body: `onboarding.rule${n}Body` as const,
 }));
 
 /** The birthday as typed: day, month and year, digits only. */
@@ -101,7 +101,7 @@ function digitsOnly(text: string) {
 function checkBirthday({ day, month, year }: BirthEntry):
   | { pending: true }
   | { birthDate: string; age: number }
-  | { error: string } {
+  | { error: TranslationKey } {
   if (!day || !month || year.length < 4) return { pending: true };
   const birthDate = parseBirthDate(day, month, year);
   if (!birthDate) return { error: 'onboarding.birthdayInvalid' };

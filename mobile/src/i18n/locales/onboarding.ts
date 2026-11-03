@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const onboarding: Strings = {
+export const onboarding = {
   en: {
     stepOf: 'Step %{step} of %{total}',
     getStarted: 'Get started',
@@ -409,4 +409,4 @@ export const onboarding: Strings = {
     editFirst: 'Prima modifico il profilo',
     everyone: 'Tutti',
   },
-};
+} satisfies Strings;

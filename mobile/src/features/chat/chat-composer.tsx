@@ -7,9 +7,8 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Space } from '@/constants/theme';
 import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
+import { MAX_MESSAGE_LENGTH } from '@/shared/limits';
 
-/** The server turns longer messages away. */
-export const MAX_MESSAGE_LENGTH = 1000;
 /** Show how much room is left once the message gets close to the limit. */
 const COUNTER_FROM = 900;
 /** VoiceOver hears the count as it drops past these, not on every keystroke. */

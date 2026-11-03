@@ -1,0 +1,161 @@
+# The solo playtest on the mock server, end to end: a test profile, one room as
+# the chooser, one as a balloon, reporting and blocking someone, then deleting
+# the account. See README.md for how to run it.
+appId: host.exp.Exponent
+env:
+  # The Metro URL Expo Go opens. iOS Simulator: localhost; Android emulator: 10.0.2.2.
+  DEV_URL: exp://127.0.0.1:8081
+  # Every bot name the mock server uses, to pick "someone" without knowing who.
+  BOT_NAME: (Lena|Mia|Sara|Nina|Lea|Emma|Julia|Alina|Laura|Sofia|Luca|Noah|Leon|Jan|Nico|Elias|David|Tim|Ben|Fabio)
+---
+- launchApp:
+    clearState: true
+- openLink: ${DEV_URL}
+# Expo Go's own developer menu greets a fresh install once.
+- runFlow:
+    when:
+      visible: Continue
+    commands:
+      - tapOn: Continue
+
+# Welcome: skip onboarding with the built-in test profile (development builds only).
+- extendedWaitUntil:
+    visible: Skip with a test profile
+    timeout: 60000
+- tapOn: Skip with a test profile
+
+# Room 1: you choose.
+- extendedWaitUntil:
+    visible: Get in line
+    timeout: 20000
+- scrollUntilVisible:
+    element: Popper
+- tapOn: Popper
+- scrollUntilVisible:
+    element: Get in line
+    direction: UP
+- tapOn: Get in line
+- repeat:
+    times: 3
+    commands:
+      - extendedWaitUntil:
+          visible: Ask them something
+          timeout: 30000
+      # The first of the five questions on offer.
+      - tapOn:
+          text: .*\?.*
+          below: Ask them something
+          index: 0
+      - tapOn: Ask this question
+      # The bots answer within 15 seconds; then a card can be marked.
+      - extendedWaitUntil:
+          visible: .*'s balloon.*
+          timeout: 30000
+      - tapOn:
+          text: .*'s balloon.*
+          index: 0
+      # The coral Pop button fills over 2.2 seconds; a long press holds it long enough.
+      - longPressOn: Pop .*'s balloon
+# Round 4, the final two: keep one, the other pops.
+- extendedWaitUntil:
+    visible: Ask them something
+    timeout: 30000
+- tapOn:
+    text: .*\?.*
+    below: Ask them something
+    index: 0
+- tapOn: Ask this question
+- extendedWaitUntil:
+    visible: Keep .*
+    timeout: 30000
+- tapOn:
+    text: Keep .*
+    index: 0
+# The match fades in after the last pop.
+- extendedWaitUntil:
+    visible: Back to home
+    timeout: 20000
+- tapOn: Back to home
+
+# Room 2: you hold a balloon.
+- extendedWaitUntil:
+    visible: Get in line
+    timeout: 20000
+- scrollUntilVisible:
+    element: Balloon
+- tapOn: Balloon
+- scrollUntilVisible:
+    element: Get in line
+    direction: UP
+- tapOn: Get in line
+# The bot chooser picks a question within a few seconds.
+- extendedWaitUntil:
+    visible: Your answer
+    timeout: 30000
+- tapOn: Your answer
+- inputText: Long walks and bad puns.
+- hideKeyboard
+- tapOn: Send answer
+
+# Report someone in the room through the "..." menu.
+- tapOn: Report or block someone
+- tapOn:
+    text: ${BOT_NAME}
+    below: Who do you want to report or block\?
+    index: 0
+- tapOn: Report
+- tapOn: Something else
+# "Also block" starts ticked; untick it so the block below is its own step.
+- tapOn: Also block .*
+- tapOn:
+    text: Report
+    below: Something else
+- extendedWaitUntil:
+    visible: Thanks, we'll look into it.
+    timeout: 10000
+- tapOn: OK
+
+# And block someone.
+- tapOn: Report or block someone
+- tapOn:
+    text: ${BOT_NAME}
+    below: Who do you want to report or block\?
+    index: 0
+- tapOn: Block
+# The confirmation: "Block <name>?"
+- extendedWaitUntil:
+    visible: Block .*\?
+    timeout: 10000
+- tapOn:
+    text: Block
+    below: Block .*\?
+
+# Leave the room (your balloon may already have popped: then go home from there).
+- runFlow:
+    when:
+      visible: Back to home
+    commands:
+      - tapOn: Back to home
+- runFlow:
+    when:
+      visible: Leave
+    commands:
+      - tapOn: Leave
+      - tapOn:
+          text: Leave
+          below: Leave this room\?
+
+# Settings: delete the account, which goes back to the welcome screen.
+- extendedWaitUntil:
+    visible: Get in line
+    timeout: 20000
+- tapOn: You
+- tapOn: Settings
+- scrollUntilVisible:
+    element: Delete account
+- tapOn: Delete account
+- tapOn: Continue
+- tapOn: Delete
+- extendedWaitUntil:
+    visible: Get started
+    timeout: 20000

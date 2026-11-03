@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for the chat with a match, in every supported language. English is the source. */
-export const chat: Strings = {
+export const chat = {
   en: {
     reportSend: 'Report',
     reportSheetBody: "%{name} won't know it was you. Tell us why, we read every one.",
@@ -230,4 +230,4 @@ export const chat: Strings = {
     ideaDrinksMessage: 'Un drink una sera di questa settimana?',
     ideaDinnerMessage: 'Una cena prima o poi? Tu scegli il posto, io il dolce.',
   },
-};
+} satisfies Strings;

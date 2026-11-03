@@ -30,12 +30,12 @@ import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { previewLine, withLastMessages, type Thread } from '@/features/matches/threads';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
-import { useLocale, useT, type Translate } from '@/i18n';
+import { useLocale, useT, type Translate, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useFilterText } from '@/state/settings';
 
 /** The test server's role chips, labeled by their `home.*` keys. */
-const MOCK_ROLES: { role: MockRole; label: string }[] = [
+const MOCK_ROLES: { role: MockRole; label: TranslationKey }[] = [
   { role: 'random', label: 'home.roleRandom' },
   { role: 'popper', label: 'home.rolePopper' },
   { role: 'contestant', label: 'home.roleBalloon' },

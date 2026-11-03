@@ -68,7 +68,8 @@
       "expo-notifications",
       "expo-image",
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

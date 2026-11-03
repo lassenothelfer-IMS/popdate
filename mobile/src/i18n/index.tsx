@@ -19,7 +19,7 @@ import { LOCALES, type Locale, type Strings } from '@/i18n/types';
  * Every area registers under its own namespace, so a key reads like
  * `t('game.pickQuestion')` and two areas never collide.
  */
-const AREAS: Record<string, Strings> = {
+const AREAS = {
   chat,
   common,
   game,
@@ -34,7 +34,27 @@ const AREAS: Record<string, Strings> = {
   you,
   almost,
   checkin,
-};
+} satisfies Record<string, Strings>;
+
+type Areas = typeof AREAS;
+type English<A extends keyof Areas> = Areas[A]['en'];
+
+/** Every key `t()` knows, like `'game.pickQuestion'`, read from the English strings. */
+export type TranslationKey = {
+  [A in keyof Areas]: `${A}.${keyof English<A> & string}`;
+}[keyof Areas];
+
+/** The keys whose English string is a plural (`{ one, other }`): they need a `count`. */
+export type PluralKey = {
+  [A in keyof Areas]: {
+    [K in keyof English<A> & string]: English<A>[K] extends string ? never : `${A}.${K}`;
+  }[keyof English<A> & string];
+}[keyof Areas];
+
+/** A plural key takes `{ count }`; any other key takes optional placeholders. */
+type OptionsFor<K extends TranslationKey> = K extends PluralKey
+  ? [options: TranslateOptions & { count: number }]
+  : [options?: TranslateOptions];
 
 const i18n = new I18n();
 i18n.defaultLocale = 'en';
@@ -60,7 +80,7 @@ export function deviceRegion(): string | null {
   return getLocales()[0]?.regionCode ?? null;
 }
 
-export type Translate = (key: string, options?: TranslateOptions) => string;
+export type Translate = <K extends TranslationKey>(key: K, ...options: OptionsFor<K>) => string;
 
 const LocaleContext = createContext<Locale>('en');
 
@@ -80,10 +100,10 @@ export function useLocale(): Locale {
  */
 export function useT(): Translate {
   const locale = use(LocaleContext);
-  return (key, options) => i18n.t(key, { locale, ...options });
+  return (key, ...[options]) => i18n.t(key, { locale, ...options });
 }
 
 /** Outside React (announcements in callbacks, the mock): translate in a given language. */
-export function translate(locale: Locale, key: string, options?: TranslateOptions) {
+export function translate<K extends TranslationKey>(locale: Locale, key: K, ...[options]: OptionsFor<K>) {
   return i18n.t(key, { locale, ...options });
 }

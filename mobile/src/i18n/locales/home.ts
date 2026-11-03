@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const home: Strings = {
+export const home = {
   en: {
     settings: 'Settings',
     play: 'Get in line',
@@ -270,4 +270,4 @@ export const home: Strings = {
     streak: '%{count} giorni di fila',
     liveQueue: { one: '1 persona in attesa a %{city}', other: '%{count} persone in attesa a %{city}' },
   },
-};
+} satisfies Strings;

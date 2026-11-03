@@ -1,7 +1,7 @@
 import type { Strings } from '@/i18n/types';
 
 /** Strings for this area of the app, in every supported language. English is the source. */
-export const profile: Strings = {
+export const profile = {
   en: {
     title: 'Your profile',
     intro:
@@ -48,7 +48,6 @@ export const profile: Strings = {
     noChanges: 'Change something to save.',
     saveFailed: 'Saving failed. Try again.',
     birthdayLocked: "Your birthday can't be changed. Write to us if it's wrong.",
-    yourPhoto: 'Your photo %{position}',
     removePhoto: 'Remove photo %{position}',
     addLeadPhoto: 'Add your lead photo',
     add: 'Add',
@@ -58,6 +57,15 @@ export const profile: Strings = {
     roundTag: 'Round %{round}',
     firstPhoto: 'Your first photo',
     roundSees: 'Round %{round} sees this',
+    yourPhotoRound: 'Your photo %{position}, seen in round %{round}',
+    yourPhotoExtra: 'Your photo %{position}, an extra no round reveals',
+    extraTag: 'Extra',
+    photoMenuTitle: 'Photo %{position}',
+    makeFirst: 'Make first',
+    moveEarlier: 'Move earlier',
+    moveLater: 'Move later',
+    reorderHint: 'Tap a photo to move it. Photo 1 leads on Home and on your matches.',
+    reorderA11yHint: 'Opens the options to move this photo.',
     photosTitle: 'Four to six photos. One more each round.',
     photosIntro:
       'People meet you one photo at a time, in this order. Lead with the one that looks like you on a good day.',
@@ -155,7 +163,6 @@ export const profile: Strings = {
     noChanges: 'Ändere etwas, um es zu sichern.',
     saveFailed: 'Sichern hat nicht geklappt. Versuch es nochmals.',
     birthdayLocked: 'Deinen Geburtstag kannst du nicht ändern. Schreib uns, wenn er nicht stimmt.',
-    yourPhoto: 'Dein Foto %{position}',
     removePhoto: 'Foto %{position} entfernen',
     addLeadPhoto: 'Hauptfoto hinzufügen',
     add: 'Hinzufügen',
@@ -165,6 +172,15 @@ export const profile: Strings = {
     roundTag: 'Runde %{round}',
     firstPhoto: 'Dein erstes Foto',
     roundSees: 'Runde %{round} sieht dieses',
+    yourPhotoRound: 'Dein Foto %{position}, zu sehen in Runde %{round}',
+    yourPhotoExtra: 'Dein Foto %{position}, ein Extra, das keine Runde zeigt',
+    extraTag: 'Extra',
+    photoMenuTitle: 'Foto %{position}',
+    makeFirst: 'An erste Stelle',
+    moveEarlier: 'Eins nach vorne',
+    moveLater: 'Eins nach hinten',
+    reorderHint: 'Tipp auf ein Foto, um es zu verschieben. Foto 1 erscheint auf Start und bei deinen Matches.',
+    reorderA11yHint: 'Öffnet die Optionen, um dieses Foto zu verschieben.',
     photosTitle: 'Vier bis sechs Fotos. Jede Runde eins mehr.',
     photosIntro:
       'Man lernt dich Foto für Foto kennen, in dieser Reihenfolge. Fang mit dem an, das dich an einem guten Tag zeigt.',
@@ -263,7 +279,6 @@ export const profile: Strings = {
     noChanges: 'Modifie quelque chose pour enregistrer.',
     saveFailed: 'L’enregistrement a échoué. Réessaie.',
     birthdayLocked: 'Ta date de naissance ne peut pas être modifiée. Écris-nous si elle est fausse.',
-    yourPhoto: 'Ta photo %{position}',
     removePhoto: 'Retirer la photo %{position}',
     addLeadPhoto: 'Ajoute ta photo principale',
     add: 'Ajouter',
@@ -273,6 +288,15 @@ export const profile: Strings = {
     roundTag: 'Manche %{round}',
     firstPhoto: 'Ta première photo',
     roundSees: 'La manche %{round} voit celle-ci',
+    yourPhotoRound: 'Ta photo %{position}, vue à la manche %{round}',
+    yourPhotoExtra: 'Ta photo %{position}, un bonus qu’aucune manche ne révèle',
+    extraTag: 'Bonus',
+    photoMenuTitle: 'Photo %{position}',
+    makeFirst: 'Mettre en premier',
+    moveEarlier: 'Avancer d’une place',
+    moveLater: 'Reculer d’une place',
+    reorderHint: 'Touche une photo pour la déplacer. La photo 1 s’affiche sur l’accueil et dans tes matchs.',
+    reorderA11yHint: 'Ouvre les options pour déplacer cette photo.',
     photosTitle: 'De quatre à six photos. Une de plus à chaque manche.',
     photosIntro:
       'On te découvre une photo à la fois, dans cet ordre. Commence par celle où tu es toi un bon jour.',
@@ -371,7 +395,6 @@ export const profile: Strings = {
     noChanges: 'Modifica qualcosa per salvare.',
     saveFailed: 'Salvataggio non riuscito. Riprova.',
     birthdayLocked: 'La tua data di nascita non si può cambiare. Scrivici se è sbagliata.',
-    yourPhoto: 'La tua foto %{position}',
     removePhoto: 'Rimuovi la foto %{position}',
     addLeadPhoto: 'Aggiungi la foto principale',
     add: 'Aggiungi',
@@ -381,6 +404,15 @@ export const profile: Strings = {
     roundTag: 'Round %{round}',
     firstPhoto: 'La tua prima foto',
     roundSees: 'Il round %{round} vede questa',
+    yourPhotoRound: 'La tua foto %{position}, vista nel round %{round}',
+    yourPhotoExtra: 'La tua foto %{position}, un extra che nessun round rivela',
+    extraTag: 'Extra',
+    photoMenuTitle: 'Foto %{position}',
+    makeFirst: 'Metti per prima',
+    moveEarlier: 'Sposta prima',
+    moveLater: 'Sposta dopo',
+    reorderHint: 'Tocca una foto per spostarla. La foto 1 appare nella Home e nei tuoi match.',
+    reorderA11yHint: 'Apre le opzioni per spostare questa foto.',
     photosTitle: 'Da quattro a sei foto. Una in più a ogni round.',
     photosIntro:
       'Ti conoscono una foto alla volta, in quest’ordine. Inizia con quella in cui sei te stesso in una bella giornata.',
@@ -433,4 +465,4 @@ export const profile: Strings = {
     discard: 'Scarta',
     keepEditing: 'Continua a modificare',
   },
-};
+} satisfies Strings;
