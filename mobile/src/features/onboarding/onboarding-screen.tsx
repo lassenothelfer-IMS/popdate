@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -30,7 +31,7 @@ import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
 import { Colors, Fonts, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
-import { INTRO } from '@/features/how-to-play/step-art';
+import { artScale, INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import {
@@ -117,6 +118,7 @@ export function OnboardingScreen() {
   const theme = useTheme();
   const t = useT();
   const reduced = useReduceMotion();
+  const { height: windowHeight } = useWindowDimensions();
   const [step, setStep] = useState<Step>('welcome');
   // The step you came from: the screen entrance only plays on a change.
   const [from, setFrom] = useState<Step | null>(null);
@@ -301,6 +303,8 @@ export function OnboardingScreen() {
     const index = INTROS.indexOf(step as Intro);
     const { Art, title, body } = INTRO[index];
     const last = index === INTROS.length - 1;
+    // A short screen shrinks the card and tightens the gap under it, so the page fits.
+    const short = artScale(windowHeight) < 1;
     return (
       <Screen
         key={step}
@@ -329,9 +333,9 @@ export function OnboardingScreen() {
           />
         </Rise>
         <Rise index={1} style={styles.introArt}>
-          <Art />
+          <Art fit />
         </Rise>
-        <Rise index={2} style={styles.introText}>
+        <Rise index={2} style={[styles.introText, short && styles.introTextShort]}>
           <View ref={headingRef} accessible accessibilityRole="header">
             <ThemedText type="display">{t(title)}</ThemedText>
           </View>
@@ -696,6 +700,9 @@ const styles = StyleSheet.create({
   introText: {
     marginTop: 40,
     gap: 14,
+  },
+  introTextShort: {
+    marginTop: Space.lg,
   },
   introBody: {
     lineHeight: 23,

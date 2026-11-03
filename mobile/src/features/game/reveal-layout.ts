@@ -1,7 +1,13 @@
 import { StyleSheet } from 'react-native';
 
 import { Space } from '@/constants/theme';
-import { cardWidthFor, ROOMY_CARD_WIDTH } from '@/features/game/answer-carousel';
+import {
+  cardWidthFor,
+  PAIR_COMPACT_HEIGHT,
+  pairCardWidthFor,
+  pairFitsSideBySide,
+  ROOMY_CARD_WIDTH,
+} from '@/features/game/answer-carousel';
 
 /** The Pop button's bar: its top padding, the button and the hairline, before the bottom inset. */
 const POP_BAR = Space.sm + 56 + StyleSheet.hairlineWidth;
@@ -13,6 +19,12 @@ const KEEPER_GAP = Space.xs;
 const KEEPER_LINE = 18;
 /** In your first rooms, "Hold to pop" over the Pop button: the footer's gap, then one footnote line. */
 const HOLD_HINT_LINE = 18;
+/**
+ * The final two's bar: its top padding, the Keep buttons and the hairline. In your
+ * first rooms the hint above them, two callout lines on a phone, and its gap.
+ */
+const KEEP_BAR = Space.sm + 52 + StyleSheet.hairlineWidth;
+const KEEP_HINT_LINES = 2 * 20;
 /**
  * Until they are measured, at the default text size: the room bar, and the
  * question block (kicker and two lines of question).
@@ -93,6 +105,21 @@ export function revealLayout(input: RevealLayoutInput) {
   const spacing = tight ? TIGHT_SPACING : CANVAS_SPACING;
   // The cards fade in after the question, so a measure that corrects this lands before they show.
   const cardsAt = input.cardsTop ?? headerHeight(spacing);
-  const cardWidth = cardWidthFor(revealRoom - cardsAt - spacing.below, pageWidth, textScale);
+  let cardWidth = cardWidthFor(revealRoom - cardsAt - spacing.below, pageWidth, textScale);
+  // The final two on a short phone: the width whose photo leaves both names and three
+  // lines of each answer above the Keep buttons. The cards cut their photos to it.
+  if (input.upCount === 2 && window.height < PAIR_COMPACT_HEIGHT && pairFitsSideBySide(pageWidth)) {
+    const keepRoom =
+      window.height -
+      insets.top -
+      (input.barHeight || BAR_ESTIMATE) -
+      KEEP_BAR -
+      (input.showHints ? Space.sm + KEEP_HINT_LINES * textScale : 0) -
+      Math.max(insets.bottom, Space.md);
+    cardWidth = Math.min(
+      cardWidth,
+      pairCardWidthFor(keepRoom - cardsAt - spacing.below, textScale),
+    );
+  }
   return { tight, cardsAt, cardWidth };
 }

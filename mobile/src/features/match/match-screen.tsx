@@ -41,6 +41,17 @@ const STAGE_HEIGHT = 380;
 const CHOOSER_CARD = { left: 50, top: 80, width: 150, height: 230, radius: 18, tilt: -6 };
 const WINNER_CARD = { left: 150, top: 20, width: 190, height: 290, radius: 20, tilt: 5 };
 
+/** The kicker's line height; the stage overlaps it by this much. */
+const KICKER_LINE = 18;
+/** Room kept for the title: two lines of hero, its gap, two lines of body. */
+const TITLE_ROOM = Space.xs + 46 * 2 + 10 + 22 * 2;
+/** The footer above its bottom inset: a large button, a plain one, and their gaps. */
+const FOOTER_HEIGHT = Space.xs + 52 + Space.xs + 44;
+/** On a short phone the empty stage under the cards' tilted feet is cropped here. */
+const COMPACT_STAGE_HEIGHT = 320;
+/** The cards never shrink past this, however short the screen; the page scrolls instead. */
+const MIN_CARD_SCALE = 0.7;
+
 /** A card flies in from 60 pt below, untwisting to its tilt, 1.1 s, 200 ms after the other. */
 function cardIn(tilt: number, delay: number) {
   return webSafeKeyframe(
@@ -131,7 +142,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
   const { profile } = useSession();
   const room = useRoom(match.roomId);
   const reduced = useReduceMotion();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const celebrated = useRef(false);
 
   // Straight from the game, everything flies in with one success haptic.
@@ -191,12 +202,28 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
   const stageWidth = Math.min(windowWidth, MaxContentWidth);
   const scale = stageWidth / DESIGN_WIDTH;
   const at = (value: number) => Math.round(value * scale);
-  const top = Math.max(Space.sm, KICKER_TOP - insets.top);
+  const roomyTop = Math.max(Space.sm, KICKER_TOP - insets.top);
+  const roomyGap = at(STAGE_TOP - KICKER_TOP) - KICKER_LINE;
+
+  // A short phone (the SE) can't fit the drawn layout above the buttons. There the
+  // top gap and the empty stage below the cards shrink, and the cards scale with the
+  // height left, so the title and its line stay clear of the footer.
+  const spare = windowHeight - insets.top - FOOTER_HEIGHT - Math.max(insets.bottom, Space.md);
+  const compact = roomyTop + KICKER_LINE + roomyGap + at(STAGE_HEIGHT) + TITLE_ROOM + Space.lg > spare;
+  const top = compact ? Math.min(roomyTop, Space.xl) : roomyTop;
+  const fit = (spare - top - KICKER_LINE - TITLE_ROOM - Space.sm) / COMPACT_STAGE_HEIGHT;
+  const cardScale = compact ? Math.max(MIN_CARD_SCALE, Math.min(scale, fit)) : scale;
+  const card = (value: number) => Math.round(value * cardScale);
+  // Smaller cards stay centered on the stage.
+  const shift = Math.round((stageWidth - DESIGN_WIDTH * cardScale) / 2);
+  const stageHeight = compact ? card(COMPACT_STAGE_HEIGHT) : at(STAGE_HEIGHT);
 
   return (
     <Screen
+      // Large Dynamic Type or a long name can still outgrow a short phone; there it scrolls.
+      scroll={compact}
       footerStyle="plain"
-      contentStyle={[styles.content, { paddingTop: top }]}
+      contentStyle={[styles.content, { paddingTop: top }, compact && styles.compactContent]}
       footer={
         <>
           <Button
@@ -266,21 +293,25 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
       <View
         style={[
           styles.stage,
-          { marginLeft: -Gutter, width: stageWidth, height: at(STAGE_HEIGHT), marginTop: at(STAGE_TOP - KICKER_TOP) - 18 },
+          { marginLeft: -Gutter, width: stageWidth, height: stageHeight, marginTop: compact ? 0 : roomyGap },
         ]}>
         {left ? (
           <Animated.View
             entering={animate ? chooserIn : undefined}
             style={[
               styles.slot,
-              { left: at(CHOOSER_CARD.left), top: at(CHOOSER_CARD.top), transform: [{ rotate: `${CHOOSER_CARD.tilt}deg` }] },
+              {
+                left: shift + card(CHOOSER_CARD.left),
+                top: card(CHOOSER_CARD.top),
+                transform: [{ rotate: `${CHOOSER_CARD.tilt}deg` }],
+              },
             ]}>
             <PhotoCard
               uri={left.uri}
               label={left.label}
               seat={left.seat}
-              width={at(CHOOSER_CARD.width)}
-              height={at(CHOOSER_CARD.height)}
+              width={card(CHOOSER_CARD.width)}
+              height={card(CHOOSER_CARD.height)}
               radius={CHOOSER_CARD.radius}
               accessibilityLabel={left.a11y}
             />
@@ -291,14 +322,18 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
             entering={animate ? winnerIn : undefined}
             style={[
               styles.slot,
-              { left: at(WINNER_CARD.left), top: at(WINNER_CARD.top), transform: [{ rotate: `${WINNER_CARD.tilt}deg` }] },
+              {
+                left: shift + card(WINNER_CARD.left),
+                top: card(WINNER_CARD.top),
+                transform: [{ rotate: `${WINNER_CARD.tilt}deg` }],
+              },
             ]}>
             <PhotoCard
               uri={right.uri}
               label={right.label}
               seat={right.seat}
-              width={at(WINNER_CARD.width)}
-              height={at(WINNER_CARD.height)}
+              width={card(WINNER_CARD.width)}
+              height={card(WINNER_CARD.height)}
               radius={WINNER_CARD.radius}
               accessibilityLabel={right.a11y}
             />
@@ -329,6 +364,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
+  },
+  compactContent: {
+    paddingBottom: Space.sm,
   },
   auras: {
     position: 'absolute',

@@ -105,6 +105,34 @@ const PAIR_DROP = 12;
 /** Narrower than this, side by side, an answer wraps a word a line: the two stack instead. */
 const PAIR_MIN_WIDTH = 150;
 const PAIR_STACK_GAP = Space.lg;
+/** Above the pair: its padding, kept clear for the ring and the breath. */
+const PAIR_PAD = RING + 4;
+/**
+ * Phones shorter than this (the SE's 667 pt) can't fit the pair's full photos and
+ * their answers above the Keep buttons, so there the photos give up height. Taller
+ * phones keep the canvas's cards.
+ */
+export const PAIR_COMPACT_HEIGHT = 740;
+/** Under the pair's photos on a short phone: the name line and three lines of answer. */
+const PAIR_TEXT_LINES = 22 + 3 * 26;
+/** The pair's photo is never cut shorter than this; past it the page scrolls. */
+const MIN_PAIR_PHOTO = 48;
+
+/**
+ * On a short phone, the width of a card whose photo leaves the name and three
+ * lines of answer of both final cards in `height`, the left one's drop included.
+ * The pair's photos are cut to that card's photo height.
+ */
+export function pairCardWidthFor(height: number, textScale = 1) {
+  const photoHeight =
+    height - PAIR_PAD - PAIR_DROP - CHROME - TEXT_PADDING - PAIR_TEXT_LINES * textScale;
+  return Math.floor(Math.max(photoHeight, MIN_PAIR_PHOTO) * PhotoAspect) + CHROME;
+}
+
+/** Whether the final two fit side by side on this page. Narrower, they stack and the page scrolls. */
+export function pairFitsSideBySide(pageWidth: number) {
+  return Math.floor((pageWidth - 2 * Gutter - PAIR_GAP) / 2) >= PAIR_MIN_WIDTH;
+}
 
 /**
  * A pair card slides in from 60 pt at its side and settles into its tilt, 150 ms
@@ -176,7 +204,7 @@ export function AnswerCarousel({
   pair = false,
 }: AnswerCarouselProps) {
   const reduced = useReduceMotion();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const scrollX = useRef(0);
   const viewport = useRef(0);
@@ -238,9 +266,17 @@ export function AnswerCarousel({
   if (pair && cards.length === 2) {
     // Both in view at once: no track to swipe. Two equal cards with the gap between
     // them, or, where two would be too narrow to read, one above the other.
-    const sideBySide = Math.min(width, Math.floor((pageWidth - 2 * Gutter - PAIR_GAP) / 2));
+    // On a short phone `width` is the photos' height budget, not the cards' width:
+    // the cards keep half the page and their photos are cut to that card's photo.
+    // Stacked, the two never share one screen anyway, so their photos stay whole.
+    const compact = windowHeight < PAIR_COMPACT_HEIGHT && pairFitsSideBySide(pageWidth);
+    const sideBySide = Math.min(
+      compact ? MAX_CARD_WIDTH : width,
+      Math.floor((pageWidth - 2 * Gutter - PAIR_GAP) / 2),
+    );
     const stacked = sideBySide < PAIR_MIN_WIDTH;
     const pairWidth = stacked ? width : sideBySide;
+    const photoHeight = compact ? (Math.min(pairWidth, width) - CHROME) / PhotoAspect : undefined;
     return (
       <View style={stacked ? styles.pairStacked : styles.pair}>
         {cards.map(({ contestant, seat, developed }, index) => (
@@ -261,6 +297,7 @@ export function AnswerCarousel({
                 contestant={contestant}
                 seat={seat}
                 width={pairWidth}
+                photoHeight={photoHeight}
                 marked={contestant.id === markedId}
                 breathe={contestant.id === markedId && !reduced}
                 developed={developed}
@@ -311,6 +348,8 @@ type AnswerCardProps = {
   contestant: Contestant;
   seat: Seat;
   width: number;
+  /** Cut shorter than the photo's 3:4, for the final two on a short phone. */
+  photoHeight?: number;
   marked: boolean;
   /** The chooser's favorite in the final two breathes, 1 to 1.04 over 3 s. */
   breathe?: boolean;
@@ -319,7 +358,16 @@ type AnswerCardProps = {
 };
 
 /** Their newest photo, then their name and their words. Tapping marks their balloon. */
-function AnswerCard({ contestant, seat, width, marked, breathe = false, developed, onPress }: AnswerCardProps) {
+function AnswerCard({
+  contestant,
+  seat,
+  width,
+  photoHeight,
+  marked,
+  breathe = false,
+  developed,
+  onPress,
+}: AnswerCardProps) {
   const theme = useTheme();
   const breath = useSharedValue(0);
   useEffect(() => {
@@ -380,7 +428,13 @@ function AnswerCard({ contestant, seat, width, marked, breathe = false, develope
             uri={latest}
             name={contestant.name}
             tone={seat}
-            style={[styles.photo, { width: photoWidth, height: photoWidth / PhotoAspect }]}
+            style={[
+              styles.photo,
+              {
+                width: photoWidth,
+                height: Math.min(photoWidth / PhotoAspect, photoHeight ?? Infinity),
+              },
+            ]}
           />
           <PhotoBadge label={t('game.photoN', { n: position })} />
         </Animated.View>
