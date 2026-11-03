@@ -4,7 +4,7 @@ import { v } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
-import { personCard } from './lib/people';
+import { isBlockedEitherWay, personCard } from './lib/people';
 
 /** A match as you see it: the `Match` shape in `src/api/types.ts`. */
 async function matchView(ctx: QueryCtx, match: Doc<'matches'>, viewerId: Id<'users'>) {
@@ -18,7 +18,7 @@ async function matchView(ctx: QueryCtx, match: Doc<'matches'>, viewerId: Id<'use
   };
 }
 
-/** Your matches, newest first. */
+/** Your matches, newest first. A match goes away while either person has blocked the other. */
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -35,7 +35,11 @@ export const list = query({
         .collect(),
     ]);
     const all = [...asPopper, ...asWinner].sort((a, b) => b.createdAt - a.createdAt);
-    return await Promise.all(all.map((match) => matchView(ctx, match, userId)));
+    const blocked = await Promise.all(
+      all.map((match) => isBlockedEitherWay(ctx, match.popperId, match.winnerId)),
+    );
+    const visible = all.filter((_, index) => !blocked[index]);
+    return await Promise.all(visible.map((match) => matchView(ctx, match, userId)));
   },
 });
 
@@ -65,6 +69,7 @@ export const get = query({
     const match = userId && id ? await ctx.db.get(id) : null;
     if (!userId || !match) return null;
     if (match.popperId !== userId && match.winnerId !== userId) return null;
+    if (await isBlockedEitherWay(ctx, match.popperId, match.winnerId)) return null;
     return await matchView(ctx, match, userId);
   },
 });

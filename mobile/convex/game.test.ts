@@ -316,6 +316,26 @@ async function historyOf(p: Player, roomId: string) {
   return rooms.find((room) => room.roomId === roomId)!;
 }
 
+test('a block hides the match from both people until it is lifted', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await pickFirstQuestion(lena, roomId);
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
+  await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
+  const matchId = (await view(lena, roomId)).matchId!;
+
+  await luca.as.mutation(api.safety.block, { userId: lena.id });
+  for (const person of [lena, luca]) {
+    expect(await person.as.query(api.matches.list, {})).toEqual([]);
+    expect(await person.as.query(api.matches.get, { matchId })).toBeNull();
+  }
+
+  await luca.as.mutation(api.safety.unblock, { userId: lena.id });
+  for (const person of [lena, luca]) {
+    expect(await person.as.query(api.matches.list, {})).toHaveLength(1);
+  }
+});
+
 test('only the chooser and the winner see the match in their history, and unmatching keeps the outcome', async () => {
   const { lena, luca, noah, roomId } = await startRoom();
   await playRound(lena, roomId, [luca, noah], noah);
