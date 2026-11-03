@@ -63,7 +63,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "backend": "convex dev",
-    "test:backend": "vitest run"
+    "test": "vitest run",
+    "test:backend": "vitest run convex"
   },
   "private": true
 }
