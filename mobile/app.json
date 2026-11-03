@@ -46,7 +46,12 @@
       [
         "expo-localization",
         {
-          "supportedLocales": ["en", "de", "fr", "it"]
+          "supportedLocales": [
+            "en",
+            "de",
+            "fr",
+            "it"
+          ]
         }
       ],
       [
@@ -68,7 +73,8 @@
       "expo-notifications",
       "expo-image",
       "expo-secure-store",
-      "expo-video"
+      "expo-video",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
