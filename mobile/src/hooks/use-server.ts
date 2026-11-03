@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { api, type QueueStatus, type Room } from '@/api';
+import { serverNow } from '@/utils/server-clock';
 
 /** The live room, `null` if it doesn't exist, `undefined` while loading. */
 export function useRoom(roomId: string) {
@@ -17,10 +18,10 @@ export function useQueueStatus() {
 
 /** Whole seconds until `deadline`, or null when there is no timer. */
 export function useSecondsLeft(deadline: number | null) {
-  const [now, setNow] = useState(() => Date.now());
+  const [now, setNow] = useState(serverNow);
   // Keeps ticking between timers so `now` is fresh the moment a new deadline arrives.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 250);
+    const id = setInterval(() => setNow(serverNow()), 250);
     return () => clearInterval(id);
   }, []);
   if (deadline === null) return null;
