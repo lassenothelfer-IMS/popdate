@@ -82,7 +82,10 @@ Done when: the production URL exists, auth works, and a test sign-in from a dev 
 
 ### 2.1 Accounts
 
-- [ ] Apple Developer Program membership ($99 a year). An organisation account is better for a dating app (it shows the company as the seller); it needs a D-U-N-S number, which takes days to weeks.
+- [ ] Apple Developer Program membership ($99 a year, plus VAT where it applies). **Lasse, Kian, Jonas and Kevin split it four ways: about $25 each a year.** One person has to be the Account Holder: they sign Apple's agreements, pay with their card, and are the only one who can renew or accept new terms, so agree who that is and settle the shares with them. The others get access through App Store Connect → Users and Access.
+  - Individual account: quickest, but the App Store shows the Account Holder's own legal name as the seller, and the account can't be handed to someone else later.
+  - Organisation account: shows a company name, can add and remove people as the team changes, and is better for a dating app. It needs a registered company (or association) with a D-U-N-S number, which takes days to weeks.
+  - Paywall earnings (phase 0.2) are paid to the Account Holder's bank account, so decide how they're shared before the first sale.
 - [ ] **Move the EAS project off Elias's account.** `mobile/app.json` lists the Expo owner `elihhh` and project id `f4648c9d-c8ad-4a8e-8f14-b63942d3b618`. If that's Elias's account, he owns the builds and signing credentials. Either ask him to transfer the project to an Expo organization the team controls (expo.dev → project settings → Transfer), or create a new project under our own account with `npx eas-cli@latest init` and update `owner` and `extra.eas.projectId` in `app.json`. Then add the others in expo.dev.
 - [ ] App Store Connect: create the app with bundle id **`com.popdate.app`** (already in `app.json`), SKU, and primary language.
 

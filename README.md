@@ -131,7 +131,7 @@ A phone can't reach a local backend on your computer; use the cloud dev deployme
 
 ## What each person does
 
-Three people, one shared repo. Each person works with their own Claude Code and stays inside their folder.
+Four people, one shared repo. The four of us split the Apple Developer account ($99 a year). Each person works with their own Claude Code and stays inside their folder.
 
 ### Jonas: backend (`mobile/convex/`)
 
@@ -162,6 +162,10 @@ Three people, one shared repo. Each person works with their own Claude Code and 
 - Make TikTok and Reels content showing the pop moment
 - Recruit both men and women early, because a room only fills when the right mix is queuing at the same time
 - Find 10 to 15 guys for the first test rooms
+
+### Kevin: code review
+
+- Review `main` and pull requests, and file what he finds as GitHub issues
 
 ## Safety and App Store requirements
 
