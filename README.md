@@ -131,7 +131,7 @@ A phone can't reach a local backend on your computer; use the cloud dev deployme
 
 ## What each person does
 
-Four people, four folders, one shared repo. Each person works with their own Claude Code and stays inside their folder.
+Three people, one shared repo. Each person works with their own Claude Code and stays inside their folder.
 
 ### Jonas: backend (`mobile/convex/`)
 
@@ -142,7 +142,7 @@ Four people, four folders, one shared repo. Each person works with their own Cla
 - Share the Convex project with the team (the app only needs its URL, which `npx convex dev` writes to `.env.local`)
 - Later: admin view for reports and selfie reviews, and sending push notifications
 
-### Lasse: mobile app (`mobile/`, except Safety)
+### Lasse: mobile app, App Store and safety (`mobile/` except `mobile/convex/`, `docs/`)
 
 - Create the Expo app (React Native, TypeScript) and connect it to Jonas's Convex backend
 - Build onboarding and profile setup with 6 photo uploads (expo-image-picker)
@@ -150,11 +150,7 @@ Four people, four folders, one shared repo. Each person works with their own Cla
 - Build the game room: question picker, answers, photo reveals, timers, pop, watch or leave
 - Build the match screen
 - Test the full flow on real phones with an Expo development build
-
-### Elias: App Store and safety (`docs/`, `mobile/src/features/safety/`)
-
-- Set team and bundle ID in `mobile/app.json` and set up EAS Build
-- Create the app in App Store Connect and upload the first TestFlight build with EAS Submit
+- Set up EAS Build, create the app in App Store Connect and upload TestFlight builds with EAS Submit
 - Write the privacy policy and terms, link them in onboarding
 - Replace anonymous login with Sign in with Apple (expo-apple-authentication)
 - Own the report and block UI and the App Store review answers
@@ -179,7 +175,7 @@ Apple treats dating apps as high risk, and missing safety features is a common r
 - Basic profanity filter on all messages, on the server
 - Terms checkbox in onboarding
 
-### Still needed before submission (Elias and Jonas)
+### Still needed before submission (Lasse and Jonas)
 
 - Real privacy policy and terms, linked in the app
 - Sign in with Apple, replacing anonymous login

@@ -8,10 +8,10 @@ This is the order we go in. Each step says who owns it and what "done" means. Ti
 | --- | --- | --- |
 | 0 | Minor UI tweaks and paywalls | Lasse (app), Jonas (backend for paywalls) |
 | 1 | Production backend on Convex | Jonas |
-| 2 | Accounts, build and TestFlight | Elias |
+| 2 | Accounts, build and TestFlight | Lasse |
 | 3 | Real playtest on phones | Everyone, Kian recruits |
-| 4 | Fixes Apple will check | Elias, Jonas, Lasse |
-| 5 | App Store listing and submission | Elias, Kian |
+| 4 | Fixes Apple will check | Lasse, Jonas |
+| 5 | App Store listing and submission | Lasse, Kian |
 | 6 | After launch | Everyone |
 
 ---
@@ -78,12 +78,12 @@ Done when: the production URL exists, auth works, and a test sign-in from a dev 
 
 ---
 
-## Phase 2: accounts, build and TestFlight (Elias)
+## Phase 2: accounts, build and TestFlight (Lasse)
 
 ### 2.1 Accounts
 
 - [ ] Apple Developer Program membership ($99 a year). An organisation account is better for a dating app (it shows the company as the seller); it needs a D-U-N-S number, which takes days to weeks.
-- [ ] Expo account with access to the EAS project. `mobile/app.json` lists the owner `elihhh` and project id `f4648c9d-c8ad-4a8e-8f14-b63942d3b618`. Add the others in expo.dev.
+- [ ] **Move the EAS project off Elias's account.** `mobile/app.json` lists the Expo owner `elihhh` and project id `f4648c9d-c8ad-4a8e-8f14-b63942d3b618`. If that's Elias's account, he owns the builds and signing credentials. Either ask him to transfer the project to an Expo organization the team controls (expo.dev → project settings → Transfer), or create a new project under our own account with `npx eas-cli@latest init` and update `owner` and `extra.eas.projectId` in `app.json`. Then add the others in expo.dev.
 - [ ] App Store Connect: create the app with bundle id **`com.popdate.app`** (already in `app.json`), SKU, and primary language.
 
 ### 2.2 Point the builds at Convex
@@ -142,7 +142,7 @@ Done when: five rooms in a row finish without anyone getting stuck.
 Apple treats dating apps as high risk. These are the usual reasons for rejection, with the GitHub issue numbers.
 
 - [ ] **Review account for App Review (Guideline 2.1).** A reviewer alone can't fill a room of six. Apple wants a demo account rather than a built-in demo mode (a demo mode needs their approval first), so give them a review account whose rooms the server fills with bots, and explain it in the review notes. Without this, review will fail.
-- [ ] **Sign in with Apple** instead of anonymous accounts (Elias). Apple doesn't require it for us: Guideline 4.8 only applies when an app offers a login like Google or Facebook, and Popdate has none. We want it because today, deleting the app loses the profile. If we ever add Google or Facebook login, it becomes required. Needs the `expo-apple-authentication` package and the "Sign In with Apple" capability for the bundle id (`ios.usesAppleSignIn: true` in `app.json`).
+- [ ] **Sign in with Apple** instead of anonymous accounts (Lasse). Apple doesn't require it for us: Guideline 4.8 only applies when an app offers a login like Google or Facebook, and Popdate has none. We want it because today, deleting the app loses the profile. If we ever add Google or Facebook login, it becomes required. Needs the `expo-apple-authentication` package and the "Sign In with Apple" capability for the bundle id (`ios.usesAppleSignIn: true` in `app.json`).
 - [ ] **Report and block everywhere (Guideline 1.2):** on every person in a room (done via the "…" menu) and by long-pressing a message (not done, #6).
 - [ ] **Blocked people disappear from Matches** (#7).
 - [ ] **A stronger server word filter** (#8): catch "f*ck", "sh1t", spaced-out letters.
@@ -155,7 +155,7 @@ Apple treats dating apps as high risk. These are the usual reasons for rejection
 
 ---
 
-## Phase 5: App Store listing and submission (Elias, Kian)
+## Phase 5: App Store listing and submission (Lasse, Kian)
 
 - [ ] **Privacy policy and terms** on a public URL (not only inside the app). The in-app versions are English only; translate them or say so.
 - [ ] **App Privacy labels** in App Store Connect. Popdate collects: photos, name, birthday, gender and who you want to meet, city, chat messages and answers, a device push token, and purchase history once paywalls exist. None of it is used for tracking across other companies' apps, so no tracking prompt is needed (as long as the analytics provider is set up without tracking).
