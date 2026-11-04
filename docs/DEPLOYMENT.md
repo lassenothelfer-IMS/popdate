@@ -88,7 +88,7 @@ Done when: the production URL exists, auth works, and a test sign-in from a dev 
   - Paywall earnings (phase 0.2) are paid to the Account Holder's bank account, so decide how they're shared before the first sale.
 - [x] **EAS project on a team account.** Done 3 Nov 2026: the project is now `@goodn8s-team/popdate` (id `6d969a16-8f03-40b0-ab56-6b10f2695343`), owned by Lasse's Expo organization `goodn8s-team`, instead of Elias's account `elihhh`. Any builds or credentials made on the old project stay there; new ones are made on this one.
 - [ ] For now only Lasse is in the `goodn8s-team` organization and runs the builds. When someone else needs to, invite them on expo.dev (Account settings → Members) with the Developer role or higher.
-- [ ] App Store Connect: create the app with bundle id **`com.popdate.app`** (already in `app.json`), SKU, and primary language.
+- [ ] App Store Connect: create the app with bundle id **`com.goodn8s.popdate`** (already in `app.json`; `com.popdate.app` was taken), SKU, and primary language.
 
 ### 2.2 Point the builds at Convex
 
