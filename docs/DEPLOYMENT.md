@@ -39,7 +39,8 @@ Decide first (whole team):
 - [ ] **Subscription, one-time purchases, or both.** Price points per country.
 
 Then build it:
-- [ ] Sign the **Paid Apps agreement** in App Store Connect, under Business. Banking and tax forms have to be complete before any purchase works, even in testing.
+- [ ] Sign the **Paid Apps agreement** in App Store Connect, under Business. First confirm the legal entity there ("Edit Legal Entity"), then accept the terms and fill in bank account, tax forms (W-8BEN for non-US individuals) and contacts. Banking and tax forms have to be complete before any purchase works, even in testing.
+- [ ] **EU later (decided 2026-11-04).** The EU storefront needs a Digital Services Act trader declaration under Business. A paid app means "trader", and Apple then shows the account holder's address, phone and email on the EU store page. Launch without the EU first; before adding it, get a business or c/o address and a separate app email and phone.
 - [ ] Create the products (subscription group and/or consumables) in App Store Connect → the app → Monetization.
 - [ ] Add a purchases library. The common choice is RevenueCat (`react-native-purchases` with `react-native-purchases-ui`, which includes ready-made paywall screens). It handles receipts, restores and subscription status. **This is a new dependency: agree on it before adding it.** It has native code, so real purchases need a development build; in Expo Go it only runs in RevenueCat's preview mode, with fake purchases.
 - [ ] Backend (Jonas): store what each user is entitled to on the server, and check it there, not only in the app. RevenueCat can send a webhook to a Convex HTTP action (`mobile/convex/http.ts`) when a purchase or renewal happens.
