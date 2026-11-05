@@ -1,0 +1,856 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../endcard/brand.css">
+<style>
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #0b0d12; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="screen" width="1080" height="1920"></canvas>
+<script type="module">
+  import { BODY, KNOT, RED } from '../endcard/balloon.js';
+  import { EYE, LEN, POSES, blend, solve, drawStickman } from './stickman.js';
+  import { DURATION, T, POPS, FLIGHT, LABELS } from './quiet-one-timeline.js';
+
+  const W = 1080, H = 1920, M = 90; // M: background margin, so camera shake never shows an edge
+  const GROUND = 1650, LEDGE = 722;
+  const INK = '#07080a', FADED = '#1d2129';
+  const MOON = { x: 800, y: 470, r: 118 };
+
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const span = (t, start, length) => clamp((t - start) / length);
+  const mix = (a, b, p) => a + (b - a) * p;
+  const outCubic = (p) => 1 - (1 - p) ** 3;
+  const inCubic = (p) => p ** 3;
+  const inOutCubic = (p) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
+  const outBack = (p, s = 1.4) => 1 + (s + 1) * (p - 1) ** 3 + s * (p - 1) ** 2;
+  const outExpo = (p) => (p === 1 ? 1 : 1 - 2 ** (-10 * p));
+  // 0 before `a`, 1 between `a` and `b`, back to 0 after, with `fade`-long ramps.
+  const win = (t, a, b, fade) => Math.min(span(t, a, fade), 1 - span(t, b - fade, fade));
+  const hexMix = (a, b, p) => {
+    const c = [a, b].map((h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)));
+    return `rgb(${c[0].map((v, i) => Math.round(mix(v, c[1][i], p))).join(',')})`;
+  };
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let r = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const bezier = (p0, p1, p2, p3, u) => [0, 1].map((k) =>
+    (1 - u) ** 3 * p0[k] + 3 * (1 - u) ** 2 * u * p1[k] + 3 * (1 - u) * u ** 2 * p2[k] + u ** 3 * p3[k]);
+
+  // ---------------------------------------------------------------- cast and poses
+
+  const P = {
+    stand: POSES.stand,
+    point: { lean: -3, tilt: -6, aF: 98, eF: -6, aB: -38, eB: 95, tF: 12, kF: -4, tB: -12, kB: -2 },
+    flex: { lean: -2, tilt: -8, aF: 92, eF: 98, aB: -6, eB: 8, tF: 13, kF: -4, tB: -13, kB: -2 },
+    keys: { lean: 2, tilt: -4, aF: 42, eF: 82, aB: -8, eB: 10, tF: 9, kF: -3, tB: -9, kB: -2 },
+    crossed: { lean: -9, tilt: -10, aF: 24, eF: 104, aB: 18, eB: 112, tF: 14, kF: -2, tB: -3, kB: -6 },
+    laugh: { lean: -12, tilt: -20, aF: 96, eF: -4, aB: 22, eB: 98, tF: 12, kF: -6, tB: -12, kB: -4 },
+    sag: { lean: 14, tilt: 30, aF: 4, eF: 2, aB: -4, eB: 2, tF: 5, kF: -6, tB: -5, kB: -8, y: 6 },
+    lookUp: { lean: -6, tilt: -30, aF: 10, eF: 8, aB: -10, eB: 8, tF: 6, kF: -3, tB: -6, kB: -2 },
+    nervous: { lean: 4, tilt: -10, aF: 14, eF: 30, aB: -6, eB: 30, tF: 4, kF: -2, tB: -4, kB: -2, y: 3 },
+    hold: { lean: 4, tilt: 10, aF: 32, eF: 72, aB: 26, eB: 80, tF: 5, kF: -2, tB: -5, kB: -2 },
+    type: { lean: 8, tilt: 24, aF: 30, eF: 90, aB: 24, eB: 96, tF: 5, kF: -2, tB: -5, kB: -2 },
+    shrink: { lean: 10, tilt: 14, aF: 26, eF: 84, aB: 20, eB: 92, tF: 8, kF: -10, tB: -8, kB: -10, y: 4 },
+    hang: { lean: 0, tilt: -10, aF: 178, eF: 0, aB: -178, eB: 0, tF: 10, kF: -12, tB: -12, kB: -24 },
+    together: { lean: 2, tilt: -12, aF: 128, eF: 14, aB: -6, eB: 10, tF: 7, kF: -3, tB: -7, kB: -2 },
+    popper: { lean: 3, tilt: 6, aF: 14, eF: 18, aB: -8, eB: 12, tF: 6, kF: -2, tB: -6, kB: -2 },
+    card: { lean: -2, tilt: -6, aF: 166, eF: 14, aB: -166, eB: -14, tF: 7, kF: -3, tB: -7, kB: -2 },
+    windup: { lean: -8, tilt: -4, aF: -140, eF: -55, aB: 40, eB: 20, tF: 12, kF: -4, tB: -14, kB: -4 },
+    release: { lean: 12, tilt: 8, aF: 62, eF: -4, aB: -30, eB: 10, tF: 16, kF: -10, tB: -12, kB: -2 },
+    reach: { lean: 0, tilt: -22, aF: 150, eF: 4, aB: -10, eB: 10, tF: 7, kF: -3, tB: -7, kB: -2 },
+  };
+
+  const FLEXERS = [
+    { id: 'A', x: 352, s: 1.36, base: 'point', props: { shades: true }, phase: 0.4 },
+    { id: 'B', x: 548, s: 1.4, base: 'flex', props: {}, muscle: true, phase: 1.9 },
+    { id: 'C', x: 744, s: 1.32, base: 'keys', props: {}, phase: 3.1 },
+    { id: 'D', x: 940, s: 1.38, base: 'crossed', props: {}, phase: 4.6 },
+  ];
+  for (const f of FLEXERS) f.popAt = POPS[f.id];
+  const QUIET = { x: 128, s: 1.0 };
+  const POPPER = { x: 800, s: 1.1 };
+  const LIFT_STRING = 110;
+  const ARMS_UP = (LEN.upper + LEN.fore + LEN.torso * 0.9) * QUIET.s; // hand to hip when hanging
+  const LAND = { x: 650, hip: LEDGE - (LEN.thigh + LEN.shin) * QUIET.s * 0.995 };
+
+  /** A flexer's pose while still in the game, at time t. */
+  function flexerAlive(f, t) {
+    const ph = f.phase;
+    const shake = Math.sin(2 * Math.PI * 6.2 * t + ph);
+    const laughing = { ...P.laugh, lean: P.laugh.lean + 5 * shake, tilt: P.laugh.tilt + 5 * shake, y: -5 * Math.abs(Math.sin(2 * Math.PI * 3.1 * t + ph)) };
+    const laughW = win(t, T.laugh, f.id === 'B' ? T.round4 + 0.2 : 99, 0.22);
+    let pose = blend(P[f.base], laughing, outCubic(laughW));
+    let face = -1, expression = laughW > 0.5 ? 'laugh' : 'smug', look = [-0.6, 0.1];
+    if (f.id === 'B' && t >= T.round4) {
+      // Alone with the quiet one: he turns to the popper and starts sweating.
+      const turn = inOutCubic(span(t, T.round4, 0.3));
+      pose = blend(pose, { ...P.nervous, x: 1.4 * Math.sin(t * 60) }, outCubic(span(t, T.round4 + 0.1, 0.3)));
+      face = mix(-1, 1, turn);
+      if (turn > 0.5) { expression = 'nervous'; look = [0.4, -0.9]; }
+    }
+    pose = { ...pose, y: (pose.y ?? 0) + 1.5 * Math.sin(2.2 * t + ph), lean: pose.lean + 1.2 * Math.sin(1.3 * t + ph) };
+    return { pose, face, expression, look };
+  }
+
+  function flexerState(f, t) {
+    if (t < f.popAt) return { ...flexerAlive(f, t), color: INK, rim: 0.45 };
+    const frozen = flexerAlive(f, f.popAt);
+    const dt = t - f.popAt;
+    let pose = frozen.pose, expression = 'shock', look = frozen.look;
+    if (dt > 0.22) {
+      pose = blend(frozen.pose, P.sag, outCubic(span(dt, 0.22, 0.5)));
+      expression = 'sad';
+      look = [0, 0.6];
+    }
+    const watch = Math.max(T.lift + 0.15, f.popAt + 0.6);
+    if (t > watch) {
+      pose = blend(pose, P.lookUp, inOutCubic(span(t, watch, 0.5)));
+      expression = 'shock';
+      look = [frozen.face > 0 ? -0.5 : 0.5, -1];
+    }
+    const fade = outCubic(span(dt, 0.2, 0.6));
+    return { pose, face: frozen.face, expression, look, color: hexMix(INK, FADED, fade), rim: mix(0.45, 0.18, fade) };
+  }
+
+  function quietState(t) {
+    let pose = P.hold, expression = 'calm', look = [0.5, -0.6];
+    if (t > T.cardUp) look = [0.7, -0.9];
+    const typing = { ...P.type, eF: P.type.eF + 8 * Math.sin(t * 38), eB: P.type.eB + 8 * Math.sin(t * 43 + 1) };
+    const typeW = win(t, T.quietTurn, T.reveal, 0.25);
+    pose = blend(pose, typing, typeW);
+    if (typeW > 0.5) look = [0.3, 0.7];
+    if (t > T.reveal && t < T.cardDown) look = [0.8, -0.8];
+    const tense = win(t, T.round4, T.lift + 0.1, 0.3);
+    pose = blend(pose, P.shrink, tense);
+    if (tense > 0.5) { expression = 'nervous'; look = [0.6, -0.9]; }
+    if (t >= POPS.B) expression = 'shock';
+    pose = { ...pose, y: (pose.y ?? 0) + 1.2 * Math.sin(2 * t), lean: pose.lean + Math.sin(1.1 * t) };
+    return { pose, expression, look };
+  }
+
+  /** The popper's front arm angle that points the pin at (x, y). */
+  function aimAngle(shoulder, [x, y]) {
+    return (Math.atan2((x - shoulder[0]) * -1, y - shoulder[1]) * 180) / Math.PI;
+  }
+
+  /** Blends a throw over `base`: wind up, snap forward at `release`, settle back. */
+  function throwOver(base, t, release, after = base) {
+    if (t < release - 0.3 || t > release + 0.6) return t > release ? after : base;
+    let p = blend(base, P.windup, outCubic(span(t, release - 0.3, 0.26)));
+    p = blend(p, P.release, outCubic(span(t, release - 0.04, 0.1)));
+    return blend(p, after, inOutCubic(span(t, release + 0.2, 0.38)));
+  }
+
+  function popperState(t, balloonAt) {
+    let pose = { ...P.popper, y: 1.2 * Math.sin(2.1 * t), lean: P.popper.lean + Math.sin(1.2 * t) };
+    let expression = 'calm', look = [-0.4, 0.6];
+    pose = blend(pose, P.card, outBack(win(t, T.cardUp, T.cardHold + 0.32, 0.32), 1.1));
+    // She likes his answer.
+    if (t > T.reveal + 0.3 && t < T.reveal + 2) { expression = 'happy'; look = [-1, 0.3]; }
+    for (const id of ['D', 'A', 'C']) pose = throwOver(pose, t, POPS[id] - FLIGHT);
+
+    // Round 4: the pin hovers between the two, then flies at the muscle guy.
+    const stand = pose;
+    if (t > T.aims[0][0]) {
+      const shoulder = solve(stand, { x: POPPER.x, y: LEDGE, s: POPPER.s, face: -1 }).shoulder;
+      const toB = T.aims.slice(1).reduce((w, [time, who]) => w + (who === 'B' ? 1 : -1) * inOutCubic(span(t, time, 0.35)), 0);
+      const angle = mix(aimAngle(shoulder, balloonAt('quiet')), aimAngle(shoulder, balloonAt('B')), toB);
+      const aim = { ...P.popper, lean: 6, tilt: 14, aF: angle, eF: 0, aB: -36, eB: 95 };
+      const aiming = blend(stand, aim, outCubic(span(t, T.aims[0][0], 0.35)));
+      pose = throwOver(aiming, t, POPS.B - FLIGHT, stand);
+      expression = t < POPS.B ? 'smug' : 'calm';
+    }
+    if (t > T.lift) look = [-0.6, -0.3];
+    pose = blend(pose, P.reach, outCubic(span(t, T.land - 0.5, 0.35)));
+    pose = blend(pose, P.together, inOutCubic(span(t, T.land, 0.3)));
+    if (t > T.land) expression = 'happy';
+    return { pose, expression, look };
+  }
+
+  // ---------------------------------------------------------------- balloon physics
+
+  // Each balloon floats on its string; the string's end follows the holder's hand.
+  const holders = [
+    ...FLEXERS.map((f, i) => ({ id: f.id, L: f.muscle ? 345 : 320, w: 112, seed: i, anchor: (t) => flexerJoints(f, t).handB, popAt: f.popAt })),
+    { id: 'quiet', L: 250, w: 104, seed: 4, anchor: (t) => quietJoints(t).handF, popAt: T.lift },
+  ];
+  let sim = null;
+  function resetSim() {
+    sim = { t: 0, snap: null, b: holders.map((h) => {
+      const a = h.anchor(0);
+      return { x: a[0], y: a[1] - h.L, px: a[0], py: a[1] - h.L };
+    }) };
+  }
+  function simTo(t) {
+    if (!sim || t < sim.t) resetSim();
+    const dt = 1 / 240;
+    while (sim.t + dt <= t) {
+      const time = sim.t + dt;
+      holders.forEach((h, i) => {
+        if (time > h.popAt) return;
+        const b = sim.b[i];
+        const vx = (b.x - b.px) * 0.985, vy = (b.y - b.py) * 0.985;
+        const wind = 70 * Math.sin(time * 0.8 + h.seed * 1.7) + 35 * Math.sin(time * 2.1 + h.seed);
+        b.px = b.x; b.py = b.y;
+        b.x += vx + wind * dt * dt;
+        b.y += vy - 1500 * dt * dt;
+        const a = h.anchor(time);
+        const dx = b.x - a[0], dy = b.y - a[1], d = Math.hypot(dx, dy);
+        if (d > h.L) {
+          // Pull the balloon back onto the string without adding that pull to its speed,
+          // or a fast hand would fling it past its rest point.
+          const cx = a[0] + (dx / d) * h.L - b.x, cy = a[1] + (dy / d) * h.L - b.y;
+          b.x += cx; b.y += cy; b.px += cx; b.py += cy;
+        }
+      });
+      // Neighbours bump instead of overlapping.
+      for (let i = 0; i < holders.length; i++) for (let k = i + 1; k < holders.length; k++) {
+        if (time > holders[i].popAt || time > holders[k].popAt) continue;
+        const a = sim.b[i], b = sim.b[k], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = 104;
+        if (d < min && d > 0) { const push = (min - d) / 2 / d; a.x -= dx * push; a.y -= dy * push; b.x += dx * push; b.y += dy * push; }
+      }
+      sim.t = time;
+      if (!sim.snap && time >= T.lift) sim.snap = [sim.b[4].x, sim.b[4].y];
+    }
+  }
+
+  const knotOffset = (w) => (13.3 / 24) * w;
+
+  /** The quiet one's balloon: physics until the lift, then a scripted flight up to the ledge. */
+  function quietBalloon(t) {
+    if (t < T.lift) return { x: sim.b[4].x, y: sim.b[4].y, w: 104 };
+    const w = mix(104, 132, outCubic(span(t, T.lift, 0.6)));
+    const standHand = solve(blend(P.hold, P.hang, 1), { x: QUIET.x, y: GROUND, s: QUIET.s, face: 1 }).handF;
+    const q1 = [standHand[0], standHand[1] - LIFT_STRING - knotOffset(w)];
+    const end = [LAND.x, LAND.hip - ARMS_UP - LIFT_STRING - knotOffset(w)];
+    let p;
+    // On the frame right at the lift the simulation can still be a step short of saving its position.
+    const from = sim.snap ?? [sim.b[4].x, sim.b[4].y];
+    if (t < T.lift + 0.22) p = [0, 1].map((k) => mix(from[k], q1[k], outCubic(span(t, T.lift, 0.22))));
+    else p = bezier(q1, [170, 520], [610, 140], end, inOutCubic(span(t, T.lift + 0.22, T.land - T.lift - 0.22)));
+    if (t >= T.land) {
+      // Both hold the string now; the balloon settles over their hands.
+      const meet = handsMeet(t);
+      const over = [meet[0] + 10 * Math.sin(t * 1.4), meet[1] - LIFT_STRING - knotOffset(w) + 4 * Math.sin(t * 2.3)];
+      p = [0, 1].map((k) => mix(end[k], over[k], inOutCubic(span(t, T.land, 0.4))));
+    }
+    return { x: p[0], y: p[1], w };
+  }
+
+  // ---------------------------------------------------------------- solved characters
+
+  const flexerJoints = (f, t) => {
+    const st = flexerState(f, t);
+    return solve(st.pose, { x: f.x, y: GROUND, s: f.s, face: st.face, muscle: f.muscle });
+  };
+
+  function quietJoints(t) {
+    const st = quietState(t);
+    if (t < T.lift) return solve(st.pose, { x: QUIET.x, y: GROUND, s: QUIET.s, face: 1 });
+    if (t < T.land) {
+      const b = quietBalloon(t);
+      const hand = [b.x, b.y + knotOffset(b.w) + LIFT_STRING];
+      const swing = Math.sin((t - T.lift) * 5) * 7 * span(t, T.lift + 0.3, 0.3);
+      const hang = { ...P.hang, lean: swing * 0.4, tF: P.hang.tF + swing, tB: P.hang.tB + swing * 1.3 };
+      const pose = blend(st.pose, hang, outCubic(span(t, T.lift, 0.22)));
+      const standing = solve(pose, { x: QUIET.x, y: GROUND, s: QUIET.s, face: 1 });
+      const hipY = hand[1] + ARMS_UP;
+      return hipY >= standing.hip[1] ? standing : solve(pose, { s: QUIET.s, face: 1, hip: [hand[0], hipY] });
+    }
+    const landed = blend({ ...P.hang, y: 7 }, { ...P.together, y: 2 * Math.sin(t * 2) }, outCubic(span(t, T.land, 0.3)));
+    return solve(landed, { x: LAND.x, y: LEDGE, s: QUIET.s, face: 1 });
+  }
+
+  const popperJoints = (t) => solve(popperState(t, balloonAt).pose, { x: POPPER.x, y: LEDGE, s: POPPER.s, face: -1 });
+
+  function handsMeet(t) {
+    const his = solve(P.together, { x: LAND.x, y: LEDGE, s: QUIET.s, face: 1 }).handF;
+    const hers = solve(P.together, { x: POPPER.x, y: LEDGE, s: POPPER.s, face: -1 }).handF;
+    return [(his[0] + hers[0]) / 2, (his[1] + hers[1]) / 2];
+  }
+
+  function balloonAt(id) {
+    if (id === 'quiet') { const b = quietBalloon(sim.t); return [b.x, b.y]; }
+    const b = sim.b[holders.findIndex((h) => h.id === id)];
+    return [b.x, b.y];
+  }
+
+  // ---------------------------------------------------------------- background
+
+  const bg = document.createElement('canvas');
+  bg.width = W + 2 * M; bg.height = H + 2 * M;
+
+  function ridge(g, base, amp, color, seed) {
+    const r = rng(seed), ph = [r() * 9, r() * 9, r() * 9, r() * 9];
+    g.fillStyle = color;
+    g.beginPath();
+    g.moveTo(-M, H + M);
+    for (let x = -M; x <= W + M; x += 6) {
+      const n = 0.5 * Math.sin(x * 0.0045 + ph[0]) + 0.28 * Math.sin(x * 0.012 + ph[1]) + 0.14 * Math.abs(Math.sin(x * 0.031 + ph[2])) + 0.06 * Math.sin(x * 0.09 + ph[3]);
+      g.lineTo(x, base - amp * (0.5 + 0.5 * n));
+    }
+    g.lineTo(W + M, H + M);
+    g.fill();
+  }
+
+  function paintBackground() {
+    const g = bg.getContext('2d');
+    g.translate(M, M);
+    const sky = g.createLinearGradient(0, -M, 0, H + M);
+    sky.addColorStop(0, '#07080c');
+    sky.addColorStop(0.38, '#151920');
+    sky.addColorStop(0.66, '#2b313b');
+    sky.addColorStop(0.84, '#252a33');
+    sky.addColorStop(1, '#121418');
+    g.fillStyle = sky;
+    g.fillRect(-M, -M, W + 2 * M, H + 2 * M);
+
+    const warm = g.createRadialGradient(MOON.x, MOON.y, 0, MOON.x, MOON.y, 950);
+    warm.addColorStop(0, 'rgba(255, 190, 145, 0.22)');
+    warm.addColorStop(0.35, 'rgba(255, 170, 125, 0.08)');
+    warm.addColorStop(1, 'rgba(255, 170, 125, 0)');
+    g.fillStyle = warm;
+    g.fillRect(-M, -M, W + 2 * M, H + 2 * M);
+
+    const r = rng(11);
+    for (let i = 0; i < 110; i++) {
+      const x = r() * (W + 2 * M) - M, y = r() * 1050 - M, size = 0.6 + r() * 1.6;
+      g.fillStyle = `rgba(235, 238, 245, ${0.15 + r() * 0.5})`;
+      g.beginPath(); g.arc(x, y, size, 0, Math.PI * 2); g.fill();
+    }
+
+    g.save();
+    g.shadowColor = 'rgba(255, 215, 175, 0.55)';
+    g.shadowBlur = 90;
+    const moon = g.createRadialGradient(MOON.x - 30, MOON.y - 35, 10, MOON.x, MOON.y, MOON.r);
+    moon.addColorStop(0, '#f6eee2');
+    moon.addColorStop(1, '#d9ccb8');
+    g.fillStyle = moon;
+    g.beginPath(); g.arc(MOON.x, MOON.y, MOON.r, 0, Math.PI * 2); g.fill();
+    g.restore();
+    for (const [dx, dy, cr, a] of [[-38, 22, 22, 0.07], [30, -40, 14, 0.06], [42, 38, 18, 0.05], [-10, -12, 9, 0.05]]) {
+      g.fillStyle = `rgba(120, 100, 80, ${a})`;
+      g.beginPath(); g.arc(MOON.x + dx, MOON.y + dy, cr, 0, Math.PI * 2); g.fill();
+    }
+
+    ridge(g, 1330, 190, '#2a2f39', 3);
+    const haze = g.createLinearGradient(0, 1150, 0, 1500);
+    haze.addColorStop(0, 'rgba(120, 132, 155, 0)');
+    haze.addColorStop(1, 'rgba(120, 132, 155, 0.18)');
+    g.fillStyle = haze;
+    g.fillRect(-M, 1150, W + 2 * M, 350);
+    ridge(g, 1470, 140, '#1c2028', 8);
+
+    // The plateau the contestants stand on.
+    const rr = rng(5);
+    const edge = [];
+    for (let x = -M; x <= W + M; x += 30) edge.push([x, GROUND + (rr() - 0.5) * 5 + Math.sin(x * 0.02) * 2]);
+    const ground = g.createLinearGradient(0, GROUND, 0, H + M);
+    ground.addColorStop(0, '#0e1015');
+    ground.addColorStop(1, '#040506');
+    g.fillStyle = ground;
+    g.beginPath();
+    g.moveTo(-M, H + M);
+    for (const p of edge) g.lineTo(...p);
+    g.lineTo(W + M, H + M);
+    g.fill();
+    g.strokeStyle = 'rgba(175, 188, 210, 0.28)';
+    g.lineWidth = 2;
+    g.beginPath();
+    edge.forEach((p, i) => (i ? g.lineTo(...p) : g.moveTo(...p)));
+    g.stroke();
+
+    // The popper's ledge, sticking out from the right.
+    const top = [[W + M, 704], [980, 708], [880, 713], [780, 717], [680, 720], [600, 723], [566, 727]];
+    const under = [[556, 742], [566, 762], [612, 788], [664, 806], [702, 832], [760, 852], [812, 884], [870, 902], [930, 944], [990, 968], [1040, 1012], [W + M, 1046]];
+    g.fillStyle = '#0a0b0e';
+    g.beginPath();
+    g.moveTo(...top[0]);
+    for (const p of [...top.slice(1), ...under]) g.lineTo(...p);
+    g.closePath();
+    g.fill();
+    g.save();
+    g.strokeStyle = 'rgba(255, 205, 165, 0.5)';
+    g.shadowColor = 'rgba(255, 190, 140, 0.6)';
+    g.shadowBlur = 8;
+    g.lineWidth = 2.5;
+    g.beginPath();
+    top.forEach((p, i) => (i ? g.lineTo(...p) : g.moveTo(...p)));
+    g.lineTo(556, 742);
+    g.stroke();
+    g.restore();
+  }
+
+  function drawAtmosphere(ctx, t) {
+    // Two fog bands drifting slowly across the valley.
+    for (const [y, h, a, speed] of [[1420, 260, 0.1, 9], [1560, 200, 0.08, -6]]) {
+      const x = ((t * speed) % 400) - 200;
+      const fog = ctx.createLinearGradient(0, y - h / 2, 0, y + h / 2);
+      fog.addColorStop(0, 'rgba(150, 165, 190, 0)');
+      fog.addColorStop(0.5, `rgba(150, 165, 190, ${a})`);
+      fog.addColorStop(1, 'rgba(150, 165, 190, 0)');
+      ctx.fillStyle = fog;
+      ctx.fillRect(-M + x, y - h / 2, W + 2 * M + 400, h);
+    }
+    // Dust in the moonlight.
+    const r = rng(23);
+    for (let i = 0; i < 34; i++) {
+      const x0 = r() * W, y0 = r() * 1700, sp = 6 + r() * 14, ph = r() * 6;
+      const x = (x0 + t * sp + 30 * Math.sin(t * 0.4 + ph)) % W, y = y0 - t * sp * 0.6 + 20 * Math.sin(t * 0.7 + ph);
+      ctx.fillStyle = `rgba(255, 230, 205, ${0.12 + 0.18 * (0.5 + 0.5 * Math.sin(t * 1.7 + ph))})`;
+      ctx.beginPath(); ctx.arc(x, y, 1.2 + r() * 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ---------------------------------------------------------------- props
+
+  const body = new Path2D(BODY), knot = new Path2D(KNOT);
+
+  function drawBalloon(ctx, x, y, w, angle, glow = 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.scale(w / 24, w / 24);
+    ctx.translate(-12, -12.7);
+    ctx.fillStyle = RED.deep;
+    ctx.fill(knot);
+    const fill = ctx.createRadialGradient(8.6, 7.2, 0, 12, 12.7, 13.5);
+    fill.addColorStop(0, RED.light);
+    fill.addColorStop(0.55, RED.base);
+    fill.addColorStop(1, RED.deep);
+    ctx.shadowColor = `rgba(240, 90, 70, ${0.4 + glow * 0.5})`;
+    ctx.shadowBlur = (22 + glow * 60) * (w / 100);
+    ctx.fillStyle = fill;
+    ctx.fill(body);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255, 253, 250, 0.42)';
+    ctx.beginPath(); ctx.ellipse(8.2, 7.6, 1.7, 3.1, -0.38, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255, 253, 250, 0.55)';
+    ctx.beginPath(); ctx.ellipse(9.6, 4.3, 0.55, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  /** A balloon on its string from `hand`; the balloon leans away from the hand. */
+  function drawTethered(ctx, hand, b, w, t, seed, glow = 0) {
+    const angle = Math.atan2(b[0] - hand[0], hand[1] - b[1]);
+    const kx = b[0] - Math.sin(angle) * knotOffset(w), ky = b[1] + Math.cos(angle) * knotOffset(w);
+    const mx = (kx + hand[0]) / 2 + 9 * Math.sin(t * 2.7 + seed), my = (ky + hand[1]) / 2;
+    ctx.strokeStyle = 'rgba(243, 238, 231, 0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(kx, ky); ctx.quadraticCurveTo(mx, my, ...hand); ctx.stroke();
+    drawBalloon(ctx, b[0], b[1], w, angle, glow);
+  }
+
+  /** What's left after a pop: a limp string with a scrap of rubber. */
+  function drawLimp(ctx, hand, t, since) {
+    const sway = Math.sin(t * 3 + since) * 6 * Math.exp(-(t - since) * 1.5);
+    const end = [hand[0] - 6 + sway, hand[1] + 70];
+    ctx.strokeStyle = 'rgba(243, 238, 231, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(...hand); ctx.quadraticCurveTo(hand[0] + 10 + sway, hand[1] + 35, ...end); ctx.stroke();
+    ctx.fillStyle = RED.deep;
+    ctx.beginPath(); ctx.moveTo(end[0] - 7, end[1]); ctx.lineTo(end[0] + 6, end[1] + 2); ctx.lineTo(end[0], end[1] + 13); ctx.fill();
+  }
+
+  const BURSTS = Object.fromEntries(Object.entries(POPS).map(([id, at], n) => {
+    const r = rng(40 + n), big = id === 'B';
+    return [id, Array.from({ length: big ? 30 : 20 }, () => {
+      const a = r() * Math.PI * 2, speed = (380 + r() * 700) * (big ? 1.35 : 1);
+      return { vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 220, spin: (r() - 0.5) * 1400, size: 9 + r() * 15, shade: [RED.light, RED.base, RED.deep][Math.floor(r() * 3)], life: 0.5 + r() * 0.45 };
+    })];
+  }));
+
+  function drawBurst(ctx, id, [x, y], dt) {
+    const big = id === 'B', S = big ? 300 : 210;
+    const p = span(dt, 0, 0.4);
+    if (p < 1) {
+      ctx.save();
+      const flash = ctx.createRadialGradient(x, y, 0, x, y, S);
+      flash.addColorStop(0, `rgba(255, 240, 225, ${0.55 * (1 - p)})`);
+      flash.addColorStop(1, 'rgba(255, 240, 225, 0)');
+      ctx.fillStyle = flash;
+      ctx.fillRect(x - S, y - S, 2 * S, 2 * S);
+      ctx.strokeStyle = RED.light;
+      ctx.globalAlpha = (1 - p) * 0.85;
+      ctx.lineWidth = mix(10, 2, p);
+      ctx.beginPath(); ctx.arc(x, y, mix(0.25, 0.62, outExpo(p)) * S, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineCap = 'round';
+      ctx.lineWidth = S * 0.06;
+      ctx.globalAlpha = clamp(1.4 - p * 1.4);
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4, d = S * mix(0.32, 0.78, outExpo(p)), len = S * (k % 2 ? 0.13 : 0.19) * (1 - p * 0.6);
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(a) * (d - len / 2), y + Math.sin(a) * (d - len / 2));
+        ctx.lineTo(x + Math.cos(a) * (d + len / 2), y + Math.sin(a) * (d + len / 2));
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    for (const s of BURSTS[id]) {
+      const q = dt / s.life;
+      if (q >= 1) continue;
+      ctx.save();
+      ctx.translate(x + s.vx * dt * (1 - q * 0.35), y + s.vy * dt + 1500 * dt * dt);
+      ctx.rotate((s.spin * dt * Math.PI) / 180);
+      ctx.globalAlpha = 1 - inCubic(q);
+      ctx.fillStyle = s.shade;
+      ctx.beginPath();
+      ctx.moveTo(-s.size / 2, 0); ctx.quadraticCurveTo(0, -s.size * 0.6, s.size / 2, 0); ctx.quadraticCurveTo(0, -s.size * 0.25, -s.size / 2, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawPin(ctx, [x, y], angle) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.strokeStyle = '#d9dde4';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(40, 0); ctx.stroke();
+    ctx.fillStyle = RED.base;
+    ctx.shadowColor = 'rgba(240, 90, 70, 0.6)';
+    ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  /** A car key fob on a ring, spun around his finger. */
+  function drawKeys(ctx, hand, t) {
+    ctx.save();
+    ctx.translate(hand[0], hand[1] - 6);
+    ctx.rotate(t * 9);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#c3c8d0';
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke();
+    // A short link, then the fob hanging off the ring.
+    ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(0, 20); ctx.stroke();
+    ctx.translate(0, 20);
+    ctx.fillStyle = '#23262c';
+    ctx.strokeStyle = 'rgba(235, 238, 244, 0.95)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.roundRect(-17, 0, 34, 52, [10, 10, 14, 14]); ctx.fill(); ctx.stroke();
+    // Lock, unlock and trunk buttons, and the logo.
+    ctx.fillStyle = '#5b616b';
+    for (const by of [13, 25, 37]) { ctx.beginPath(); ctx.roundRect(-8, by - 4, 16, 8, 4); ctx.fill(); }
+    ctx.fillStyle = '#c3c8d0';
+    ctx.beginPath(); ctx.arc(0, 47, 2.2, 0, Math.PI * 2); ctx.fill();
+    // The flip-out blade, with cuts along one edge.
+    ctx.fillStyle = '#cfd4db';
+    ctx.beginPath();
+    ctx.moveTo(-5, 52); ctx.lineTo(5, 52); ctx.lineTo(5, 64); ctx.lineTo(9, 68); ctx.lineTo(5, 72); ctx.lineTo(9, 77); ctx.lineTo(5, 82);
+    ctx.lineTo(5, 90); ctx.lineTo(0, 96); ctx.lineTo(-5, 92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function bubbleBox(ctx, x, bottom, w, h, tailX, scale) {
+    tailX = clamp(tailX, x + 24, x + w - 24);
+    ctx.save();
+    ctx.translate(tailX, bottom + 16);
+    ctx.scale(scale, scale);
+    ctx.translate(-tailX, -bottom - 16);
+    ctx.fillStyle = EYE;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.roundRect(x, bottom - h, w, h, 26);
+    ctx.moveTo(tailX - 13, bottom - 2); ctx.lineTo(tailX + 4, bottom + 16); ctx.lineTo(tailX + 11, bottom - 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Where each speech bubble sits, chosen so no two overlap.
+  const ANSWER_SPOTS = { D: { bottom: 985 }, C: { bottom: 895 }, B: { bottom: 985 }, A: { bottom: 895 } };
+  const MOCK_SPOTS = { A: { bottom: 895, minX: 410 }, D: { bottom: 985 }, C: { bottom: 805 }, B: { bottom: 985 } };
+  const ANSWER = 'fresh pasta, from scratch. lemon, butter, way too much parmesan. we eat on the balcony, burn the dessert together, and I walk you home. but first I’d ask what you actually like.';
+
+  /** One line of speech above a flexer, from `start` until `end`. */
+  function say(ctx, t, f, text, start, end, { bottom, minX = 24 }) {
+    const p = span(t, start, 0.32), out = inCubic(span(t, end, 0.2));
+    if (p <= 0 || out >= 1) return;
+    ctx.font = '600 36px HankenGrotesk';
+    const w = ctx.measureText(text).width + 48, h = 64;
+    const x = clamp(f.x - w / 2, minX, W - 24 - w);
+    const tail = clamp(f.x, x + 24, x + w - 24);
+    const scale = outBack(p) * (1 - out);
+    bubbleBox(ctx, x, bottom, w, h, f.x, scale);
+    ctx.save();
+    ctx.translate(tail, bottom + 16); ctx.scale(scale, scale); ctx.translate(-tail, -bottom - 16);
+    ctx.fillStyle = '#141210';
+    ctx.fillText(text, x + 24, bottom - 20);
+    ctx.restore();
+  }
+
+  function drawAnswers(ctx, t) {
+    const byId = Object.fromEntries(FLEXERS.map((f) => [f.id, f]));
+    for (const [id, start, text] of T.answers) say(ctx, t, byId[id], text, start, T.laugh, ANSWER_SPOTS[id]);
+    for (const [id, start, text] of T.mocks) say(ctx, t, byId[id], text, start, T.reveal, MOCK_SPOTS[id]);
+
+    // His turn: the bubble grows while he types, and his answer only shows once he's done.
+    const p = span(t, T.quietTurn, 0.3), out = inCubic(span(t, T.cardDown, 0.2));
+    if (p <= 0 || out >= 1) return;
+    ctx.font = '500 27px HankenGrotesk';
+    const full = 370, lines = [''];
+    for (const word of ANSWER.split(' ')) {
+      const next = lines.at(-1) ? `${lines.at(-1)} ${word}` : word;
+      if (ctx.measureText(next).width > full - 48 && lines.at(-1)) lines.push(word); else lines[lines.length - 1] = next;
+    }
+    const grow = inOutCubic(span(t, T.quietTurn, T.reveal - T.quietTurn));
+    const x = 24, bottom = 1080, w = mix(130, full, grow), h = mix(66, lines.length * 35 + 40, grow);
+    const pulse = 1 + 0.05 * Math.sin(Math.PI * span(t, T.reveal, 0.3));
+    const scale = outBack(p) * (1 - out) * pulse;
+    const tail = QUIET.x + 6;
+    bubbleBox(ctx, x, bottom, w, h, tail, scale);
+    ctx.save();
+    ctx.translate(tail, bottom + 16); ctx.scale(scale, scale); ctx.translate(-tail, -bottom - 16);
+    ctx.fillStyle = '#141210';
+    if (t < T.reveal) {
+      // Typing dots, bouncing one after another.
+      for (let k = 0; k < 3; k++) {
+        const bounce = Math.max(0, Math.sin((t - T.quietTurn) * 9 - k * 0.9));
+        ctx.globalAlpha = 0.45 + 0.4 * bounce;
+        ctx.beginPath(); ctx.arc(x + w / 2 + (k - 1) * 22, bottom - h / 2 - 7 * bounce, 7, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      lines.forEach((l, i) => {
+        ctx.globalAlpha = outCubic(span(t, T.reveal + i * 0.04, 0.2));
+        ctx.fillText(l, x + 24, bottom - h + 46 + i * 35);
+      });
+    }
+    ctx.restore();
+  }
+
+  /** The question card: held up, then left floating above her until the round starts. */
+  function drawCard(ctx, j, t) {
+    const p = win(t, T.cardUp + 0.08, T.cardDown, 0.25);
+    if (p <= 0) return;
+    const held = (k) => [(k.handF[0] + k.handB[0]) / 2, (k.handF[1] + k.handB[1]) / 2 - 100];
+    const tilt = (k) => Math.atan2(k.handB[1] - k.handF[1], k.handB[0] - k.handF[0]) * 0.5;
+    const hold = popperJoints(T.cardHold);
+    const free = outCubic(span(t, T.cardHold, 0.5));
+    const at = t < T.cardHold ? held(j) : held(hold);
+    const cx = at[0], cy = at[1] - 30 * free + 6 * Math.sin(t * 1.8) * free;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((t < T.cardHold ? tilt(j) : tilt(hold) * (1 - free)) + 0.02 * Math.sin(t * 1.3) * free);
+    ctx.scale(p * mix(1, 0.9, free), p * mix(1, 0.9, free));
+    ctx.fillStyle = EYE;
+    ctx.shadowColor = 'rgba(255, 200, 160, 0.45)';
+    ctx.shadowBlur = 30;
+    ctx.beginPath(); ctx.roundRect(-215, -72, 430, 144, 14); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#141210';
+    ctx.font = '600 40px HankenGrotesk';
+    ctx.letterSpacing = '2px';
+    ctx.textAlign = 'center';
+    ctx.fillText('WHAT WOULD YOU', 0, -10);
+    ctx.fillText('COOK ME?', 0, 42);
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- the frame
+
+  // Camera: a slow push-in, tighter while she aims, then it follows him up.
+  function camera(ctx, t) {
+    const tension = win(t, T.aims[0][0], POPS.B + 0.15, 0.6) * (t > POPS.B ? 1 - outExpo(span(t, POPS.B, 0.3)) : 1);
+    const zoom = mix(1, 1.045, inOutCubic(span(t, 0, POPS.B - 0.1))) + 0.035 * tension;
+    const cy = mix(1180, 990, inOutCubic(span(t, T.lift, 2.2)));
+    let sx = 0, sy = 0;
+    for (const [id, at] of Object.entries(POPS)) {
+      const dt = t - at;
+      if (dt < 0 || dt > 0.6) continue;
+      const amp = (id === 'B' ? 16 : 7) * Math.exp(-dt / 0.14);
+      sx += amp * Math.sin(dt * 50); sy += amp * Math.cos(dt * 43);
+    }
+    ctx.translate(540 + sx, cy + sy);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-540, -cy);
+  }
+
+  function drawWorld(ctx, t) {
+    simTo(t);
+    ctx.save();
+    camera(ctx, t);
+    ctx.drawImage(bg, -M, -M);
+    drawAtmosphere(ctx, t);
+
+    const qb = quietBalloon(t);
+    const popper = popperState(t, balloonAt);
+    const pj = solve(popper.pose, { x: POPPER.x, y: LEDGE, s: POPPER.s, face: -1 });
+    if (t > T.lift) {
+      const head = pj.head;
+      popper.look = [clamp((qb.x - head[0]) / 250, -1, 1), clamp((qb.y + 200 - head[1]) / 250, -1, 1)];
+    }
+    drawStickman(ctx, pj, { rim: 'rgba(255, 205, 165, 0.6)', rimBlur: 20, expression: popper.expression, look: popper.look, props: { bun: true, dress: true } });
+
+    // The pin she's holding, or the one in flight.
+    const releases = Object.values(POPS).map((p) => p - FLIGHT);
+    const flying = releases.find((r) => t >= r && t < r + FLIGHT);
+    const between = releases.some((r) => t >= r && t < r + 0.45);
+    const card = win(t, T.cardUp, T.cardHold + 0.2, 0.2) > 0;
+    if (!card && !between && t < releases.at(-1)) {
+      const a = Math.atan2(pj.handF[1] - pj.elbowF[1], pj.handF[0] - pj.elbowF[0]);
+      drawPin(ctx, pj.handF, a);
+    }
+
+    const joints = FLEXERS.map((f) => {
+      const st = flexerState(f, t);
+      const j = solve(st.pose, { x: f.x, y: GROUND, s: f.s, face: st.face, muscle: f.muscle });
+      drawStickman(ctx, j, { color: st.color, rim: `rgba(180, 195, 220, ${st.rim})`, expression: st.expression, look: st.look, props: f.props });
+      if (f.id === 'C' && t < f.popAt) drawKeys(ctx, j.handF, t);
+      return j;
+    });
+
+    const q = quietState(t);
+    const qj = quietJoints(t);
+    let qLook = q.look, qExpr = q.expression;
+    if (t > T.lift) { qExpr = t > T.lift + 0.9 ? 'happy' : 'shock'; qLook = [0.5, -0.8]; }
+    if (t > T.land) qLook = [0.8, -0.2];
+
+    // Lift: a warm halo and sparkles trail behind his balloon.
+    if (t > T.lift) {
+      const glow = outCubic(span(t, T.lift, 0.5));
+      const halo = ctx.createRadialGradient(qb.x, qb.y, 0, qb.x, qb.y, 260);
+      halo.addColorStop(0, `rgba(255, 150, 120, ${0.28 * glow})`);
+      halo.addColorStop(1, 'rgba(255, 150, 120, 0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(qb.x - 260, qb.y - 260, 520, 520);
+      for (let k = 0; k < 48; k++) {
+        const born = T.lift + 0.2 + k * 0.045, age = t - born;
+        if (age < 0 || age > 0.9) continue;
+        const at = quietBalloon(born), r = rng(90 + k);
+        ctx.fillStyle = `rgba(255, 225, 200, ${0.8 * (1 - age / 0.9)})`;
+        ctx.beginPath(); ctx.arc(at.x + (r() - 0.5) * 70, at.y + 40 + age * 90 + (r() - 0.5) * 40, 1.5 + r() * 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    drawStickman(ctx, qj, { expression: qExpr, look: qLook, rim: t > T.lift ? 'rgba(255, 200, 170, 0.6)' : 'rgba(180, 195, 220, 0.45)' });
+
+    // Balloons and strings.
+    FLEXERS.forEach((f, i) => {
+      const hand = joints[i].handB;
+      if (t < f.popAt) drawTethered(ctx, hand, [sim.b[i].x, sim.b[i].y], 112, t, i);
+      else drawLimp(ctx, hand, t, f.popAt);
+    });
+    const qHand = t >= T.land ? handsMeet(t) : qj.handF;
+    drawTethered(ctx, qHand, [qb.x, qb.y], qb.w, t, 4, t > T.lift ? outCubic(span(t, T.lift, 0.5)) : 0);
+
+
+    if (flying !== undefined) {
+      const u = span(t, flying, FLIGHT) ** 1.15;
+      const from = popperJoints(flying).handF, to = balloonAt(Object.keys(POPS).find((id) => POPS[id] - FLIGHT === flying));
+      const ctrl = [(from[0] + to[0]) / 2, Math.min(from[1], to[1]) - 140];
+      const at = (v) => [0, 1].map((k) => (1 - v) ** 2 * from[k] + 2 * (1 - v) * v * ctrl[k] + v ** 2 * to[k]);
+      const pos = at(u), prev = at(Math.max(0, u - 0.06)), tail = at(Math.max(0, u - 0.3));
+      const trail = ctx.createLinearGradient(...tail, ...pos);
+      trail.addColorStop(0, 'rgba(243, 238, 231, 0)');
+      trail.addColorStop(1, 'rgba(243, 238, 231, 0.55)');
+      ctx.strokeStyle = trail; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(...tail); ctx.quadraticCurveTo(...at(Math.max(0, u - 0.15)), ...pos); ctx.stroke();
+      drawPin(ctx, [pos[0] - 40 * Math.cos(Math.atan2(pos[1] - prev[1], pos[0] - prev[0])), pos[1] - 40 * Math.sin(Math.atan2(pos[1] - prev[1], pos[0] - prev[0]))], Math.atan2(pos[1] - prev[1], pos[0] - prev[0]));
+    }
+    FLEXERS.forEach((f, i) => { if (t >= f.popAt) drawBurst(ctx, f.id, [sim.b[i].x, sim.b[i].y], t - f.popAt); });
+
+    const front = ctx.createLinearGradient(0, GROUND - 40, 0, H + M);
+    front.addColorStop(0, 'rgba(140, 155, 180, 0)');
+    front.addColorStop(0.35, 'rgba(140, 155, 180, 0.07)');
+    front.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+    ctx.fillStyle = front;
+    ctx.fillRect(-M, GROUND - 40, W + 2 * M, H - GROUND + 40 + M);
+    ctx.restore();
+  }
+
+  function drawLabels(ctx, t) {
+    ctx.save();
+    ctx.font = '600 44px HankenGrotesk';
+    ctx.letterSpacing = '9px';
+    ctx.textBaseline = 'alphabetic';
+    LABELS.forEach(([at, text], i) => {
+      const next = LABELS[i + 1]?.[0] ?? Infinity;
+      const inP = i === 0 ? 1 : outCubic(span(t, at, 0.3)), outP = inCubic(span(t, next, 0.2));
+      const a = inP * (1 - outP);
+      if (a <= 0) return;
+      const y = 172 + (1 - inP) * 30 - outP * 30;
+      const color = text === 'MATCH' ? '#F0695C' : EYE;
+      ctx.globalAlpha = a * 0.92;
+      ctx.fillStyle = color;
+      ctx.fillRect(72, y - 16, 30, 3);
+      ctx.fillText(text, 118, y);
+    });
+    ctx.globalAlpha = 0.5;
+    ctx.letterSpacing = '0px';
+    ctx.font = '400 40px Gloock';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = EYE;
+    ctx.fillText('popdate', 540, 1862);
+    ctx.restore();
+  }
+
+  const screen = document.getElementById('screen');
+  const out = screen.getContext('2d');
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  const wctx = work.getContext('2d');
+  let grain = null;
+
+  window.DURATION = DURATION;
+  window.renderAt = (t) => {
+    // Motion blur: average three moments spread over a 240° shutter.
+    for (let i = 0; i < 3; i++) {
+      wctx.clearRect(0, 0, W, H);
+      drawWorld(wctx, Math.max(0, t - (2 - i) / 90));
+      out.globalAlpha = 1 / (i + 1);
+      out.drawImage(work, 0, 0);
+    }
+    out.globalAlpha = 1;
+    // Text stays sharp: the card and the answers are drawn once, outside the motion blur.
+    out.save();
+    camera(out, t);
+    drawCard(out, solve(popperState(t, balloonAt).pose, { x: POPPER.x, y: LEDGE, s: POPPER.s, face: -1 }), t);
+    drawAnswers(out, t);
+    out.restore();
+    drawLabels(out, t);
+    window.debug = { b: sim.b.map((b) => [Math.round(b.x), Math.round(b.y)]), hands: FLEXERS.map((f) => flexerJoints(f, t).handB.map(Math.round)) };
+
+    const tension = win(t, T.aims[0][0], POPS.B, 0.6);
+    const vig = out.createRadialGradient(540, 980, 520 - 120 * tension, 540, 980, 1300);
+    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vig.addColorStop(1, `rgba(0, 0, 0, ${0.6 + 0.2 * tension})`);
+    out.fillStyle = vig;
+    out.fillRect(0, 0, W, H);
+
+    const flash = 0.3 * (1 - outCubic(span(t - POPS.B, 0, 0.25))) * (t >= POPS.B ? 1 : 0);
+    if (flash > 0) { out.fillStyle = `rgba(255, 244, 234, ${flash})`; out.fillRect(0, 0, W, H); }
+
+    const g = rng(Math.floor(t * 30) + 1);
+    out.save();
+    out.globalCompositeOperation = 'overlay';
+    out.globalAlpha = 0.1;
+    out.translate(-Math.floor(g() * 128), -Math.floor(g() * 128));
+    out.fillStyle = grain;
+    out.fillRect(0, 0, W + 128, H + 128);
+    out.restore();
+  };
+
+  const image = new Image();
+  image.src = '../endcard/grain.png';
+  await image.decode();
+  grain = out.createPattern(image, 'repeat');
+  await Promise.all(['600 44px HankenGrotesk', '500 25px HankenGrotesk', '400 40px Gloock'].map((f) => document.fonts.load(f)));
+  paintBackground();
+  window.renderAt(0);
+  window.ready = true;
+</script>
+</body>
+</html>
