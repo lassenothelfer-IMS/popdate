@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="brand.css">
+<style>
+  html, body { margin: 0; background: transparent; }
+  .stage { display: flex; align-items: center; justify-content: center; }
+  .lockup { display: flex; align-items: center; gap: 0.2em; font-family: Gloock; font-size: 220px; letter-spacing: -0.01em; line-height: 1; padding: 40px 60px; }
+  .lockup .mark { position: relative; display: flex; transform: translateY(-0.02em); }
+  .icon { width: 1024px; height: 1024px; position: relative; overflow: hidden;
+    background: radial-gradient(circle at 50% 44%, #3A1D19 0%, #1C1917 58%, #141210 100%); }
+  .icon .grain { position: absolute; inset: 0; background: url(grain.png); opacity: 0.08; mix-blend-mode: overlay; }
+  .icon .mark { position: absolute; left: 50%; top: 50%; transform: translate(-52%, -50%); }
+</style>
+</head>
+<body>
+<div id="root" class="stage"></div>
+<script type="module">
+  import { balloonSvg, sparksSvg } from './logo-parts.js';
+  const mode = new URLSearchParams(location.search).get('mode') ?? 'lockup-dark';
+  const root = document.getElementById('root');
+  if (mode === 'icon') {
+    root.innerHTML = `<div class="icon"><div class="grain"></div><div class="mark">${balloonSvg({ id: 'i', width: 500, string: false })}${sparksSvg(500)}</div></div>`;
+  } else {
+    const ink = mode === 'lockup-light' ? '#1C1917' : '#F3EEE7';
+    root.innerHTML = `<div class="lockup" style="color:${ink}"><span class="mark">${balloonSvg({ id: 'l', width: 150, string: false })}${sparksSvg(150)}</span><span>Popdate</span></div>`;
+  }
+  await document.fonts.ready;
+  window.ready = true;
+</script>
+</body>
+</html>

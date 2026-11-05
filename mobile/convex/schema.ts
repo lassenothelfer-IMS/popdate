@@ -6,6 +6,9 @@ export const gender = v.union(v.literal('woman'), v.literal('man'));
 /** Who someone wants to meet: one side of the room, or either. */
 export const interest = v.union(v.literal('woman'), v.literal('man'), v.literal('everyone'));
 
+export const waitlistPhone = v.union(v.literal('iphone'), v.literal('android'));
+export const waitlistLanguage = v.union(v.literal('en'), v.literal('de'), v.literal('fr'), v.literal('it'));
+
 export const roomStatus = v.union(
   v.literal('picking'),
   v.literal('answering'),
@@ -205,4 +208,32 @@ export default defineSchema({
     windowStart: v.number(),
     count: v.number(),
   }).index('by_key', ['key']),
+
+  /**
+   * People who want an email when Popdate launches, from the waitlist page in `waitlist/`.
+   * Nobody outside the Convex dashboard and `npx convex run` can read this table.
+   */
+  waitlist: defineTable({
+    /** Trimmed and lowercased. */
+    email: v.string(),
+    phone: waitlistPhone,
+    /** ISO 3166-1 alpha-2, for example "CH". */
+    country: v.string(),
+    city: v.string(),
+    gender,
+    wantsToMeet: gender,
+    language: v.optional(waitlistLanguage),
+    /** Where they came from, from `?ref=` or `?utm_source=` on the page link, like "tiktok". */
+    source: v.optional(v.string()),
+    status: v.union(v.literal('pending'), v.literal('confirmed')),
+    /** SHA-256 of the token in their confirm and leave links. The token itself is only ever in the email. */
+    tokenHash: v.string(),
+    /** Which consent text they agreed to, so it can be shown later. */
+    consentVersion: v.string(),
+    createdAt: v.number(),
+    confirmedAt: v.optional(v.number()),
+    lastEmailAt: v.optional(v.number()),
+  })
+    .index('by_email', ['email'])
+    .index('by_token', ['tokenHash']),
 });

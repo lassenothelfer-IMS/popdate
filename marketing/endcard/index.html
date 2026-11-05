@@ -1,0 +1,205 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="brand.css">
+<style>
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: var(--page); }
+  #stage { position: absolute; inset: 0; transform-origin: 540px 860px; }
+  #glow { position: absolute; inset: 0; }
+  #grain { position: absolute; inset: -128px; background: url(grain.png); opacity: 0.09; mix-blend-mode: overlay; }
+  #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0, 0, 0, 0.55) 100%); }
+  #flash { position: absolute; inset: 0; background: #FFF4EA; opacity: 0; }
+  #burst { position: absolute; left: 0; top: 0; }
+  .line { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; }
+  .word { display: inline-block; overflow: hidden; vertical-align: top; padding: 0 0.02em 0.12em; margin-bottom: -0.12em; }
+  .word > span { display: inline-block; will-change: transform; }
+  #kicker { top: 610px; font: 600 34px/1 HankenGrotesk; letter-spacing: 0.22em; color: var(--text-secondary); }
+  #line1 { top: 696px; font: 400 124px/1.1 Gloock; letter-spacing: -0.015em; color: var(--text); }
+  #line2 { top: 850px; font: 400 196px/1.1 Gloock; letter-spacing: -0.02em; color: var(--accent); }
+  #balloon { position: absolute; left: 0; top: 0; transform-origin: 50% 30%; }
+  #wordmark { top: 1030px; font: 400 182px/1.1 Gloock; letter-spacing: -0.015em; color: var(--text); }
+  #wordmark .word { padding: 0; margin: 0; }
+  #tagline { top: 1270px; font: 500 46px/1 HankenGrotesk; color: var(--text-secondary); }
+  #share { top: 1270px; font: 600 42px/1 HankenGrotesk; color: var(--text); opacity: 0; }
+  #cta { position: absolute; left: 50%; top: 1360px; transform: translateX(-50%); padding: 22px 40px;
+    border: 2px solid var(--accent); border-radius: 999px; font: 600 36px/1 HankenGrotesk; color: var(--text); white-space: nowrap; }
+  #age { top: 1470px; font: 500 28px/1 HankenGrotesk; letter-spacing: 0.18em; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="glow"></div>
+  <svg id="burst" width="1080" height="1920" viewBox="0 0 1080 1920"></svg>
+  <div id="kicker" class="line"></div>
+  <div id="line1" class="line"></div>
+  <div id="line2" class="line"></div>
+  <div id="balloon"></div>
+  <div id="wordmark" class="line"></div>
+  <div id="tagline" class="line">Be the last balloon.</div>
+  <div id="share" class="line">Send this to someone who’d pop everyone.</div>
+  <div id="cta">Coming soon &middot; Follow to play first</div>
+  <div id="age" class="line">18+</div>
+</div>
+<div id="grain"></div>
+<div id="vignette"></div>
+<div id="flash"></div>
+<script type="module">
+  import { balloonSvg, RED } from './balloon.js';
+  import { sparksSvg } from './logo-parts.js';
+
+  // The clip in the Stitch ends on a real pop; this card starts on the same beat.
+  const POP = { x: 540, y: 860 };
+  const BALLOON = { width: 330, x: 540, y: 470 };
+
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const span = (t, start, length) => clamp((t - start) / length);
+  const outExpo = (p) => (p === 1 ? 1 : 1 - 2 ** (-10 * p));
+  const outCubic = (p) => 1 - (1 - p) ** 3;
+  const inCubic = (p) => p ** 3;
+  const inOutCubic = (p) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2);
+  const outBack = (p, s = 1.2) => 1 + (s + 1) * (p - 1) ** 3 + s * (p - 1) ** 2;
+  const mix = (a, b, p) => a + (b - a) * p;
+
+  // Deterministic randomness, so every render of a frame is the same.
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let r = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function words(el, text) {
+    el.innerHTML = text.split(' ').map((w) => `<span class="word"><span>${w}</span></span>`).join(' ');
+    return [...el.querySelectorAll('.word > span')];
+  }
+  function letters(el, text) {
+    el.innerHTML = [...text].map((c) => `<span class="word"><span>${c}</span></span>`).join('');
+    return [...el.querySelectorAll('.word > span')];
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const kicker = words($('kicker'), 'YOU’VE SEEN THE SHOW.');
+  const line1 = words($('line1'), 'Wanna play this');
+  const line2 = words($('line2'), 'online?');
+  const wordmark = letters($('wordmark'), 'Popdate');
+
+  // The pop: the app's burst (a ring and eight rays, long on the axes) plus torn rubber.
+  const S = 720;
+  const RAYS = [0, 45, 90, 135, 180, 225, 270, 315].map((angle) => {
+    const axis = angle % 90 === 0, vertical = angle % 180 === 90;
+    return { angle, distance: ((axis ? (vertical ? 52 : 58) : 54) / 72) * S, length: ((axis ? 14 : 10) / 72) * S };
+  });
+  const rand = rng(7);
+  const SHARDS = Array.from({ length: 30 }, () => {
+    const a = rand() * Math.PI * 2;
+    const speed = 900 + rand() * 1500;
+    return {
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed - 300, spin: (rand() - 0.5) * 1400,
+      size: 14 + rand() * 30, shade: [RED.light, RED.base, RED.deep][Math.floor(rand() * 3)], life: 0.55 + rand() * 0.5,
+    };
+  });
+  const burst = $('burst');
+
+  function drawBurst(t) {
+    const parts = [];
+    const p = span(t, 0, 0.42);
+    if (p < 1) {
+      const ring = mix(0.55, 1.35, outExpo(p)) * ((26 / 72) * S);
+      parts.push(`<circle cx="${POP.x}" cy="${POP.y}" r="${ring}" fill="none" stroke="${RED.light}" stroke-width="${mix(14, 2, p)}" opacity="${(1 - p) * 0.8}"/>`);
+      for (const ray of RAYS) {
+        const d = ray.distance * mix(0.5, 1.15, outExpo(p));
+        const r = (ray.angle * Math.PI) / 180, len = ray.length * (1 - p * 0.6);
+        const x1 = POP.x + Math.cos(r) * (d - len / 2), y1 = POP.y + Math.sin(r) * (d - len / 2);
+        const x2 = POP.x + Math.cos(r) * (d + len / 2), y2 = POP.y + Math.sin(r) * (d + len / 2);
+        parts.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${RED.light}" stroke-width="${(5 / 72) * S}" stroke-linecap="round" opacity="${clamp(1.4 - p * 1.4)}"/>`);
+      }
+    }
+    for (const s of SHARDS) {
+      const q = t / s.life;
+      if (q >= 1) continue;
+      const x = POP.x + s.vx * t * (1 - q * 0.35), y = POP.y + s.vy * t + 1700 * t * t;
+      parts.push(`<path d="M${-s.size / 2} 0 Q0 ${-s.size * 0.6} ${s.size / 2} 0 Q0 ${-s.size * 0.25} ${-s.size / 2} 0z" fill="${s.shade}"
+        transform="translate(${x} ${y}) rotate(${s.spin * t})" opacity="${1 - inCubic(q)}"/>`);
+    }
+    burst.innerHTML = parts.join('');
+  }
+
+  function rise(els, t, start, stagger, length = 0.6) {
+    els.forEach((el, i) => {
+      const p = outExpo(span(t, start + i * stagger, length));
+      el.style.transform = `translateY(${(1 - p) * 110}%)`;
+    });
+  }
+
+  window.renderAt = (t) => {
+    // Camera: a slow push-in on each scene.
+    const push = t < 2.4 ? mix(1, 1.035, inOutCubic(span(t, 0.2, 2.2))) : mix(1, 1.03, outCubic(span(t, 2.4, 3.6)));
+    $('stage').style.transform = `scale(${push})`;
+
+    $('flash').style.opacity = String(0.9 * (1 - outCubic(span(t, 0, 0.22))));
+    drawBurst(t);
+
+    // The last second: the logo balloon strains as if it's about to pop, and the video cuts
+    // before it does, so the loop drops straight back into the show clip's pop.
+    const strain = span(t, 5.05, 0.95) ** 2;
+
+    // A warm glow behind the words, then a stronger one when the balloon lands.
+    const glow = 0.16 * outCubic(span(t, 0, 0.6)) + 0.14 * outCubic(span(t, 2.6, 0.8)) + 0.12 * strain;
+    const gy = t < 2.4 ? 900 : mix(900, 640, outCubic(span(t, 2.4, 0.8)));
+    $('glow').style.background = `radial-gradient(circle at 540px ${gy}px, rgba(207, 58, 47, ${glow}) 0%, rgba(207, 58, 47, 0) 46%)`;
+    const g = rng(Math.floor(t * 30) + 1);
+    $('grain').style.transform = `translate(${Math.floor(g() * 128)}px, ${Math.floor(g() * 128)}px)`;
+
+    // Scene 1: the question.
+    rise(kicker, t, 0.18, 0.05, 0.5);
+    rise(line1, t, 0.32, 0.09);
+    rise(line2, t, 0.72, 0, 0.7);
+    const out = inCubic(span(t, 2.1, 0.4));
+    for (const id of ['kicker', 'line1', 'line2']) {
+      const delay = id === 'kicker' ? 0 : id === 'line1' ? 0.05 : 0.1;
+      const o = inCubic(span(t, 2.1 + delay, 0.38));
+      $(id).style.opacity = String(1 - o);
+      $(id).style.transform = `translateY(${-90 * o}px)`;
+      $(id).style.filter = `blur(${10 * o}px)`;
+    }
+    $('kicker').style.visibility = out >= 1 ? 'hidden' : 'visible';
+
+    // Scene 2: a balloon floats up and becomes the logo.
+    const up = span(t, 2.25, 1.05);
+    const by = mix(1980, BALLOON.y, outBack(up, 0.9));
+    const bob = Math.sin((t - 2.25) * 2.1) * 10 * span(t, 3.1, 0.8);
+    const tilt = Math.sin((t - 2.25) * 1.7) * mix(7, 3, up);
+    const balloon = $('balloon');
+    // The logo's sparks flick on once the wordmark is in.
+    const spark = outBack(span(t, 3.3, 0.35), 2) * (1 + 0.3 * strain);
+    const sparks = `<div style="position:absolute;inset:0;opacity:${clamp(span(t, 3.3, 0.12))};transform:scale(${mix(0.6, 1, spark)});transform-origin:${BALLOON.width / 2}px ${(BALLOON.width * 11) / 24}px">${sparksSvg(BALLOON.width)}</div>`;
+    balloon.innerHTML = balloonSvg({ id: 'hero', width: BALLOON.width, phase: t * 3.2 }) + sparks;
+    const shake = Math.sin(t * 97) * 7 * strain;
+    const swell = 1 + 0.14 * strain;
+    balloon.style.transform = `translate(${BALLOON.x - BALLOON.width / 2 + shake}px, ${by + bob - 24 * strain}px) rotate(${tilt + Math.sin(t * 71) * 2.5 * strain}deg) scale(${swell}, ${swell * (1 - 0.03 * strain)})`;
+    balloon.style.visibility = t < 2.2 ? 'hidden' : 'visible';
+
+    rise(wordmark, t, 3.0, 0.045, 0.7);
+    // The tagline hands over to a share prompt once the call to action is in.
+    const tag = outCubic(span(t, 3.55, 0.6));
+    const tagOut = inCubic(span(t, 4.75, 0.3));
+    $('tagline').style.opacity = String(tag * (1 - tagOut));
+    $('tagline').style.transform = `translateY(${(1 - tag) * 30 - tagOut * 30}px)`;
+    const share = outCubic(span(t, 4.95, 0.45));
+    $('share').style.opacity = String(share);
+    $('share').style.transform = `translateY(${(1 - share) * 30}px)`;
+    const cta = outBack(span(t, 4.05, 0.55), 1.4);
+    $('cta').style.opacity = String(clamp(span(t, 4.05, 0.3)));
+    $('cta').style.transform = `translateX(-50%) scale(${mix(0.9, 1, cta)})`;
+    $('age').style.opacity = String(0.8 * outCubic(span(t, 4.4, 0.5)));
+  };
+
+  await document.fonts.ready;
+  window.renderAt(0);
+  window.ready = true;
+</script>
+</body>
+</html>
