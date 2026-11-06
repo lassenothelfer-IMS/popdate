@@ -631,12 +631,13 @@ class MockServer implements PopdateApi {
 
   async listMatches() {
     await this.restore();
-    return [...this.matches].reverse();
+    return this.matches.filter((match) => !this.isBlocked(match.other.id)).reverse();
   }
 
   async getMatch(matchId: string) {
     await this.restore();
-    return this.matches.find((match) => match.id === matchId) ?? null;
+    const match = this.matches.find((m) => m.id === matchId);
+    return match && !this.isBlocked(match.other.id) ? match : null;
   }
 
   async unmatch(matchId: string) {
