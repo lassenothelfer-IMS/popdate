@@ -1,0 +1,53 @@
+import type { Strings } from '@/i18n/types';
+
+/** Balloons: what a room costs. English is the source. */
+export const balloons = {
+  en: {
+    count: { one: '%{count} balloon left', other: '%{count} balloons left' },
+    unlimited: 'Unlimited balloons with Popdate+',
+    howItWorks: 'You only lose one when yours gets popped.',
+    empty: 'No balloons left. Free ones come back at %{time}.',
+    outTitle: 'No balloons left',
+    outBody: 'Your free balloons come back at %{time}.',
+    onTheWayTitle: 'Your balloons are on the way',
+    onTheWayBody: 'The purchase went through. They show up here in a moment.',
+    plusSyncingTitle: 'Popdate+ is still on its way',
+    plusSyncingBody: 'It can take a minute to reach your account. Try again shortly.',
+  },
+  de: {
+    count: { one: 'Noch %{count} Ballon', other: 'Noch %{count} Ballons' },
+    unlimited: 'Unbegrenzte Ballons mit Popdate+',
+    howItWorks: 'Du verlierst nur einen, wenn deiner platzt.',
+    empty: 'Keine Ballons mehr. Die Gratis-Ballons kommen um %{time} zurück.',
+    outTitle: 'Keine Ballons mehr',
+    outBody: 'Deine Gratis-Ballons kommen um %{time} zurück.',
+    onTheWayTitle: 'Deine Ballons sind unterwegs',
+    onTheWayBody: 'Der Kauf hat geklappt. Sie tauchen gleich hier auf.',
+    plusSyncingTitle: 'Popdate+ ist noch unterwegs',
+    plusSyncingBody: 'Es kann eine Minute dauern, bis es bei deinem Konto ankommt. Versuch es gleich nochmals.',
+  },
+  fr: {
+    count: { one: 'Encore %{count} ballon', other: 'Encore %{count} ballons' },
+    unlimited: 'Ballons illimités avec Popdate+',
+    howItWorks: 'Tu n’en perds un que quand le tien éclate.',
+    empty: 'Tu n’as plus de ballons. Les gratuits reviennent à %{time}.',
+    outTitle: 'Tu n’as plus de ballons',
+    outBody: 'Tes ballons gratuits reviennent à %{time}.',
+    onTheWayTitle: 'Tes ballons arrivent',
+    onTheWayBody: 'L’achat est passé. Ils apparaissent ici dans un instant.',
+    plusSyncingTitle: 'Popdate+ arrive',
+    plusSyncingBody: 'Ça peut prendre une minute avant d’arriver sur ton compte. Réessaie dans un instant.',
+  },
+  it: {
+    count: { one: 'Ancora %{count} palloncino', other: 'Ancora %{count} palloncini' },
+    unlimited: 'Palloncini illimitati con Popdate+',
+    howItWorks: 'Ne perdi uno solo quando il tuo scoppia.',
+    empty: 'Niente più palloncini. Quelli gratis tornano alle %{time}.',
+    outTitle: 'Niente più palloncini',
+    outBody: 'I tuoi palloncini gratis tornano alle %{time}.',
+    onTheWayTitle: 'I tuoi palloncini stanno arrivando',
+    onTheWayBody: 'L’acquisto è andato a buon fine. Compaiono qui tra un attimo.',
+    plusSyncingTitle: 'Popdate+ sta arrivando',
+    plusSyncingBody: 'Può volerci un minuto prima che arrivi sul tuo account. Riprova tra poco.',
+  },
+} satisfies Strings;

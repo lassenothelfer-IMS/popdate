@@ -9,6 +9,7 @@ import {
   QUESTION_OPTIONS_PER_ROUND,
   shuffle,
 } from './game';
+import { spendBalloon } from './balloons';
 import { ageFromBirthDate, getProfile, personCard, photoUrls } from './people';
 import { schedulePush } from '../push';
 import { questionPool } from './questions';
@@ -138,9 +139,21 @@ export async function endAnsweringIfEveryoneAnswered(ctx: MutationCtx, roomId: I
   if (waiting.length === 0) await startPopping(ctx, room);
 }
 
+async function answeredIn(ctx: QueryCtx, roomId: Id<'rooms'>, userId: Id<'users'>) {
+  const answers = await ctx.db
+    .query('answers')
+    .withIndex('by_room_round', (q) => q.eq('roomId', roomId))
+    .collect();
+  return answers.some((answer) => answer.userId === userId);
+}
+
 /** Pops one contestant: the next round starts, or the last balloon left wins. */
 export async function pop(ctx: MutationCtx, room: Doc<'rooms'>, seat: Doc<'roomPlayers'>) {
   await ctx.db.patch(seat._id, { popped: true, poppedInRound: room.round });
+  // A popped balloon costs its owner one of theirs, if they played: someone who never
+  // answered in this room may not even have been there (an app killed while in line,
+  // seated much later), so they aren't charged.
+  if (await answeredIn(ctx, room._id, seat.userId)) await spendBalloon(ctx, seat.userId);
   const seats = await seatsOf(ctx, room._id);
   if (seats.filter(stillIn).length <= 1) {
     await finish(ctx, room._id);
@@ -203,6 +216,8 @@ export async function leave(ctx: MutationCtx, room: Doc<'rooms'>, userId: Id<'us
     popped: true,
     poppedInRound: room.round,
   });
+  // Leaving while still holding your balloon costs it, as a pop would.
+  await spendBalloon(ctx, userId);
   const seats = await seatsOf(ctx, room._id);
   if (seats.filter(stillIn).length <= 1) {
     await finish(ctx, room._id);

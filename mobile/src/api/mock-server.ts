@@ -6,6 +6,7 @@
  * Every other player in a room is a bot.
  */
 import type {
+  Balloons,
   BlockedPerson,
   Contestant,
   Gender,
@@ -27,6 +28,16 @@ import type {
   RoomPlayer,
   RoomStatus,
 } from '@/api/types';
+import {
+  BALLOON_PACKS,
+  canPlay,
+  NO_BALLOONS,
+  credit,
+  newWallet,
+  spend,
+  viewOf,
+  type BalloonWallet,
+} from '@/shared/balloons';
 import { DEFAULT_SETTINGS } from '@/shared/settings';
 import {
   ANSWER_GRACE_MS,
@@ -53,6 +64,7 @@ const HISTORY_KEY = 'popdate.mockHistory';
 const MATCHES_KEY = 'popdate.mockMatches';
 const BLOCKED_KEY = 'popdate.mockBlocked';
 const ROOMS_KEY = 'popdate.mockRooms';
+const BALLOONS_KEY = 'popdate.mockBalloons';
 /** Each chat is kept under its own key, so a new message only rewrites that one chat. */
 const messagesKey = (matchId: string) => `popdate.mockMessages.${matchId}`;
 /** How many past rooms the mock keeps. */
@@ -357,6 +369,9 @@ class MockServer implements PopdateApi {
   private profile: Profile | null = null;
   private queue: QueueStatus = { state: 'idle' };
   private queueListeners = new Set<(status: QueueStatus) => void>();
+  /** Your balloons, kept on the device. Null until the first sign-in makes a new wallet. */
+  private wallet: BalloonWallet | null = null;
+  private balloonListeners = new Set<(balloons: Balloons | null) => void>();
   private queueTimer: ReturnType<typeof setInterval> | null = null;
   /** Bots in line right now, besides you. Home shows it, and your queue starts from it. */
   private lineWaiting = randomInt(1, LOBBY_SIZE - 2);
@@ -370,6 +385,11 @@ class MockServer implements PopdateApi {
   private messageListeners = new Map<string, Set<(messages: Message[]) => void>>();
 
   nextRole: MockRole = 'random';
+  /**
+   * Popdate+ as RevenueCat reports it. Only the real server hears from RevenueCat's
+   * webhook, so the app hands it over here (`setMockPlus`).
+   */
+  private plus = false;
   /** Rooms you played, newest first, kept on the device. */
   private history: RoomSummary[] = [];
   /** Second chances: your runner-ups, the ones you sent, the ones sent to you. */
@@ -383,14 +403,16 @@ class MockServer implements PopdateApi {
 
   private restore() {
     this.restored ??= (async () => {
-      const [profile, settings, history, matches, blocked, rooms] = await Promise.all([
+      const [profile, settings, history, matches, blocked, rooms, wallet] = await Promise.all([
         readJson<Profile>(PROFILE_KEY),
         readJson<Settings>(SETTINGS_KEY),
         readJson<RoomSummary[]>(HISTORY_KEY),
         readJson<Match[]>(MATCHES_KEY),
         readJson<BlockedPerson[]>(BLOCKED_KEY),
         readJson<SavedRoom[]>(ROOMS_KEY),
+        readJson<BalloonWallet>(BALLOONS_KEY),
       ]);
+      if (wallet) this.wallet ??= wallet;
       if (history) this.history = history;
       if (matches) this.matches = matches;
       if (blocked) this.blocked = blocked;
@@ -426,6 +448,7 @@ class MockServer implements PopdateApi {
   async signIn() {
     await this.restore();
     this.userId ??= `user-${randomId()}`;
+    if (!this.wallet) this.setWallet(newWallet(Date.now()));
     return this.userId;
   }
 
@@ -453,6 +476,7 @@ class MockServer implements PopdateApi {
 
   async joinQueue() {
     if (!this.profile) throw new Error('Finish your profile before you play.');
+    if (!this.plus && this.wallet && !canPlay(this.wallet, Date.now())) throw new Error(NO_BALLOONS);
     this.clearQueueTimer();
     // The people Home said were waiting are already there, with you on top.
     const waiting = Math.min(this.lineWaiting, LOBBY_SIZE - 2);
@@ -489,6 +513,50 @@ class MockServer implements PopdateApi {
     return () => {
       this.queueListeners.delete(onChange);
     };
+  }
+
+  watchBalloons(onChange: (balloons: Balloons | null) => void) {
+    this.balloonListeners.add(onChange);
+    onChange(this.balloonsNow());
+    return () => {
+      this.balloonListeners.delete(onChange);
+    };
+  }
+
+  async balloonsBought(productId: string) {
+    const pack = BALLOON_PACKS[productId];
+    if (pack && this.wallet) this.setWallet(credit(this.wallet, pack, Date.now()));
+  }
+
+  setPlus(plus: boolean) {
+    if (plus === this.plus) return;
+    this.plus = plus;
+    const view = this.balloonsNow();
+    this.balloonListeners.forEach((listener) => listener(view));
+  }
+
+  private balloonsNow() {
+    if (!this.userId || !this.wallet) return null;
+    const view = viewOf(this.wallet, Date.now());
+    return this.plus ? { ...view, plus: true } : view;
+  }
+
+  private setWallet(wallet: BalloonWallet | null) {
+    this.wallet = wallet;
+    if (wallet) void writeJson(BALLOONS_KEY, wallet);
+    else void removeJson(BALLOONS_KEY);
+    const view = this.balloonsNow();
+    this.balloonListeners.forEach((listener) => listener(view));
+  }
+
+  /**
+   * Your balloon popped, or you left holding it. Bots' balloons cost nothing, and
+   * neither does Popdate+. A pop only costs you if you answered in the room, as on the server.
+   */
+  private spendIfMine(seat: Seat, { left = false } = {}) {
+    if (this.plus || seat.player.id !== this.userId || !this.wallet) return;
+    if (!left && seat.answers.size === 0) return;
+    this.setWallet(spend(this.wallet, Date.now()));
   }
 
   private setQueue(status: QueueStatus) {
@@ -588,6 +656,7 @@ class MockServer implements PopdateApi {
       // Leaving mid-game counts as popped, and the round goes on.
       seat.popped = true;
       seat.poppedInRound = room.round;
+      this.spendIfMine(seat, { left: true });
       if (room.seats.filter(isActive).length <= 1) {
         this.finish(room);
         return;
@@ -826,6 +895,7 @@ class MockServer implements PopdateApi {
     void removeJson(MATCHES_KEY);
     void removeJson(BLOCKED_KEY);
     void removeJson(ROOMS_KEY);
+    this.setWallet(null);
     this.history = [];
     this.chances = [];
     this.finishedRooms = [];
@@ -1116,6 +1186,7 @@ class MockServer implements PopdateApi {
     this.clearTimers(room);
     seat.popped = true;
     seat.poppedInRound = room.round;
+    this.spendIfMine(seat);
     if (room.seats.filter(isActive).length <= 1) {
       this.finish(room);
       return;

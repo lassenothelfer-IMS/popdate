@@ -10,10 +10,12 @@
 
 import type * as account from "../account.js";
 import type * as auth from "../auth.js";
+import type * as balloons from "../balloons.js";
 import type * as chat from "../chat.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_balloons from "../lib/balloons.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_game from "../lib/game.js";
 import type * as lib_people from "../lib/people.js";
@@ -43,10 +45,12 @@ import type {
 declare const fullApi: ApiFromModules<{
   account: typeof account;
   auth: typeof auth;
+  balloons: typeof balloons;
   chat: typeof chat;
   history: typeof history;
   http: typeof http;
   "lib/auth": typeof lib_auth;
+  "lib/balloons": typeof lib_balloons;
   "lib/errors": typeof lib_errors;
   "lib/game": typeof lib_game;
   "lib/people": typeof lib_people;

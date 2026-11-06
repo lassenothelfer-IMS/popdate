@@ -1,7 +1,8 @@
 import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import { api } from './_generated/api';
+import { FREE_BALLOONS, STARTER_BALLOONS } from '../src/shared/balloons';
+import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { ANSWER_GRACE_MS, ANSWER_MS, PICK_MS } from './lib/game';
 import schema from './schema';
@@ -511,4 +512,167 @@ test('the chat loads only the newest 200 messages, oldest first', async () => {
   expect(messages).toHaveLength(200);
   expect(messages[0].text).toBe('m5');
   expect(messages[199].text).toBe('m204');
+});
+
+async function balloons(p: Player) {
+  return (await p.as.query(api.balloons.mine, {}))!;
+}
+
+async function playToTheEnd(lena: Player, luca: Player, noah: Player, roomId: string) {
+  await pickFirstQuestion(lena, roomId);
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
+  await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
+}
+
+const START = FREE_BALLOONS + STARTER_BALLOONS;
+
+test('a popped balloon costs one; the winner and the chooser keep theirs', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  expect(await balloons(noah)).toMatchObject({ free: FREE_BALLOONS, extra: STARTER_BALLOONS, plus: false });
+  await playToTheEnd(lena, luca, noah, roomId);
+
+  const count = async (p: Player) => {
+    const b = await balloons(p);
+    return b.free + b.extra;
+  };
+  expect(await count(noah)).toBe(START - 1);
+  expect(await count(luca)).toBe(START);
+  expect(await count(lena)).toBe(START);
+});
+
+test('leaving while holding your balloon costs it; leaving after your pop costs nothing more', async () => {
+  const { luca, noah, roomId } = await startRoom();
+  await noah.as.mutation(api.rooms.leaveRoom, { roomId });
+  const b = await balloons(noah);
+  expect(b.free + b.extra).toBe(START - 1);
+  // Luca won, then leaves the finished room: still all of his.
+  await luca.as.mutation(api.rooms.leaveRoom, { roomId });
+  const kept = await balloons(luca);
+  expect(kept.free + kept.extra).toBe(START);
+});
+
+test('with no balloons left you can not join the line until the next day', async () => {
+  const t = convexTest(schema, modules);
+  const max = await player(t, 'Max', 'man', 'woman');
+  const today = new Date().toISOString().slice(0, 10);
+  await t.run(async (ctx) => {
+    await ctx.db.insert('balloons', { userId: max.userId, free: 0, extra: 0, refillDay: today, updatedAt: Date.now() });
+  });
+  await expect(max.as.mutation(api.queue.joinQueue, {})).rejects.toThrow('No balloons left.');
+
+  vi.setSystemTime(Date.now() + 24 * 60 * 60_000);
+  await max.as.mutation(api.queue.joinQueue, {});
+  expect((await max.as.query(api.queue.status, {})).state).toBe('searching');
+});
+
+test('a RevenueCat pack adds its balloons once, and Popdate+ stops the spending', async () => {
+  const { t, lena, luca, noah, roomId } = await startRoom();
+  const event = {
+    eventId: 'evt-1',
+    type: 'NON_RENEWING_PURCHASE',
+    userIds: ['$RCAnonymousID:abc', noah.id],
+    productId: 'popdate.balloons.5',
+    entitlementIds: [],
+  };
+  expect(await t.mutation(internal.balloons.applyPurchaseEvent, event)).toBe('applied');
+  expect(await t.mutation(internal.balloons.applyPurchaseEvent, event)).toBe('duplicate');
+  expect((await balloons(noah)).extra).toBe(STARTER_BALLOONS + 5);
+
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    eventId: 'evt-2',
+    type: 'INITIAL_PURCHASE',
+    userIds: [noah.id],
+    productId: 'popdate.plus.monthly',
+    entitlementIds: ['plus'],
+    expirationAtMs: Date.now() + 30 * 24 * 60 * 60_000,
+  });
+  expect((await balloons(noah)).plus).toBe(true);
+  await playToTheEnd(lena, luca, noah, roomId);
+  const b = await balloons(noah);
+  expect(b.free + b.extra).toBe(FREE_BALLOONS + STARTER_BALLOONS + 5);
+
+  expect(
+    await t.mutation(internal.balloons.applyPurchaseEvent, { ...event, eventId: 'evt-3', userIds: ['nobody'] }),
+  ).toBe('unknown user');
+});
+
+test('a pop costs nothing to someone who never answered in the room', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await pickFirstQuestion(lena, roomId);
+  // Only Luca answers; Noah's app was closed. Time runs out and Lena pops Noah.
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
+  vi.advanceTimersByTime(ANSWER_MS + ANSWER_GRACE_MS + 1000);
+  await vi.runOnlyPendingTimersAsync();
+  await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
+  const b = await balloons(noah);
+  expect(b.free + b.extra).toBe(START);
+});
+
+test('a late, older Popdate+ event does not undo a newer one', async () => {
+  const { t, noah } = await startRoom();
+  const later = Date.now() + 30 * 24 * 60 * 60_000;
+  const base = { userIds: [noah.id], entitlementIds: ['plus'], productId: 'popdate.plus.monthly' };
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    ...base,
+    eventId: 'renewal',
+    type: 'RENEWAL',
+    expirationAtMs: later,
+    eventAt: 2000,
+  });
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    ...base,
+    eventId: 'old-expiration',
+    type: 'EXPIRATION',
+    expirationAtMs: Date.now() - 1000,
+    eventAt: 1000,
+  });
+  expect((await balloons(noah)).plus).toBe(true);
+
+  // A newer expiration does end it.
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    ...base,
+    eventId: 'new-expiration',
+    type: 'EXPIRATION',
+    expirationAtMs: Date.now() - 1000,
+    eventAt: 3000,
+  });
+  expect((await balloons(noah)).plus).toBe(false);
+});
+
+test('switching plans keeps Popdate+, and a restore on a new account moves it there', async () => {
+  const { t, luca, noah } = await startRoom();
+  const yearLater = Date.now() + 365 * 24 * 60 * 60_000;
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    eventId: 'yearly',
+    type: 'RENEWAL',
+    userIds: [noah.id],
+    entitlementIds: ['plus'],
+    productId: 'popdate.plus.yearly',
+    expirationAtMs: yearLater,
+    eventAt: 2000,
+  });
+  // The change event carries the old monthly plan's end; it must not shorten the year.
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    eventId: 'change',
+    type: 'PRODUCT_CHANGE',
+    userIds: [noah.id],
+    entitlementIds: ['plus'],
+    productId: 'popdate.plus.monthly',
+    expirationAtMs: Date.now() - 1000,
+    eventAt: 3000,
+  });
+  expect((await balloons(noah)).plus).toBe(true);
+
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    eventId: 'transfer',
+    type: 'TRANSFER',
+    userIds: [],
+    entitlementIds: [],
+    eventAt: 4000,
+    transferredFrom: [noah.id],
+    transferredTo: [luca.id],
+  });
+  expect((await balloons(luca)).plus).toBe(true);
+  expect((await balloons(noah)).plus).toBe(false);
 });

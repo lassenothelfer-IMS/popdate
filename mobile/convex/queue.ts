@@ -3,6 +3,7 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
+import { hasBalloon, NO_BALLOONS } from './lib/balloons';
 import { fail } from './lib/errors';
 import { lobbySize } from './lib/game';
 import { activeRoomOf, getProfile } from './lib/people';
@@ -89,6 +90,7 @@ export const joinQueue = mutation({
     const profile = await getProfile(ctx, userId);
     if (!profile) fail('Finish your profile before you play.');
     if (await activeRoomOf(ctx, userId)) fail("You're still in a room.");
+    if (!(await hasBalloon(ctx, userId))) fail(NO_BALLOONS);
 
     const entry = {
       userId,

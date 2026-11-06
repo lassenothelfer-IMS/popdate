@@ -6,6 +6,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 import type {
+  Balloons,
   Match,
   Message,
   PopdateApi,
@@ -290,6 +291,15 @@ export class ConvexServer implements PopdateApi {
 
   watchQueue(onChange: (status: QueueStatus) => void) {
     return this.watch(api.queue.status, {}, onChange);
+  }
+
+  watchBalloons(onChange: (balloons: Balloons | null) => void) {
+    return this.watch(api.balloons.mine, {}, onChange);
+  }
+
+  async balloonsBought(_productId: string) {
+    // RevenueCat's webhook credits the pack on the server (convex/http.ts), and the
+    // balloons query updates by itself. Trusting the app here would let anyone add balloons.
   }
 
   // Rooms

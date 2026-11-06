@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProfileDraft, Room } from '@/api/types';
+import type { Balloons, ProfileDraft, Room } from '@/api/types';
+import { FREE_BALLOONS, STARTER_BALLOONS } from '@/shared/balloons';
 
 // The device store reaches for the keychain through React Native; the mock
 // server only needs somewhere to keep JSON, so a map stands in for it.
@@ -186,6 +187,59 @@ describe('mock server', () => {
       const [history] = await mockServer.listRoomHistory();
       expect(history).toMatchObject({ role: 'contestant', outcome: 'left' });
       stop();
+    });
+  });
+
+  describe('balloons', () => {
+    beforeEach(async () => {
+      await mockServer.saveProfile(DRAFT);
+    });
+
+    function current() {
+      let latest: Balloons | null = null;
+      mockServer.watchBalloons((next) => (latest = next))();
+      return latest!;
+    }
+
+    it('starts with the free and starter balloons, and leaving a room while in costs one', async () => {
+      expect(current()).toMatchObject({ free: FREE_BALLOONS, extra: STARTER_BALLOONS, plus: false });
+      const { roomId, stop } = await playRoom('contestant');
+      await mockServer.leaveRoom(roomId);
+      expect(current().free).toBe(FREE_BALLOONS - 1);
+      stop();
+    });
+
+    it('never charges the chooser', async () => {
+      const { roomId, stop } = await playRoom('popper');
+      await mockServer.leaveRoom(roomId);
+      expect(current()).toMatchObject({ free: FREE_BALLOONS, extra: STARTER_BALLOONS });
+      stop();
+    });
+
+    it('spends nothing with Popdate+, as RevenueCat reports it', async () => {
+      mockServer.setPlus(true);
+      expect(current().plus).toBe(true);
+      const { roomId, stop } = await playRoom('contestant');
+      await mockServer.leaveRoom(roomId);
+      expect(current()).toMatchObject({ free: FREE_BALLOONS, extra: STARTER_BALLOONS });
+      mockServer.setPlus(false);
+      stop();
+    });
+
+    it('keeps you out of the line with none left, until a pack lands', async () => {
+      for (let i = 0; i < FREE_BALLOONS + STARTER_BALLOONS; i++) {
+        const { roomId, stop } = await playRoom('contestant');
+        await mockServer.leaveRoom(roomId);
+        stop();
+      }
+      expect(current()).toMatchObject({ free: 0, extra: 0 });
+      await expect(mockServer.joinQueue()).rejects.toThrow('No balloons left.');
+
+      await mockServer.balloonsBought('popdate.balloons.5');
+      await mockServer.balloonsBought('not.a.pack');
+      expect(current().extra).toBe(5);
+      await mockServer.joinQueue();
+      await mockServer.leaveQueue();
     });
   });
 

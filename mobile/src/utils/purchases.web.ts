@@ -3,8 +3,6 @@
  * purchases.ts, so screens don't need to check the platform.
  */
 
-export const PLUS_ENTITLEMENT = 'plus';
-
 export const purchasesAvailable = false;
 
 export function setPurchasesUser(_userId: string | null) {}
@@ -17,6 +15,10 @@ export type PaywallOutcome = 'bought' | 'closed' | 'failed';
 
 export async function showPaywall(): Promise<PaywallOutcome> {
   return 'failed';
+}
+
+export async function showBalloonShop(): Promise<{ outcome: PaywallOutcome; productId?: string }> {
+  return { outcome: 'failed' };
 }
 
 export async function manageSubscription() {}

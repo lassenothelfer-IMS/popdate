@@ -27,6 +27,7 @@ import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { outcomeLine } from '@/features/rooms/rooms-screen';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
+import { BalloonLine } from '@/features/balloons/balloon-line';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { previewLine, withLastMessages, type Thread } from '@/features/matches/threads';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
@@ -104,7 +105,7 @@ export function HomeScreen() {
   /** Your newest matches with their last message. Null until the first load, so nothing flashes before the rows. */
   const [matches, setMatches] = useState<Thread[] | null>(null);
   const [mockRole, setMockRole] = useState(getMockNextRole);
-  const { join, joining, error } = useJoinQueue();
+  const { join, joining, error, balloons } = useJoinQueue();
   /** Null until it loads, or while it can't: the line then falls back to the day and city. */
   const [live, setLive] = useState<QueueStats | null>(null);
   const { history, reload: reloadHistory } = useRoomHistory();
@@ -232,6 +233,9 @@ export function HomeScreen() {
             />
           </View>
           {error ? <ErrorLine message={error} /> : null}
+          <View style={styles.balloonLine}>
+            <BalloonLine balloons={balloons} />
+          </View>
           {live ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.liveNote}>
               {t('home.roomsLastHour', { count: live.roomsLastHour })}
@@ -388,6 +392,10 @@ const styles = StyleSheet.create({
   liveNote: {
     marginTop: Space.xs,
     textAlign: 'center',
+  },
+  balloonLine: {
+    marginTop: Space.sm,
+    alignItems: 'center',
   },
   liveDot: {
     width: 8,

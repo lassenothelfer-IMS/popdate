@@ -199,6 +199,38 @@ export default defineSchema({
     createdAt: v.number(),
   }).index('by_reported', ['reportedId']),
 
+  /**
+   * Each player's balloons (rules in `src/shared/balloons.ts`). No row yet means a
+   * new player's starting wallet; the first change writes it.
+   */
+  balloons: defineTable({
+    userId: v.id('users'),
+    /** Today's free balloons left. */
+    free: v.number(),
+    /** Bought and starter balloons left. */
+    extra: v.number(),
+    /** The UTC day the free ones were last topped up, YYYY-MM-DD. */
+    refillDay: v.string(),
+    /** Popdate+ until then, in epoch ms, from RevenueCat's webhook. */
+    plusUntil: v.optional(v.number()),
+    /** When the last Popdate+ event applied happened, so a late older one can't undo it. */
+    plusEventAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  }).index('by_user', ['userId']),
+
+  /** RevenueCat webhook events already applied, so a resend doesn't add a pack twice. */
+  purchaseEvents: defineTable({
+    eventId: v.string(),
+    userId: v.optional(v.id('users')),
+    type: v.string(),
+    productId: v.optional(v.string()),
+    /** SANDBOX or PRODUCTION: a test purchase must never be credited as a real one. */
+    environment: v.optional(v.string()),
+    /** Kept when no account was found, so the team can still credit the purchase by hand. */
+    revenueCatIds: v.optional(v.array(v.string())),
+    receivedAt: v.number(),
+  }).index('by_event', ['eventId']),
+
   /** Fixed-window counters for the rate limits in `lib/rateLimit.ts`. */
   rateLimits: defineTable({
     key: v.string(),

@@ -34,9 +34,18 @@ Done when: a full room as chooser and as balloon looks right on two different iP
 
 Popdate sells something digital (features inside the app), so Apple requires **in-app purchase** through StoreKit (App Store Review Guideline 3.1.1). A card form inside the app is not allowed anywhere. A link or button to a website checkout is allowed only on the **US storefront** (since 2025); elsewhere it needs Apple's External Purchase Link entitlement, with its own fees in the EU and some other countries. Plan for in-app purchase everywhere and treat a US web link as an optional extra.
 
-Decide first (whole team):
-- [ ] **What is paid.** Ideas that fit the game without breaking it: more second chances per week, seeing who almost picked you, a profile boost in the queue, more rooms per day. Don't charge for playing a basic room: rooms need six people, and a paywall in front of the queue empties it.
-- [ ] **Subscription, one-time purchases, or both.** Price points per country.
+**The model: balloons (decided by Lasse 2026-11-06, built, numbers still open for the team).** Rooms cost balloons; the rules are in `mobile/src/shared/balloons.ts`, used by the server, the mock and the app alike:
+- Joining the line needs at least one balloon.
+- You lose one **only when yours gets popped**, or when you leave a room while still holding it. Winning keeps it, and the chooser never pays. A pop costs nothing if you never answered in that room (you may have closed the app while in line and been seated later).
+- **3 free balloons a day**: they top back up at UTC midnight (1:00 or 2:00 in Zurich). A new account starts with **2 extra**.
+- **Balloon packs** (consumables): `popdate.balloons.5` and `popdate.balloons.15`. Bought balloons never expire and are used after the free ones.
+- **Popdate+** (subscription, entitlement `plus`): unlimited balloons. Room for more perks later (seeing who almost picked you, filters).
+- Why this shape: every room needs six people, so the free refill keeps players coming back instead of leaving, and only losing costs a balloon.
+
+Still to agree (whole team):
+- [ ] The numbers: free per day, starter extra, pack sizes. Change them in `src/shared/balloons.ts`; the server reads the same file.
+- [ ] Prices. Ideas: 5 balloons CHF 2.90, 15 for CHF 6.90, Popdate+ around CHF 7–10 a month with a cheaper yearly plan.
+- [ ] Known gap: signing out and making a new profile gives a fresh starter wallet, because test accounts are anonymous. Sign in with Apple closes it.
 
 Then build it:
 - [ ] Sign the **Paid Apps agreement** in App Store Connect, under Business. First confirm the legal entity there ("Edit Legal Entity"), then accept the terms and fill in bank account, tax forms (W-8BEN for non-US individuals) and contacts. Banking and tax forms have to be complete before any purchase works, even in testing. *Submitted 2026-11-06: tax forms active, bank account and agreement processing.* For the W-8BEN treaty claim, app sales are usually business profits: Switzerland, Article 7, 0%, "Income from the sale of applications", no permanent establishment in the US.
@@ -44,10 +53,20 @@ Then build it:
 - [ ] Create the products (subscription group and/or consumables) in App Store Connect → the app → Monetization.
 - [x] App record in App Store Connect: **Popdate: Dating Game** (`popdate` was taken), bundle ID `com.goodn8s.popdate`.
 - [x] RevenueCat (agreed 2026-11-06): project "Popdate: Dating Game", App Store app connected with an In-App Purchase key (.p8, kept by Lasse only). The app side is in `mobile/src/utils/purchases.ts`: entitlement **`plus`**, the RevenueCat **Test Store** in development builds (fake products, no Apple needed) and the App Store everywhere else. Settings has a Popdate+ section with **Restore purchases**. Nothing is locked behind `plus` yet.
-- [ ] In RevenueCat: create the entitlement `plus`, the products (Test Store first, then the App Store ones), an offering, and a paywall in the paywall editor. The app shows that paywall as it is.
+- [x] Balloons in the app and on the server (2026-11-06): the `balloons` table, spending on a pop in `convex/lib/room.ts`, the check in `joinQueue`, the live count on Home, and the balloon shop when you're out (Get in line, Play another room).
+- [ ] In RevenueCat, with the **same ids** as in `src/shared/balloons.ts`:
+  - the entitlement `plus`;
+  - products: `popdate.balloons.5` and `popdate.balloons.15` (consumable), and a Popdate+ subscription attached to `plus` (Test Store first, then App Store);
+  - an offering with the id **`balloons`** holding the packs (and Popdate+), with a paywall made in the paywall editor. The app opens it when you're out of balloons. Without it, the app just says when the free ones come back;
+  - the default (current) offering with Popdate+, which Settings → Get Popdate+ shows.
+- [ ] RevenueCat webhook → Convex (Lasse or Jonas), **once per Convex deployment** (dev now, prod again in phase 1):
+  - Set `REVENUECAT_WEBHOOK_AUTH` on that deployment to its own long random string: `npx convex env set REVENUECAT_WEBHOOK_AUTH <value>` for dev, the same with `--prod` for production.
+  - In RevenueCat → Integrations → Webhooks, add one webhook per deployment: `https://<that-deployment>.convex.site/revenuecat`, with that deployment's string as the Authorization header. The dev webhook gets **sandbox events only**; the prod webhook gets both, since TestFlight and App Review buy in sandbox but talk to prod.
+  - Each deployment ignores accounts it doesn't know, and keeps those events in `purchaseEvents` (product, `environment`, RevenueCat ids) so a lost purchase can be credited by hand. A `SANDBOX` row is a test: never credit it as real.
+  - Packs and Popdate+ only reach the server this way; the app is never trusted to add balloons.
 - [ ] Apply for the **App Store Small Business Program** (15% instead of 30%), then turn it on in RevenueCat's App Store app settings.
 - [ ] Rebuild the development build (`eas build --profile development --platform ios`): RevenueCat is native code, so the build from 2026-11-04 doesn't have it.
-- [ ] Backend (Jonas): store what each user is entitled to on the server, and check it there, not only in the app. RevenueCat can send a webhook to a Convex HTTP action (`mobile/convex/http.ts`) when a purchase or renewal happens.
+- [x] Backend: entitlements live on the server. `convex/http.ts` takes RevenueCat's webhook, `convex/balloons.ts` applies each event once (packs add balloons, Popdate+ events set `plusUntil`). A restore on another account (RevenueCat's TRANSFER event) moves Popdate+ along. PRODUCT_CHANGE is ignored on purpose: the new plan's RENEWAL carries its expiration. Jonas: please review. Not handled yet: refunds of packs.
 - [ ] The paywall screen must show the price, the billing period, what's included, **Restore purchases**, and links to the terms and privacy policy (Guideline 3.1.2 for subscriptions).
 - [ ] Test with Sandbox Apple accounts (App Store Connect → Users and Access → Sandbox), including buy, cancel, renew and restore on a second phone.
 
@@ -71,6 +90,7 @@ All commands run in `mobile/`.
   npx @convex-dev/auth --prod
   ```
 - [ ] Production environment variables (Convex dashboard → Settings → Environment Variables): leave `LOBBY_SIZE` and `ALLOW_TEST_PLAYERS` **unset** in production, so rooms need six real people and fake test players can't be added.
+- [ ] Set `REVENUECAT_WEBHOOK_AUTH` with `--prod` and add the production webhook in RevenueCat (see 0.2). Without it, real purchases never reach production: nobody gets their balloons or Popdate+.
 - [ ] Seed the questions table if production starts empty (same way as on dev).
 - [ ] Run the backend tests against the code being deployed: `npm run test:backend`.
 - [ ] Decide who reviews reports and selfies, and how. Today a selfie is approved by hand:

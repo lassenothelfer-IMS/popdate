@@ -62,7 +62,7 @@ export const deleteAccount = mutation({
       await ctx.db.delete(verification._id);
     }
 
-    for (const table of ['settings', 'pushTokens'] as const) {
+    for (const table of ['settings', 'pushTokens', 'balloons'] as const) {
       const rows = await ctx.db
         .query(table)
         .withIndex('by_user', (q) => q.eq('userId', userId))

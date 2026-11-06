@@ -2,6 +2,7 @@ import { getLocales } from 'expo-localization';
 import { I18n, type TranslateOptions } from 'i18n-js';
 import { createContext, use, type ReactNode } from 'react';
 
+import { balloons } from '@/i18n/locales/balloons';
 import { chat } from '@/i18n/locales/chat';
 import { common } from '@/i18n/locales/common';
 import { game } from '@/i18n/locales/game';
@@ -20,6 +21,7 @@ import { LOCALES, type Locale, type Strings } from '@/i18n/types';
  * `t('game.pickQuestion')` and two areas never collide.
  */
 const AREAS = {
+  balloons,
   chat,
   common,
   game,
