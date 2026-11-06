@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { useSession } from '@/state/session';
+import { sendChangedToken } from '@/utils/push';
 
 /** What the server puts in a push's data, so a tap knows where to go. */
 type PushData =
@@ -21,15 +22,27 @@ function hrefFor(data: unknown): Href | null {
   return null;
 }
 
+/** The match whose chat is on screen: its messages already show, so they need no banner. */
+let openChat: string | null = null;
+
+/** The chat screen says which match it shows, and null when it closes. */
+export function setOpenChat(matchId: string | null) {
+  openChat = matchId;
+}
+
 if (Platform.OS !== 'web') {
   // While the app is open a push still shows as a banner, quietly.
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      const push = notification.request.content.data as Partial<PushData> | undefined;
+      const inChat = push?.type === 'chat' && push.matchId === openChat;
+      return {
+        shouldShowBanner: !inChat,
+        shouldShowList: !inChat,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    },
   });
 }
 
@@ -64,6 +77,13 @@ export function usePushRouting() {
     const last = Notifications.getLastNotificationResponse();
     if (last) open(last);
     const subscription = Notifications.addNotificationResponseReceivedListener(open);
+    return () => subscription.remove();
+  }, [ready]);
+
+  // The push service can replace a phone's token while the app runs: send the new one.
+  useEffect(() => {
+    if (Platform.OS === 'web' || !ready) return;
+    const subscription = Notifications.addPushTokenListener((token) => void sendChangedToken(token));
     return () => subscription.remove();
   }, [ready]);
 }

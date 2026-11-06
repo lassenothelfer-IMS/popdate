@@ -36,6 +36,7 @@ import { useSession } from '@/state/session';
 import { useFilterText, useSettings } from '@/state/settings';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
+import { setOpenChat } from '@/utils/push-routing';
 
 /** The seed's pieces are always these, so the first open knows to rise them in before the room loads. */
 const SEED_KEYS = ['seed-pill', 'seed-question', 'seed-answer'] as const;
@@ -165,6 +166,10 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const filter = useFilterText();
   const { locale, region } = useSettings();
   const room = useRoom(match.roomId);
+  useEffect(() => {
+    setOpenChat(match.id);
+    return () => setOpenChat(null);
+  }, [match.id]);
   // Report, block or unmatch; any of the last two closes the chat.
   const people = usePersonActions({ onGone: leave });
   const [checkingIn, setCheckingIn] = useState(false);

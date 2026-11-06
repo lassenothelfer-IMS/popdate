@@ -44,14 +44,26 @@ export async function registerPushIfAllowed() {
   }
 }
 
+/** The push service gave this phone a new token while the app runs: the server needs it. */
+export function sendChangedToken(devicePushToken: Notifications.DevicePushToken) {
+  return sendToken(devicePushToken);
+}
+
 /** The send in flight, so calls that overlap share it instead of registering twice. */
 let sending: Promise<void> | null = null;
 
-function sendToken() {
+/**
+ * Fetching the token without `devicePushToken` fires the token listener, so the
+ * listener hands in the one it was given, or it would call itself forever.
+ */
+function sendToken(devicePushToken?: Notifications.DevicePushToken) {
   sending ??= (async () => {
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
-      const { data } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+      const { data } = await Notifications.getExpoPushTokenAsync({
+        ...(projectId ? { projectId } : {}),
+        ...(devicePushToken ? { devicePushToken } : {}),
+      });
       await api.registerPushToken(data);
     } catch {
       // No token yet (Expo Go without an EAS project id, or offline). The next launch tries again.
