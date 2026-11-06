@@ -6,11 +6,11 @@ This is the order we go in. Each step says who owns it and what "done" means. Ti
 
 | Phase | What | Owner |
 | --- | --- | --- |
-| 0 | Minor UI tweaks and paywalls | Lasse (app), Jonas (backend for paywalls) |
-| 1 | Production backend on Convex | Jonas |
+| 0 | Minor UI tweaks and paywalls | Lasse |
+| 1 | Production backend on Convex | Lasse |
 | 2 | Accounts, build and TestFlight | Lasse |
-| 3 | Real playtest on phones | Everyone, Kian recruits |
-| 4 | Fixes Apple will check | Lasse, Jonas |
+| 3 | Real playtest on phones | Everyone, Kian and Jonas recruit |
+| 4 | Fixes Apple will check | Lasse |
 | 5 | App Store listing and submission | Lasse, Kian |
 | 6 | After launch | Everyone |
 
@@ -30,7 +30,7 @@ These come first, because they change the build we test and the answers we give 
 
 Done when: a full room as chooser and as balloon looks right on two different iPhones.
 
-### 0.2 Paywalls (Lasse and Jonas)
+### 0.2 Paywalls (Lasse)
 
 Popdate sells something digital (features inside the app), so Apple requires **in-app purchase** through StoreKit (App Store Review Guideline 3.1.1). A card form inside the app is not allowed anywhere. A link or button to a website checkout is allowed only on the **US storefront** (since 2025); elsewhere it needs Apple's External Purchase Link entitlement, with its own fees in the EU and some other countries. Plan for in-app purchase everywhere and treat a US web link as an optional extra.
 
@@ -59,14 +59,14 @@ Then build it:
   - products: `popdate.balloons.5` and `popdate.balloons.15` (consumable), and a Popdate+ subscription attached to `plus` (Test Store first, then App Store);
   - an offering with the id **`balloons`** holding the packs (and Popdate+), with a paywall made in the paywall editor. The app opens it when you're out of balloons. Without it, the app just says when the free ones come back;
   - the default (current) offering with Popdate+, which Settings → Get Popdate+ shows.
-- [ ] RevenueCat webhook → Convex (Lasse or Jonas), **once per Convex deployment** (dev now, prod again in phase 1):
+- [ ] RevenueCat webhook → Convex (Lasse), **once per Convex deployment** (dev now, prod again in phase 1):
   - Set `REVENUECAT_WEBHOOK_AUTH` on that deployment to its own long random string: `npx convex env set REVENUECAT_WEBHOOK_AUTH <value>` for dev, the same with `--prod` for production.
   - In RevenueCat → Integrations → Webhooks, add one webhook per deployment: `https://<that-deployment>.convex.site/revenuecat`, with that deployment's string as the Authorization header. The dev webhook gets **sandbox events only**; the prod webhook gets both, since TestFlight and App Review buy in sandbox but talk to prod.
   - Each deployment ignores accounts it doesn't know, and keeps those events in `purchaseEvents` (product, `environment`, RevenueCat ids) so a lost purchase can be credited by hand. A `SANDBOX` row is a test: never credit it as real.
   - Packs and Popdate+ only reach the server this way; the app is never trusted to add balloons.
 - [ ] Apply for the **App Store Small Business Program** (15% instead of 30%), then turn it on in RevenueCat's App Store app settings.
 - [ ] Rebuild the development build (`eas build --profile development --platform ios`): RevenueCat is native code, so the build from 2026-11-04 doesn't have it.
-- [x] Backend: entitlements live on the server. `convex/http.ts` takes RevenueCat's webhook, `convex/balloons.ts` applies each event once (packs add balloons, Popdate+ events set `plusUntil`). A restore on another account (RevenueCat's TRANSFER event) moves Popdate+ along. PRODUCT_CHANGE is ignored on purpose: the new plan's RENEWAL carries its expiration. Jonas: please review. Not handled yet: refunds of packs.
+- [x] Backend: entitlements live on the server. `convex/http.ts` takes RevenueCat's webhook, `convex/balloons.ts` applies each event once (packs add balloons, Popdate+ events set `plusUntil`). A restore on another account (RevenueCat's TRANSFER event) moves Popdate+ along. PRODUCT_CHANGE is ignored on purpose: the new plan's RENEWAL carries its expiration. Not handled yet: refunds of packs.
 - [ ] The paywall screen must show the price, the billing period, what's included, **Restore purchases**, and links to the terms and privacy policy (Guideline 3.1.2 for subscriptions).
 - [ ] Test with Sandbox Apple accounts (App Store Connect → Users and Access → Sandbox), including buy, cancel, renew and restore on a second phone.
 
@@ -74,7 +74,7 @@ Done when: a sandbox account can buy, the feature unlocks on the server, and res
 
 ---
 
-## Phase 1: production backend (Jonas)
+## Phase 1: production backend (Lasse)
 
 The app talks to Convex only when `EXPO_PUBLIC_API=convex` and `EXPO_PUBLIC_CONVEX_URL` are set. A release build with `convex` but no URL now stops at launch with an error instead of quietly playing against bots.
 
@@ -152,7 +152,7 @@ Done when: a TestFlight build installs, signs in, and plays a room against produ
 
 ---
 
-## Phase 3: real playtest (everyone, Kian recruits)
+## Phase 3: real playtest (everyone, Kian and Jonas recruit)
 
 A room only starts with six compatible people in the line at once, so this needs planning.
 

@@ -1,6 +1,6 @@
 /**
- * In-memory stand-in for the Supabase backend, so the app can be built and
- * played before Jonas's server functions exist. It follows the same rules
+ * In-memory stand-in for the Convex backend in `convex/`, so the app can be
+ * built and played without a deployment. It follows the same rules
  * the real server will: the queue builds a lobby of 1 popper + 5 contestants,
  * timers and photo reveals run here, and the app only sees the `Room` view.
  * Every other player in a room is a bot.
