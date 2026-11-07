@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 
 /**
  * How many rooms you have played, stored on this device only. Hints such as
- * "Swipe through the five" show during your first 3 rooms and hide from room 4.
+ * "Swipe through all five" show during your first 3 rooms and hide from room 4.
  */
 const KEY = 'popdate.roomsPlayed';
 /** Hints show while you have played fewer rooms than this. */

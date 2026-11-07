@@ -48,11 +48,11 @@ type LiveRowProps = {
   contestant: Contestant;
   color: string;
   isMe: boolean;
-  /** The popper's view while answers come in. Contestants see no statuses. */
+  /** While answers come in, for everyone in the room. */
   status?: 'answered' | 'writing';
 };
 
-/** Someone still in: their dot, name and age, and for the popper whether they answered. */
+/** Someone still in: their dot, name and age, and while answering whether they answered. */
 export function LiveRow({ contestant, color, isMe, status }: LiveRowProps) {
   const theme = useTheme();
   const t = useT();
