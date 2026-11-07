@@ -54,11 +54,15 @@ Then build it:
 - [x] App record in App Store Connect: **Popdate: Dating Game** (`popdate` was taken), bundle ID `com.goodn8s.popdate`.
 - [x] RevenueCat (agreed 2026-11-06): project "Popdate: Dating Game", App Store app connected with an In-App Purchase key (.p8, kept by Lasse only). The app side is in `mobile/src/utils/purchases.ts`: entitlement **`plus`**, the RevenueCat **Test Store** in development builds (fake products, no Apple needed) and the App Store everywhere else. Settings has a Popdate+ section with **Restore purchases**. Nothing is locked behind `plus` yet.
 - [x] Balloons in the app and on the server (2026-11-06): the `balloons` table, spending on a pop in `convex/lib/room.ts`, the check in `joinQueue`, the live count on Home, and the balloon shop when you're out (Get in line, Play another room).
-- [ ] In RevenueCat, with the **same ids** as in `src/shared/balloons.ts`:
-  - the entitlement `plus`;
-  - products: `popdate.balloons.5` and `popdate.balloons.15` (consumable), and a Popdate+ subscription attached to `plus` (Test Store first, then App Store);
-  - an offering with the id **`balloons`** holding the packs (and Popdate+), with a paywall made in the paywall editor. The app opens it when you're out of balloons. Without it, the app just says when the free ones come back;
-  - the default (current) offering with Popdate+, which Settings → Get Popdate+ shows.
+- [x] RevenueCat, Test Store (done 2026-11-07):
+  - entitlement **`plus`** (Popdate+) with `popdate.plus.weekly` ($4.99), `popdate.plus.6months` ($29.99) and `popdate.plus.yearly` ($49.99). No monthly plan.
+  - consumables `popdate.balloons.5` ($2.99) and `popdate.balloons.15` ($6.99), the ids in `src/shared/balloons.ts`.
+  - offering **`default`** (current): `$rc_weekly`, `$rc_six_month`, `$rc_annual`, with the published paywall **Popdate+** (Settings → Get Popdate+).
+  - offering **`balloons`**: `balloons_5`, `balloons_15` and `$rc_weekly`, with the published paywall **Balloon shop** (shown when you're out of balloons).
+  - Both paywalls were made with RevenueCat's AI editor in Popdate's colours, have a close button, and link to the Terms and Privacy pages below. The headline uses the system font; upload Gloock in RevenueCat to use the serif.
+  - Test Store prices are USD placeholders and can't be edited once saved: make new products to change them.
+- [x] Terms and Privacy on GitHub Pages: https://lassenothelfer-ims.github.io/popdate/terms/ and https://lassenothelfer-ims.github.io/popdate/privacy/. Built from the app's own text (`site/build.mjs`) by `.github/workflows/pages.yml` whenever `legal-screen.tsx` changes. Use the privacy URL in App Store Connect too. Swap in Kian's website later if it gets its own pages.
+- [ ] The same products in **App Store Connect** (the app → Monetization), with the **same product ids**: a subscription group "Popdate+" with the three plans, and the two consumables, with CHF prices. Then add each App Store product to the matching package in both offerings (the "Popdate: Dating Game (App Store)" slot) and attach the three plans to `plus`.
 - [ ] RevenueCat webhook → Convex (Lasse), **once per Convex deployment** (dev now, prod again in phase 1):
   - Set `REVENUECAT_WEBHOOK_AUTH` on that deployment to its own long random string: `npx convex env set REVENUECAT_WEBHOOK_AUTH <value>` for dev, the same with `--prod` for production.
   - In RevenueCat → Integrations → Webhooks, add one webhook per deployment: `https://<that-deployment>.convex.site/revenuecat`, with that deployment's string as the Authorization header. The dev webhook gets **sandbox events only**; the prod webhook gets both, since TestFlight and App Review buy in sandbox but talk to prod. Set the prod webhook's app filter to the **App Store app only**.
