@@ -6,6 +6,8 @@
 brag-output*/
 design/
 docs/
+site/
+_site/
 .claude/
 .github/
 mobile/.maestro/

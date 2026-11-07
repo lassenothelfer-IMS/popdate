@@ -16,6 +16,8 @@ type Section = { title: string; body: string };
 /**
  * The Terms of Use and Privacy Policy, in English for every language until
  * they are reviewed and translated. A draft to have checked before launch.
+ * The same text is published as web pages (`site/build.mjs`, GitHub Pages),
+ * which the paywalls and the App Store listing link to: change it here only.
  */
 const UPDATED = '7 November 2026';
 
@@ -46,6 +48,10 @@ const DOCS: Record<LegalDoc, Section[]> = {
       body: 'We do not run background checks. Meet in public, tell a friend, and read the safe dating tips in Settings. Popdate is not responsible for how people behave on or off the app.',
     },
     {
+      title: 'Balloons and Popdate+',
+      body: 'Joining a room needs a balloon. You get free balloons every day, and you can buy balloon packs or Popdate+, which gives unlimited balloons. Payment is handled by Apple through your Apple ID. Balloon packs are one-time purchases and do not expire. Popdate+ is a subscription that renews automatically at the price shown, weekly, every 6 months or yearly, unless you cancel it at least 24 hours before the current period ends. You can manage or cancel it in your App Store account settings, or under Settings, Manage Popdate+. Deleting your account does not cancel it. Refunds are handled by Apple.',
+    },
+    {
       title: 'Ending your account',
       body: 'You can delete your account at any time in Settings. We may suspend or remove accounts that break these terms.',
     },
@@ -70,6 +76,10 @@ const DOCS: Record<LegalDoc, Section[]> = {
     {
       title: 'Where it is stored',
       body: 'On our backend provider\'s servers. Your session stays in this phone\'s keychain. Data is sent over encrypted connections.',
+    },
+    {
+      title: 'Purchases',
+      body: 'If you buy balloons or Popdate+, Apple handles the payment; we never see your card or payment details. Our purchases provider, RevenueCat, receives the purchase and your Popdate account id so your balloons and Popdate+ reach your account.',
     },
     {
       title: 'How long we keep it',
