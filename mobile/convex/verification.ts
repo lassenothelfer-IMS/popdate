@@ -66,6 +66,9 @@ export const review = internalMutation({
       .query('verifications')
       .withIndex('by_user', (q) => q.eq('userId', userId))
       .unique();
-    if (row) await ctx.db.patch(row._id, { status });
+    if (!row) return;
+    // Compared, then deleted, as the app promises.
+    await deleteImage(ctx, row.selfie);
+    await ctx.db.patch(row._id, { status });
   },
 });

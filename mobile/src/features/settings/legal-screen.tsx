@@ -17,7 +17,7 @@ type Section = { title: string; body: string };
  * The Terms of Use and Privacy Policy, in English for every language until
  * they are reviewed and translated. A draft to have checked before launch.
  */
-const UPDATED = '28 October 2026';
+const UPDATED = '7 November 2026';
 
 const DOCS: Record<LegalDoc, Section[]> = {
   terms: [
@@ -73,7 +73,7 @@ const DOCS: Record<LegalDoc, Section[]> = {
     },
     {
       title: 'How long we keep it',
-      body: 'While your account exists. Deleting your account in Settings deletes your profile, photos, answers, matches and messages. Reports about you may be kept for up to a year to keep others safe.',
+      body: 'While your account exists. Deleting your account in Settings deletes your profile, photos, answers, matches and messages. Your verification selfie is deleted once it has been reviewed. When a chat ends (an unmatch or a deleted account), its last messages are kept for 30 days so they can still be reported, then deleted. Reports about you, with the messages they concern, may be kept for up to a year to keep others safe. If you have Popdate+, only its end date is kept until it runs out, so a restore can move it to a new account.',
     },
     {
       title: 'Your rights',

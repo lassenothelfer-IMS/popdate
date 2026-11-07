@@ -12,6 +12,7 @@ import type * as account from "../account.js";
 import type * as auth from "../auth.js";
 import type * as balloons from "../balloons.js";
 import type * as chat from "../chat.js";
+import type * as crons from "../crons.js";
 import type * as history from "../history.js";
 import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -33,6 +34,7 @@ import type * as safety from "../safety.js";
 import type * as secondChances from "../secondChances.js";
 import type * as settings from "../settings.js";
 import type * as testPlayers from "../testPlayers.js";
+import type * as uploads from "../uploads.js";
 import type * as users from "../users.js";
 import type * as verification from "../verification.js";
 
@@ -47,6 +49,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   balloons: typeof balloons;
   chat: typeof chat;
+  crons: typeof crons;
   history: typeof history;
   http: typeof http;
   "lib/auth": typeof lib_auth;
@@ -68,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   secondChances: typeof secondChances;
   settings: typeof settings;
   testPlayers: typeof testPlayers;
+  uploads: typeof uploads;
   users: typeof users;
   verification: typeof verification;
 }>;

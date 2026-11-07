@@ -235,6 +235,12 @@ export interface PopdateApi {
    */
   leaveQueue(): Promise<string | null>;
   watchQueue(onChange: (status: QueueStatus) => void): Unsubscribe;
+  /**
+   * The queue screen calls this every `QUEUE_PING_MS` while you wait: a place in
+   * line nobody checks in on (the app was closed) is dropped, so an absent player
+   * is never put in a room.
+   */
+  pingQueue(): Promise<void>;
   /** Your balloons, live. Null while signed out. Joining the line needs one. */
   watchBalloons(onChange: (balloons: Balloons | null) => void): Unsubscribe;
   /**

@@ -13,6 +13,9 @@ export const roomStatus = v.union(
   v.literal('finished'),
 );
 
+/** One message, as kept for a report. */
+export const chatLine = v.object({ senderId: v.id('users'), text: v.string(), sentAt: v.number() });
+
 export const reportReason = v.union(
   v.literal('harassment'),
   v.literal('fake'),
@@ -103,10 +106,13 @@ export default defineSchema({
     gender,
     wantsToMeet: interest,
     joinedAt: v.number(),
+    /** When the app last checked in from the queue screen; a row that stops checking in is dropped. */
+    seenAt: v.optional(v.number()),
     roomId: v.optional(v.id('rooms')),
   })
     .index('by_user', ['userId'])
-    .index('by_room_joined', ['roomId', 'joinedAt']),
+    .index('by_room_joined', ['roomId', 'joinedAt'])
+    .index('by_room_seen', ['roomId', 'seenAt']),
 
   questions: defineTable({
     text: v.string(),
@@ -125,6 +131,8 @@ export default defineSchema({
     /** When the current answer or pop timer ends, in epoch milliseconds. */
     deadline: v.optional(v.number()),
     popReminder: v.boolean(),
+    /** The popper picked or popped at least once: they're really there. */
+    popperActed: v.optional(v.boolean()),
     winnerId: v.optional(v.id('users')),
     matchId: v.optional(v.id('matches')),
     createdAt: v.number(),
@@ -164,7 +172,9 @@ export default defineSchema({
     round: v.number(),
     text: v.string(),
     createdAt: v.number(),
-  }).index('by_room_round', ['roomId', 'round']),
+  })
+    .index('by_room_round', ['roomId', 'round'])
+    .index('by_user', ['userId']),
 
   matches: defineTable({
     roomId: v.id('rooms'),
@@ -196,8 +206,28 @@ export default defineSchema({
     reportedId: v.id('users'),
     reason: reportReason,
     details: v.optional(v.string()),
+    /** The newest messages between the two, copied when the report is made. */
+    transcript: v.optional(v.array(chatLine)),
     createdAt: v.number(),
   }).index('by_reported', ['reportedId']),
+
+  /**
+   * The last messages of a chat that ended (unmatch or a deleted account), kept
+   * 30 days so it can still be reported, then deleted by `crons.ts`. Ids sorted: `aId < bId`.
+   */
+  endedChats: defineTable({
+    aId: v.id('users'),
+    bId: v.id('users'),
+    messages: v.array(chatLine),
+    endedAt: v.number(),
+  })
+    .index('by_pair', ['aId', 'bId'])
+    .index('by_ended', ['endedAt']),
+
+  /** How far the sweep of unclaimed uploads got, in `_creationTime` (one row). */
+  uploadSweep: defineTable({
+    after: v.number(),
+  }),
 
   /**
    * Each player's balloons (rules in `src/shared/balloons.ts`). No row yet means a
@@ -226,6 +256,10 @@ export default defineSchema({
     productId: v.optional(v.string()),
     /** SANDBOX or PRODUCTION: a test purchase must never be credited as a real one. */
     environment: v.optional(v.string()),
+    /** APP_STORE, TEST_STORE, …: Test Store events only count where ACCEPT_TEST_STORE is set. */
+    store: v.optional(v.string()),
+    /** Recorded, but nothing was credited (a Test Store event on a deployment that refuses them). */
+    ignored: v.optional(v.boolean()),
     /** Kept when no account was found, so the team can still credit the purchase by hand. */
     revenueCatIds: v.optional(v.array(v.string())),
     receivedAt: v.number(),

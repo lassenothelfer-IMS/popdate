@@ -90,7 +90,8 @@ export const settings = {
     deleteAccount: 'Delete account',
     deleting: 'Deleting…',
     deleteTitle: 'Delete your account?',
-    deleteBody: 'This deletes your profile, photos, matches and messages.',
+    deleteBody:
+      'This deletes your profile, photos, matches and messages. Popdate+ keeps billing through Apple until you cancel it in Manage Popdate+.',
     deleteConfirmTitle: 'Delete for good?',
     deleteConfirmBody: "You can't undo this.",
     delete: 'Delete',
@@ -235,7 +236,8 @@ export const settings = {
     deleteAccount: 'Konto löschen',
     deleting: 'Wird gelöscht …',
     deleteTitle: 'Dein Konto löschen?',
-    deleteBody: 'Dein Profil, deine Fotos, Matches und Nachrichten werden gelöscht.',
+    deleteBody:
+      'Dein Profil, deine Fotos, Matches und Nachrichten werden gelöscht. Popdate+ wird über Apple weiter abgerechnet, bis du es unter «Popdate+ verwalten» kündigst.',
     deleteConfirmTitle: 'Endgültig löschen?',
     deleteConfirmBody: 'Das kannst du nicht rückgängig machen.',
     delete: 'Löschen',
@@ -385,7 +387,8 @@ export const settings = {
     deleteAccount: 'Supprimer le compte',
     deleting: 'Suppression…',
     deleteTitle: 'Supprimer ton compte ?',
-    deleteBody: 'Ton profil, tes photos, tes matchs et tes messages seront supprimés.',
+    deleteBody:
+      'Ton profil, tes photos, tes matchs et tes messages seront supprimés. Popdate+ reste facturé par Apple jusqu’à ce que tu le résilies dans Gérer Popdate+.',
     deleteConfirmTitle: 'Supprimer définitivement ?',
     deleteConfirmBody: 'Tu ne pourras pas revenir en arrière.',
     delete: 'Supprimer',
@@ -536,7 +539,8 @@ export const settings = {
     deleteAccount: 'Elimina account',
     deleting: 'Eliminazione…',
     deleteTitle: 'Eliminare il tuo account?',
-    deleteBody: 'Verranno eliminati profilo, foto, match e messaggi.',
+    deleteBody:
+      'Verranno eliminati profilo, foto, match e messaggi. Popdate+ continua a essere addebitato da Apple finché non lo disdici in Gestisci Popdate+.',
     deleteConfirmTitle: 'Eliminare per sempre?',
     deleteConfirmBody: 'Non potrai tornare indietro.',
     delete: 'Elimina',

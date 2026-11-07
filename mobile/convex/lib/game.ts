@@ -13,6 +13,9 @@ export {
   POP_LIMIT_MS,
   POP_REMINDER_MS,
   QUESTION_OPTIONS_PER_ROUND,
+  QUEUE_AWAY_MS,
+  QUEUE_PING_MS,
+  QUEUE_STALE_MS,
   SECOND_CHANCE_MS,
 } from '../../src/shared/limits';
 

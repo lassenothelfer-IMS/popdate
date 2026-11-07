@@ -1,8 +1,10 @@
 # Backend review, 6 Nov 2026
 
-A full review of `mobile/convex` found 39 confirmed problems; a second agent checked each one. **None are fixed yet.** They're listed most severe first, each with the reviewer's suggested fix.
+A full review of `mobile/convex` found 39 confirmed problems; a second agent checked each one. They're listed most severe first, each with the reviewer's suggested fix.
 
-## 1. [high] Waiting queue rows never expire and are never checked again, and matchmake builds each lobby around the oldest waiting row (`first`). In a straight lobby that row is the only possible chooser, so an abandoned row becomes the popper of a room of five real players. Rows only go away through leaveQueue, prepareSignOut or deleteAccount. There is no crons.ts and no TTL. On a cold start, app/index.tsx sends a queued player to /home and leaves their row waiting.
+**Status, 7 Nov 2026:** 1 to 18 (the high and medium ones) are fixed, each with a backend test in `convex/game.test.ts`. A second review of those fixes found 14 more problems in them, all fixed too. The biggest one: iOS pauses the app in the background, so the queue now keeps someone who locked their phone for up to 10 minutes as a contestant, but only lets someone who checked in within the last 90 seconds be the chooser. 19 to 39 (low) are still open; 7, 19 and 23 of them partly overlap what's fixed (photos of blocked people, rows of deleted accounts).
+
+## 1. ✅ Fixed. [high] Waiting queue rows never expire and are never checked again, and matchmake builds each lobby around the oldest waiting row (`first`). In a straight lobby that row is the only possible chooser, so an abandoned row becomes the popper of a room of five real players. Rows only go away through leaveQueue, prepareSignOut or deleteAccount. There is no crons.ts and no TTL. On a cold start, app/index.tsx sends a queued player to /home and leaves their row waiting.
 
 `mobile/convex/queue.ts:170` (lens: queue)
 
@@ -25,7 +27,7 @@ for (const row of waiting) {
 
 Optional extra safeguard: in `pickTimeUp`, if `room.round === 1` and the popper never picked, end the room with `finish(ctx, roomId, { withWinner: false })` before any contestant is charged.
 
-## 2. [medium] Blocking someone doesn't cut off their access to you. matches.list/get, chat.list and rooms.get never check blocks, so the blocked person keeps a live view of the blocker's current name, age and photos, plus the whole chat history. The blocker also still sees the blocked person in their own Matches. The app's Block action (src/features/chat/person-actions.tsx:108) only calls safety.block and never unmatches.
+## 2. ✅ Fixed. [medium] Blocking someone doesn't cut off their access to you. matches.list/get, chat.list and rooms.get never check blocks, so the blocked person keeps a live view of the blocker's current name, age and photos, plus the whole chat history. The blocker also still sees the blocked person in their own Matches. The app's Block action (src/features/chat/person-actions.tsx:108) only calls safety.block and never unmatches.
 
 `mobile/convex/matches.ts:22` (lens: authz)
 
@@ -45,7 +47,7 @@ This also lets an unblock restore the chat, which is what the mock contract test
 
 That test closes GitHub issue #7 along with the three extra leaks.
 
-## 3. [medium] applyPurchaseEvent credits balloon packs and Popdate+ without ever checking event.environment, and docs/DEPLOYMENT.md tells you to send SANDBOX events to the prod webhook. Free sandbox purchases therefore become real entitlements on production. The comment on purchaseEvents.environment in schema.ts says the opposite: a test purchase must never be credited as a real one.
+## 3. ✅ Fixed. [medium] applyPurchaseEvent credits balloon packs and Popdate+ without ever checking event.environment, and docs/DEPLOYMENT.md tells you to send SANDBOX events to the prod webhook. Free sandbox purchases therefore become real entitlements on production. The comment on purchaseEvents.environment in schema.ts says the opposite: a test purchase must never be credited as a real one.
 
 `mobile/convex/balloons.ts:90` (lens: authz)
 
@@ -55,7 +57,7 @@ That test closes GitHub issue #7 along with the three extra leaks.
 4. Keep crediting App Store SANDBOX, so App Review and TestFlight purchases still work.
 5. Also set the prod webhook in RevenueCat to the App Store app only, and add that to DEPLOYMENT.md:64.
 
-## 4. [medium] finish() creates the match and sends both people an "It's a match" push without checking blocks. The room screen lets anyone block someone mid-game, and the room carries on, so a room can end with a match between two people where one has blocked the other.
+## 4. ✅ Fixed. [medium] finish() creates the match and sends both people an "It's a match" push without checking blocks. The room screen lets anyone block someone mid-game, and the room carries on, so a room can end with a match between two people where one has blocked the other.
 
 `mobile/convex/lib/room.ts:169` (lens: game)
 
@@ -75,7 +77,7 @@ if (winner && !blocked) {
 
 Add a test to game.test.ts for this case: Luca blocks Lena mid-room, Lena pops Noah, then check that `room.matchId` is null and `luca.as.query(api.matches.list)` returns an empty list.
 
-## 5. [medium] A chooser who never shows up still gets a full game played for them by the timers. Queue rows never expire, so someone who backgrounded or killed the app while waiting can be drawn as chooser. pickTimeUp then picks every question and popLimitUp pops a random balloon every round. pop() charges each of those contestants a balloon because they answered, and the last one is matched with a chooser who was never there.
+## 5. ✅ Fixed. [medium] A chooser who never shows up still gets a full game played for them by the timers. Queue rows never expire, so someone who backgrounded or killed the app while waiting can be drawn as chooser. pickTimeUp then picks every question and popLimitUp pops a random balloon every round. pop() charges each of those contestants a balloon because they answered, and the last one is matched with a chooser who was never there.
 
 `mobile/convex/rooms.ts:188` (lens: game)
 
@@ -86,7 +88,7 @@ Add a test to game.test.ts for this case: Luca blocks Lena mid-room, Lena pops N
 `if (!room.popperActed) { await finish(ctx, roomId, { withWinner: false }); return; }`
 The room then ends after round 1 (about 2.5 minutes) with no balloons spent and no match. A popper who is there but slow is unaffected, because any pick or pop sets the flag. Expiring stale queue rows (a heartbeat or a max wait) would stop the ghost from being seated at all, but that is a bigger change.
 
-## 6. [medium] deleteAccount never deletes the `answers` rows, but the in-app privacy policy (src/features/settings/legal-screen.tsx:76) says deleting your account deletes your answers, and the README says deletion removes everything. The answer text is also still shown to the other players.
+## 6. ✅ Fixed. [medium] deleteAccount never deletes the `answers` rows, but the in-app privacy policy (src/features/settings/legal-screen.tsx:76) says deleting your account deletes your answers, and the README says deletion removes everything. The answer text is also still shown to the other players.
 
 `mobile/convex/account.ts:44` (lens: account)
 
@@ -99,13 +101,13 @@ Also extend the deletion test in game.test.ts to check that Luca has no `answers
 
 The other option is to change the policy text, but the text would still be stored next to a deleted user, so deleting is the better fix.
 
-## 7. [medium] Photos and selfies are uploaded to _storage before any mutation records an owner. Every upload that is never saved stays in storage with no `uploads` row and no reference, so neither deleteAccount nor anything else can ever delete it.
+## 7. ✅ Fixed. [medium] Photos and selfies are uploaded to _storage before any mutation records an owner. Every upload that is never saved stays in storage with no `uploads` row and no reference, so neither deleteAccount nor anything else can ever delete it.
 
 `mobile/src/api/convex-server.ts:150` (lens: account)
 
 **Fix:** Add a sweep on the server, because client-side cleanup cannot cover a network drop or the user quitting the app. Create mobile/convex/crons.ts that runs an internalMutation every hour (crons.interval('sweep unclaimed uploads', { hours: 1 }, internal.uploads.sweep)). The sweep pages through ctx.db.system.query('_storage') in _creationTime order and stops at files newer than a grace period, for example 24 h. For each older file it checks ctx.db.query('uploads').withIndex('by_storage', q => q.eq('storageId', file._id)).unique() and calls ctx.storage.delete(file._id) when there is no row. This is safe because every referenced file has an `uploads` row: profile photos and selfies get one through claimImage, and test players get one through testPlayers.ts:57. Optional client-side pairing: in ConvexServer, drop a pendingUploads entry when saveProfile fails with 'A photo did not upload', so a photo that sat unsaved past the grace period gets uploaded again rather than reusing an id that was swept.
 
-## 8. [medium] After a Popdate+ subscriber deletes their account, a RevenueCat TRANSFER into the new account does nothing. deleteAccount deleted both the users row and the wallet holding plusUntil, so accountOf(transferredFrom) returns null and transferPlus is skipped. The delete dialog also never says that Apple billing continues.
+## 8. ✅ Fixed. [medium] After a Popdate+ subscriber deletes their account, a RevenueCat TRANSFER into the new account does nothing. deleteAccount deleted both the users row and the wallet holding plusUntil, so accountOf(transferredFrom) returns null and transferPlus is skipped. The delete dialog also never says that Apple billing continues.
 
 `mobile/convex/balloons.ts:77` (lens: account)
 
@@ -123,7 +125,7 @@ The other option is to change the policy text, but the text would still be store
 
 Another fix: when the TRANSFER source is unknown, schedule an internal action that calls RevenueCat's `GET /v1/subscribers/{to}` and sets `plusUntil` from the `plus` entitlement's `expires_date`. This needs a secret RevenueCat API key in Convex.
 
-## 9. [medium] deleteAccount, and unmatch in matches.ts:50, read and delete every message of a match in a single mutation. A busy or flooded chat therefore goes past Convex's per-transaction limits (32,000 documents scanned, 16 MiB read, 16,000 documents written; checked against docs.convex.dev/production/state/limits). After that the account can never be deleted and the match can never be unmatched.
+## 9. ✅ Fixed. [medium] deleteAccount, and unmatch in matches.ts:50, read and delete every message of a match in a single mutation. A busy or flooded chat therefore goes past Convex's per-transaction limits (32,000 documents scanned, 16 MiB read, 16,000 documents written; checked against docs.convex.dev/production/state/limits). After that the account can never be deleted and the match can never be unmatched.
 
 `C:\Users\lasse\WebstormProjects\popdate\mobile\convex\account.ts:107` (lens: perf)
 
@@ -151,7 +153,7 @@ export const purgeMessages = internalMutation({
 
 Each batch of 500 stays far below the per-transaction limits. Convex allows up to 1,000 scheduled functions per mutation, which is far more than any user's match count.
 
-## 10. [medium] Matchmaking only looks at the 500 oldest unmatched queue rows (take(MAX_WAITING)), and nothing ever expires a row: there is no cron, and rows leave only through the Cancel button, a match, or sign-out. Once the oldest 500 rows cannot form a lobby among themselves, everyone who joins later is invisible to matchmaking for good.
+## 10. ✅ Fixed. [medium] Matchmaking only looks at the 500 oldest unmatched queue rows (take(MAX_WAITING)), and nothing ever expires a row: there is no cron, and rows leave only through the Cancel button, a match, or sign-out. Once the oldest 500 rows cannot form a lobby among themselves, everyone who joins later is invisible to matchmaking for good.
 
 `C:\Users\lasse\WebstormProjects\popdate\mobile\convex\queue.ts:16` (lens: perf)
 
@@ -160,7 +162,7 @@ Each batch of 500 stays far below the per-transaction limits. Convex allows up t
 
 Later, if the queue grows, query candidates per compatible gender bucket (index `['roomId', 'gender', 'joinedAt']`) instead of one global oldest-500 window.
 
-## 11. [medium] When no lobby forms, matchmake loads the blocks of every waiting player: blocksOf(first) runs for each of up to 500 rows, with both directions collected unbounded. A joinQueue's read set therefore grows with the total block rows of the whole queue, and scripted mutual blocks can push every joinQueue past the 32,000-documents-scanned limit.
+## 11. ✅ Fixed. [medium] When no lobby forms, matchmake loads the blocks of every waiting player: blocksOf(first) runs for each of up to 500 rows, with both directions collected unbounded. A joinQueue's read set therefore grows with the total block rows of the whole queue, and scripted mutual blocks can push every joinQueue past the 32,000-documents-scanned limit.
 
 `C:\Users\lasse\WebstormProjects\popdate\mobile\convex\queue.ts:172` (lens: perf)
 
@@ -178,7 +180,7 @@ Then:
 
 Cost then depends on group size, not on how many block rows anyone has, so the per-transaction scan limit can no longer be reached.
 
-## 12. [medium] Every joinQueue reads the whole waiting range, plus about 2 block queries per waiting player, and then writes into that same range. Concurrent joinQueue, leaveQueue and saveProfile calls by waiting players therefore always conflict under OCC. Joins serialize globally and start failing under burst load.
+## 12. ✅ Fixed. [medium] Every joinQueue reads the whole waiting range, plus about 2 block queries per waiting player, and then writes into that same range. Concurrent joinQueue, leaveQueue and saveProfile calls by waiting players therefore always conflict under OCC. Joins serialize globally and start failing under burst load.
 
 `C:\Users\lasse\WebstormProjects\popdate\mobile\convex\queue.ts:167` (lens: perf)
 
@@ -192,7 +194,7 @@ To shorten each matchmake run, filter `waiting` with `fits()` first. Skip any `f
 
 In game.test.ts, run the scheduled matchmaker after each joinQueue: use fake timers and `t.finishInProgressScheduledFunctions()`, or call `internal.queue.matchmake` directly.
 
-## 13. [medium] Uploaded files are recorded only when saveProfile or submitSelfie claims them. Nothing ever deletes uploads that are never claimed, and there is no sweep or `uploads` row for them. Storage grows without bound, and a player's photos can outlive their account.
+## 13. ✅ Fixed. [medium] Uploaded files are recorded only when saveProfile or submitSelfie claims them. Nothing ever deletes uploads that are never claimed, and there is no sweep or `uploads` row for them. Storage grows without bound, and a player's photos can outlive their account.
 
 `C:\Users\lasse\WebstormProjects\popdate\mobile\convex\lib\uploads.ts:12` (lens: perf)
 
@@ -211,7 +213,7 @@ It needs no client change and no owner field on uploads.
 
 There is one small edge case on the client. If a claim fails because a pending upload is older than the cutoff and was already swept, convex-server.ts should drop that entry from `pendingUploads`, so the next save uploads the photo again.
 
-## 14. [medium] Blocking someone you matched with hides nothing. `matches.list`, `matches.get` and `chat.list` never check `blocks`, so the person you blocked comes back in your Matches, and they keep your name, photo and the whole chat.
+## 14. ✅ Fixed. [medium] Blocking someone you matched with hides nothing. `matches.list`, `matches.get` and `chat.list` never check `blocks`, so the person you blocked comes back in your Matches, and they keep your name, photo and the whole chat.
 
 `mobile/convex/matches.ts:22` (lens: safety)
 
@@ -223,7 +225,7 @@ There is one small edge case on the client. If a claim fails because a pending u
 4. Make the same change in the mock (`listMatches`/`getMatch` in mobile/src/api/mock-server.ts using `this.isBlocked(match.other.id)`) so the two stay in step.
 5. Add a game.test.ts case: block, check that `matches.list` is empty for both sides, unblock, check that the match comes back.
 
-## 15. [medium] A harasser can erase the evidence and dodge reports. Either person's unmatch, or deleting their account, hard-deletes every message for both people. A report records no match or room. Reporting a deleted account fails with "That person doesn't exist."
+## 15. ✅ Fixed. [medium] A harasser can erase the evidence and dodge reports. Either person's unmatch, or deleting their account, hard-deletes every message for both people. A report records no match or room. Reporting a deleted account fails with "That person doesn't exist."
 
 `mobile/convex/matches.ts:43` (lens: safety)
 
@@ -231,7 +233,7 @@ There is one small edge case on the client. If a claim fails because a pending u
 2. Add optional `matchId: v.id('matches')` and `transcript: v.array(v.object({ senderId, text, sentAt }))` to `reports`. In `report`, look up the match between `me` and `reportedId` (`by_popper`/`by_winner`) and copy its newest messages (for example up to `CHAT_LIMIT`) into the row.
 3. Keep evidence through an unmatch or deletion. Before deleting in `matches.unmatch` and in `deleteAccount`'s match loop, copy the messages into a small `endedChats` table: `{ aId, bId, matchId, messages, endedAt }`, indexed by the pair. Have `report` fall back to that table when no live match exists, and purge rows older than about 30 days with a daily cron (`crons.ts`). The chat still disappears for both people as the UI promises, but the team keeps a time-limited copy for review.
 
-## 16. [medium] The selfie is never deleted after review, although the app says it is compared to photo 1 "and then deleted". `review` only changes the status, so the stored file stays until the user sends another selfie or deletes their account.
+## 16. ✅ Fixed. [medium] The selfie is never deleted after review, although the app says it is compared to photo 1 "and then deleted". `review` only changes the status, so the stored file stays until the user sends another selfie or deletes their account.
 
 `mobile/convex/verification.ts:62` (lens: safety)
 
@@ -248,7 +250,7 @@ if (row) {
 
 Cleaner variant: make `selfie: v.optional(v.id('_storage'))` in schema.ts. In `review`, patch `{ status, selfie: undefined }`. Guard the two existing `deleteImage(row.selfie)` calls with `if (row.selfie)`.
 
-## 17. [medium] Production credits every SANDBOX event as a real purchase. http.ts never reads `store`, and applyPurchaseEvent never checks `environment`, which it only stores. DEPLOYMENT.md sets the prod webhook to send sandbox events for every app in the project, and RevenueCat's Test Store docs say Test Store purchases are 'reported as sandbox data'. So free Test Store and TestFlight purchases turn into real packs and real Popdate+ on prod.
+## 17. ✅ Fixed. [medium] Production credits every SANDBOX event as a real purchase. http.ts never reads `store`, and applyPurchaseEvent never checks `environment`, which it only stores. DEPLOYMENT.md sets the prod webhook to send sandbox events for every app in the project, and RevenueCat's Test Store docs say Test Store purchases are 'reported as sandbox data'. So free Test Store and TestFlight purchases turn into real packs and real Popdate+ on prod.
 
 `mobile/convex/balloons.ts:93` (lens: payments)
 
@@ -260,7 +262,7 @@ Alternatively, pass `store` through to applyPurchaseEvent so the event is still 
 
 Belt and braces: in DEPLOYMENT.md step 0.2, set the prod webhook's app filter to the App Store app only, not "all apps".
 
-## 18. [medium] TRANSFER copies whatever plusUntil the server has stored for the source account. It does not use what RevenueCat actually moved. A source that is missing, stale, or unrelated to the moved purchase gives the wrong result, and the TRANSFER is still recorded as handled, so it is never retried.
+## 18. ✅ Fixed. [medium] TRANSFER copies whatever plusUntil the server has stored for the source account. It does not use what RevenueCat actually moved. A source that is missing, stale, or unrelated to the moved purchase gives the wrong result, and the TRANSFER is still recorded as handled, so it is never retried.
 
 `mobile/convex/lib/balloons.ts:78` (lens: payments)
 

@@ -4,7 +4,15 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { FREE_BALLOONS, STARTER_BALLOONS } from '../src/shared/balloons';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
-import { ANSWER_GRACE_MS, ANSWER_MS, PICK_MS } from './lib/game';
+import {
+  ANSWER_GRACE_MS,
+  ANSWER_MS,
+  PICK_MS,
+  POP_LIMIT_MS,
+  POP_REMINDER_MS,
+  QUEUE_AWAY_MS,
+  QUEUE_STALE_MS,
+} from './lib/game';
 import schema from './schema';
 import { modules } from './test.setup';
 
@@ -48,7 +56,14 @@ async function player(t: Tester, name: string, gender: Gender, wantsToMeet: Inte
     bio: 'Hi there',
     photos: await storePhotos(t, name),
   });
-  return { id: userId as string, userId, as };
+  return { id: userId as string, userId, as, t };
+}
+
+/** Joins the line, then lets the matchmaker that `joinQueue` schedules run. */
+async function join(p: { as: ReturnType<Tester['withIdentity']>; t: Tester }) {
+  await p.as.mutation(api.queue.joinQueue, {});
+  vi.advanceTimersByTime(1);
+  await p.t.finishInProgressScheduledFunctions();
 }
 
 /** Lena pops, Luca and Noah hold balloons. */
@@ -57,7 +72,7 @@ async function startRoom() {
   const lena = await player(t, 'Lena', 'woman', 'man');
   const luca = await player(t, 'Luca', 'man', 'woman');
   const noah = await player(t, 'Noah', 'man', 'woman');
-  for (const p of [lena, luca, noah]) await p.as.mutation(api.queue.joinQueue, {});
+  for (const p of [lena, luca, noah]) await join(p);
   const status = await lena.as.query(api.queue.status, {});
   if (status.state !== 'matched') throw new Error('No room formed');
   return { t, lena, luca, noah, roomId: status.roomId };
@@ -81,12 +96,12 @@ test('a lobby forms only from people who want to meet each other', async () => {
   const luca = await player(t, 'Luca', 'man', 'woman');
   const noah = await player(t, 'Noah', 'man', 'woman');
 
-  await lena.as.mutation(api.queue.joinQueue, {});
-  await max.as.mutation(api.queue.joinQueue, {});
-  await luca.as.mutation(api.queue.joinQueue, {});
+  await join(lena);
+  await join(max);
+  await join(luca);
   expect(await lena.as.query(api.queue.status, {})).toMatchObject({ state: 'searching', needed: 3 });
 
-  await noah.as.mutation(api.queue.joinQueue, {});
+  await join(noah);
   const status = await lena.as.query(api.queue.status, {});
   expect(status.state).toBe('matched');
   // Max wants to meet men, so he isn't in a room with Lena.
@@ -106,10 +121,10 @@ test('people who blocked each other are never put in the same room', async () =>
   const ben = await player(t, 'Ben', 'man', 'woman');
   await luca.as.mutation(api.safety.block, { userId: noah.id });
 
-  for (const p of [lena, luca, noah]) await p.as.mutation(api.queue.joinQueue, {});
+  for (const p of [lena, luca, noah]) await join(p);
   expect((await lena.as.query(api.queue.status, {})).state).toBe('searching');
 
-  await ben.as.mutation(api.queue.joinQueue, {});
+  await join(ben);
   const status = await lena.as.query(api.queue.status, {});
   const room = await view(lena, status.state === 'matched' ? status.roomId : '');
   expect(room.contestants.map((c) => c.id).sort()).toEqual([luca.id, ben.id].sort());
@@ -284,6 +299,9 @@ test('deleting an account removes the profile, matches, chat and sign-in records
   });
 
   await luca.as.mutation(api.account.deleteAccount, {});
+  // The chat's messages are deleted in batches right after.
+  vi.advanceTimersByTime(1);
+  await t.finishInProgressScheduledFunctions();
 
   expect(await lena.as.query(api.matches.list, {})).toEqual([]);
   const left = await t.run(async (ctx) => ({
@@ -297,8 +315,15 @@ test('deleting an account removes the profile, matches, chat and sign-in records
       .withIndex('userId', (q) => q.eq('userId', luca.userId))
       .collect(),
     messages: await ctx.db.query('messages').collect(),
+    answers: await ctx.db
+      .query('answers')
+      .withIndex('by_user', (q) => q.eq('userId', luca.userId))
+      .collect(),
   }));
-  expect(left).toEqual({ user: null, profile: null, sessions: [], messages: [] });
+  expect(left).toEqual({ user: null, profile: null, sessions: [], messages: [], answers: [] });
+  // The chat's last messages stay 30 days, so Lena could still report him.
+  const kept = await t.run(async (ctx) => await ctx.db.query('endedChats').collect());
+  expect(kept.map((chat) => chat.messages.map((m) => m.text))).toEqual([['Hi Lena']]);
   // The token Luca still holds no longer works.
   await expect(luca.as.mutation(api.queue.joinQueue, {})).rejects.toThrow('Sign in first.');
 });
@@ -339,7 +364,7 @@ test('history keeps a pop that came before leaving, and tells it apart from leav
   const luca = await player(t, 'Luca', 'man', 'woman');
   const noah = await player(t, 'Noah', 'man', 'woman');
   const ben = await player(t, 'Ben', 'man', 'woman');
-  for (const p of [lena, luca, noah, ben]) await p.as.mutation(api.queue.joinQueue, {});
+  for (const p of [lena, luca, noah, ben]) await join(p);
   const status = await lena.as.query(api.queue.status, {});
   const roomId = status.state === 'matched' ? status.roomId : '';
 
@@ -370,7 +395,7 @@ test('leaving the queue after a room formed keeps your seat and hands back the r
   expect(await lena.as.query(api.queue.status, {})).toEqual({ state: 'matched', roomId });
 
   const mia = await player(t, 'Mia', 'woman', 'man');
-  await mia.as.mutation(api.queue.joinQueue, {});
+  await join(mia);
   expect(await mia.as.mutation(api.queue.leaveQueue, {})).toBeNull();
   expect(await mia.as.query(api.queue.status, {})).toEqual({ state: 'idle' });
 });
@@ -382,12 +407,12 @@ test('the queue only counts people who could share a room with you', async () =>
     await player(t, 'Mia', 'woman', 'man'),
     await player(t, 'Ava', 'woman', 'man'),
   ];
-  for (const p of women) await p.as.mutation(api.queue.joinQueue, {});
+  for (const p of women) await join(p);
   // Three women who want men can never fill a room together.
   expect(await women[0].as.query(api.queue.status, {})).toMatchObject({ found: 1, needed: 3 });
 
   const max = await player(t, 'Max', 'man', 'man');
-  await max.as.mutation(api.queue.joinQueue, {});
+  await join(max);
   expect(await women[0].as.query(api.queue.status, {})).toMatchObject({ found: 1 });
   expect(await max.as.query(api.queue.status, {})).toMatchObject({ found: 1 });
 });
@@ -399,7 +424,7 @@ test('the chooser is drawn from everyone in the lobby who fits the others', asyn
   const ava = await player(t, 'Ava', 'woman', 'everyone');
   const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
   try {
-    for (const p of [lena, mia, ava]) await p.as.mutation(api.queue.joinQueue, {});
+    for (const p of [lena, mia, ava]) await join(p);
   } finally {
     random.mockRestore();
   }
@@ -562,7 +587,7 @@ test('with no balloons left you can not join the line until the next day', async
   await expect(max.as.mutation(api.queue.joinQueue, {})).rejects.toThrow('No balloons left.');
 
   vi.setSystemTime(Date.now() + 24 * 60 * 60_000);
-  await max.as.mutation(api.queue.joinQueue, {});
+  await join(max);
   expect((await max.as.query(api.queue.status, {})).state).toBe('searching');
 });
 
@@ -675,4 +700,271 @@ test('switching plans keeps Popdate+, and a restore on a new account moves it th
   });
   expect((await balloons(luca)).plus).toBe(true);
   expect((await balloons(noah)).plus).toBe(false);
+});
+
+test('someone away is never the chooser; coming back completes the room; ten minutes away drops the place', async () => {
+  const t = convexTest(schema, modules);
+  const lena = await player(t, 'Lena', 'woman', 'man');
+  const luca = await player(t, 'Luca', 'man', 'woman');
+  const noah = await player(t, 'Noah', 'man', 'woman');
+  const max = await player(t, 'Max', 'man', 'man');
+
+  // Lena got in line, then locked her phone. She's the only one who could choose.
+  await join(lena);
+  vi.advanceTimersByTime(QUEUE_STALE_MS + 1000);
+  await join(luca);
+  await join(noah);
+  expect(await luca.as.query(api.queue.status, {})).toMatchObject({ state: 'searching' });
+
+  // She opens the app again: her check-in alone forms the room, with her choosing.
+  await lena.as.mutation(api.queue.pingQueue, {});
+  vi.advanceTimersByTime(1);
+  await t.finishInProgressScheduledFunctions();
+  const status = await lena.as.query(api.queue.status, {});
+  expect(status.state).toBe('matched');
+  expect((await view(lena, status.state === 'matched' ? status.roomId : '')).me.role).toBe('popper');
+
+  // Max never comes back: after ten minutes his place is gone.
+  await join(max);
+  await t.mutation(internal.queue.sweepStale, {});
+  expect(await max.as.query(api.queue.status, {})).toMatchObject({ state: 'searching' });
+  vi.advanceTimersByTime(QUEUE_AWAY_MS + 1000);
+  await t.mutation(internal.queue.sweepStale, {});
+  expect(await max.as.query(api.queue.status, {})).toEqual({ state: 'idle' });
+});
+
+test('someone whose phone is locked can still hold a balloon, just not choose', async () => {
+  const t = convexTest(schema, modules);
+  const luca = await player(t, 'Luca', 'man', 'woman');
+  const lena = await player(t, 'Lena', 'woman', 'man');
+  const noah = await player(t, 'Noah', 'man', 'woman');
+
+  // Luca got in line first, then locked his phone for five minutes.
+  await join(luca);
+  vi.advanceTimersByTime(5 * 60_000);
+  await join(lena);
+  await join(noah);
+
+  const status = await luca.as.query(api.queue.status, {});
+  expect(status.state).toBe('matched');
+  const room = await view(luca, status.state === 'matched' ? status.roomId : '');
+  expect(room.popper.id).toBe(lena.id);
+  expect(room.me.role).toBe('contestant');
+});
+
+test('a chooser who never picks or pops ends the room with no match and no balloon spent', async () => {
+  const { t, luca, noah, roomId } = await startRoom();
+  // Lena, the chooser, never touches the room: the timer picks her question.
+  vi.advanceTimersByTime(PICK_MS + 1);
+  await t.finishInProgressScheduledFunctions();
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
+  await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  vi.advanceTimersByTime(POP_REMINDER_MS + 1);
+  await t.finishInProgressScheduledFunctions();
+  vi.advanceTimersByTime(POP_LIMIT_MS + 1);
+  await t.finishInProgressScheduledFunctions();
+
+  const room = await view(luca, roomId);
+  expect(room).toMatchObject({ status: 'finished', winnerId: null, matchId: null });
+  for (const p of [luca, noah]) {
+    const b = await balloons(p);
+    expect(b.free + b.extra).toBe(START);
+  }
+});
+
+test('a block hides the match, the chat and the photos until it is lifted', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await playToTheEnd(lena, luca, noah, roomId);
+  const matchId = (await view(lena, roomId)).matchId!;
+  await luca.as.mutation(api.chat.send, { matchId, text: 'Hi Lena' });
+
+  await luca.as.mutation(api.safety.block, { userId: lena.id });
+  expect(await lena.as.query(api.matches.list, {})).toEqual([]);
+  expect(await luca.as.query(api.matches.list, {})).toEqual([]);
+  expect(await lena.as.query(api.matches.get, { matchId })).toBeNull();
+  expect(await lena.as.query(api.chat.list, { matchId })).toEqual([]);
+  const lenaSees = await view(lena, roomId);
+  expect(lenaSees.contestants.find((c) => c.id === luca.id)!.photos).toEqual([]);
+  expect(lenaSees.contestants.find((c) => c.id === noah.id)!.photos.length).toBeGreaterThan(0);
+  expect((await view(luca, roomId)).popper.photos).toEqual([]);
+
+  await lena.as.mutation(api.safety.block, { userId: luca.id });
+  const [blocked] = await luca.as.query(api.safety.listBlocked, {});
+  expect(blocked.photo).toBe('');
+
+  await luca.as.mutation(api.safety.unblock, { userId: lena.id });
+  await lena.as.mutation(api.safety.unblock, { userId: luca.id });
+  expect(await lena.as.query(api.matches.list, {})).toHaveLength(1);
+  expect(await lena.as.query(api.chat.list, { matchId })).toHaveLength(1);
+});
+
+test('a block during the room means no match at the end', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await luca.as.mutation(api.safety.block, { userId: lena.id });
+  await playToTheEnd(lena, luca, noah, roomId);
+  const room = await view(lena, roomId);
+  expect(room.winnerId).toBe(luca.id);
+  expect(room.matchId).toBeNull();
+  expect(await luca.as.query(api.matches.list, {})).toEqual([]);
+});
+
+test('Test Store purchases count only where ACCEPT_TEST_STORE is set', async () => {
+  const { t, noah } = await startRoom();
+  const pack = {
+    type: 'NON_RENEWING_PURCHASE',
+    userIds: [noah.id],
+    productId: 'popdate.balloons.5',
+    entitlementIds: [],
+    store: 'TEST_STORE',
+  };
+  await t.mutation(internal.balloons.applyPurchaseEvent, { ...pack, eventId: 'test-1' });
+  expect((await balloons(noah)).extra).toBe(STARTER_BALLOONS);
+
+  process.env.ACCEPT_TEST_STORE = 'true';
+  try {
+    await t.mutation(internal.balloons.applyPurchaseEvent, { ...pack, eventId: 'test-2' });
+    expect((await balloons(noah)).extra).toBe(STARTER_BALLOONS + 5);
+  } finally {
+    delete process.env.ACCEPT_TEST_STORE;
+  }
+  // The App Store's own sandbox (TestFlight, App Review) always counts.
+  await t.mutation(internal.balloons.applyPurchaseEvent, { ...pack, eventId: 'sandbox', store: 'APP_STORE' });
+  expect((await balloons(noah)).extra).toBe(STARTER_BALLOONS + 10);
+});
+
+test('Popdate+ of a deleted account can still move to the new one', async () => {
+  const { t, luca, noah } = await startRoom();
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    eventId: 'buy',
+    type: 'INITIAL_PURCHASE',
+    userIds: [noah.id],
+    entitlementIds: ['plus'],
+    productId: 'popdate.plus.monthly',
+    expirationAtMs: Date.now() + 30 * 24 * 60 * 60_000,
+    eventAt: 1000,
+  });
+  await noah.as.mutation(api.account.deleteAccount, {});
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    eventId: 'move',
+    type: 'TRANSFER',
+    userIds: [],
+    entitlementIds: [],
+    eventAt: 2000,
+    transferredFrom: [noah.id],
+    transferredTo: [luca.id],
+  });
+  expect((await balloons(luca)).plus).toBe(true);
+  // Nothing of Noah's is left once it moved.
+  const kept = await t.run(async (ctx) =>
+    ctx.db
+      .query('balloons')
+      .withIndex('by_user', (q) => q.eq('userId', noah.userId))
+      .unique(),
+  );
+  expect(kept).toBeNull();
+});
+
+test('the selfie is deleted once it has been reviewed', async () => {
+  const { t, luca } = await startRoom();
+  const selfie = await t.run(async (ctx) => ctx.storage.store(new Blob(['me'], { type: 'image/jpeg' })));
+  await luca.as.mutation(api.verification.submitSelfie, { selfie });
+  await t.mutation(internal.verification.review, { userId: luca.userId, status: 'verified' });
+  expect(await luca.as.query(api.verification.get, {})).toBe('verified');
+  expect(await t.run(async (ctx) => ctx.db.system.get(selfie))).toBeNull();
+});
+
+test('an unmatch can still be reported with the chat, also after the account is gone', async () => {
+  const { t, lena, luca, noah, roomId } = await startRoom();
+  await playToTheEnd(lena, luca, noah, roomId);
+  const matchId = (await view(lena, roomId)).matchId!;
+  await luca.as.mutation(api.chat.send, { matchId, text: 'Something nasty' });
+  await luca.as.mutation(api.matches.unmatch, { matchId });
+  vi.advanceTimersByTime(1);
+  await t.finishInProgressScheduledFunctions();
+  await luca.as.mutation(api.account.deleteAccount, {});
+
+  await lena.as.mutation(api.safety.report, { userId: luca.id, reason: 'harassment' });
+  const [report] = await t.run(async (ctx) => ctx.db.query('reports').collect());
+  expect(report.transcript?.map((line) => line.text)).toEqual(['Something nasty']);
+  expect(await t.run(async (ctx) => ctx.db.query('messages').collect())).toEqual([]);
+
+  // After 30 days the kept copy goes.
+  vi.advanceTimersByTime(31 * 24 * 60 * 60_000);
+  await t.mutation(internal.matches.purgeEndedChats, {});
+  expect(await t.run(async (ctx) => ctx.db.query('endedChats').collect())).toEqual([]);
+});
+
+test('uploads nobody saved within a day are deleted; saved ones stay', async () => {
+  const { t, luca } = await startRoom();
+  const stray = await t.run(async (ctx) => ctx.storage.store(new Blob(['stray'], { type: 'image/jpeg' })));
+  const profile = await luca.as.query(api.profiles.getMine, {});
+  vi.advanceTimersByTime(25 * 60 * 60_000);
+  await t.mutation(internal.uploads.sweepUnclaimed, {});
+  expect(await t.run(async (ctx) => ctx.db.system.get(stray))).toBeNull();
+  const photos = await t.run(async (ctx) =>
+    Promise.all(profile!.photoIds.map((id) => ctx.db.system.get(id as Id<'_storage'>))),
+  );
+  expect(photos.every((file) => file !== null)).toBe(true);
+});
+
+test('reporting and blocking a deleted account both go through', async () => {
+  const { lena, luca } = await startRoom();
+  await luca.as.mutation(api.account.deleteAccount, {});
+  await lena.as.mutation(api.safety.report, { userId: luca.id, reason: 'fake' });
+  await lena.as.mutation(api.safety.block, { userId: luca.id });
+});
+
+test('a block hides the match in the room history too, until it is lifted', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await playToTheEnd(lena, luca, noah, roomId);
+  const mine = async () => (await lena.as.query(api.history.list, {})).find((r) => r.roomId === roomId)!;
+  expect((await mine()).matchId).not.toBeNull();
+
+  await luca.as.mutation(api.safety.block, { userId: lena.id });
+  expect(await mine()).toMatchObject({ matchId: null, matchName: null });
+  expect((await view(lena, roomId)).matchId).toBeNull();
+
+  await luca.as.mutation(api.safety.unblock, { userId: lena.id });
+  expect((await mine()).matchName).toBe('Luca');
+});
+
+test("a deleted account's Popdate+ follows its renewals and goes when it ends", async () => {
+  const { t, noah } = await startRoom();
+  const plus = { userIds: [noah.id], entitlementIds: ['plus'], productId: 'popdate.plus.monthly' };
+  const month = 30 * 24 * 60 * 60_000;
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    ...plus,
+    eventId: 'buy',
+    type: 'INITIAL_PURCHASE',
+    expirationAtMs: Date.now() + month,
+    eventAt: 1000,
+  });
+  await noah.as.mutation(api.account.deleteAccount, {});
+  const kept = () =>
+    t.run(async (ctx) =>
+      ctx.db
+        .query('balloons')
+        .withIndex('by_user', (q) => q.eq('userId', noah.userId))
+        .unique(),
+    );
+  expect(await kept()).toMatchObject({ free: 0, extra: 0 });
+
+  const later = Date.now() + 2 * month;
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    ...plus,
+    eventId: 'renew',
+    type: 'RENEWAL',
+    expirationAtMs: later,
+    eventAt: 2000,
+  });
+  expect((await kept())?.plusUntil).toBe(later);
+
+  await t.mutation(internal.balloons.applyPurchaseEvent, {
+    ...plus,
+    eventId: 'end',
+    type: 'EXPIRATION',
+    expirationAtMs: Date.now() - 1000,
+    eventAt: 3000,
+  });
+  expect(await kept()).toBeNull();
 });

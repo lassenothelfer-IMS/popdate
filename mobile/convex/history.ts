@@ -2,7 +2,7 @@ import { getAuthUserId } from '@convex-dev/auth/server';
 
 import type { Doc, Id } from './_generated/dataModel';
 import { query, type QueryCtx } from './_generated/server';
-import { getProfile } from './lib/people';
+import { getProfile, isBlockedEitherWay } from './lib/people';
 
 /** How many past rooms the history shows. */
 const HISTORY_LIMIT = 50;
@@ -19,9 +19,11 @@ async function summary(
   // The match belongs to the popper and the winner, as in `ownsMatch`; it's gone once they unmatch.
   const match = (iAmPopper || iWon) && room.matchId ? await ctx.db.get(room.matchId) : null;
   const otherId = match ? (match.popperId === userId ? match.winnerId : match.popperId) : null;
+  // A block, either way, hides the match here as in Matches, until it's lifted.
+  const hidden = otherId ? await isBlockedEitherWay(ctx, userId, otherId) : false;
   const [popper, other] = await Promise.all([
     getProfile(ctx, room.popperId),
-    otherId ? getProfile(ctx, otherId) : null,
+    otherId && !hidden ? getProfile(ctx, otherId) : null,
   ]);
   const rounds = await Promise.all(
     room.usedQuestionIds.map(async (questionId, index) => {
@@ -60,8 +62,8 @@ async function summary(
     poppedInRound,
     totalRounds: room.totalRounds,
     popperName: popper?.name ?? 'Someone',
-    matchName: match && match.popperId !== match.winnerId ? (other?.name ?? 'Someone') : null,
-    matchId: (match?._id as string | undefined) ?? null,
+    matchName: match && !hidden && match.popperId !== match.winnerId ? (other?.name ?? 'Someone') : null,
+    matchId: match && !hidden ? (match._id as string) : null,
     rounds,
   };
 }

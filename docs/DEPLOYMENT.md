@@ -61,7 +61,9 @@ Then build it:
   - the default (current) offering with Popdate+, which Settings → Get Popdate+ shows.
 - [ ] RevenueCat webhook → Convex (Lasse), **once per Convex deployment** (dev now, prod again in phase 1):
   - Set `REVENUECAT_WEBHOOK_AUTH` on that deployment to its own long random string: `npx convex env set REVENUECAT_WEBHOOK_AUTH <value>` for dev, the same with `--prod` for production.
-  - In RevenueCat → Integrations → Webhooks, add one webhook per deployment: `https://<that-deployment>.convex.site/revenuecat`, with that deployment's string as the Authorization header. The dev webhook gets **sandbox events only**; the prod webhook gets both, since TestFlight and App Review buy in sandbox but talk to prod.
+  - In RevenueCat → Integrations → Webhooks, add one webhook per deployment: `https://<that-deployment>.convex.site/revenuecat`, with that deployment's string as the Authorization header. The dev webhook gets **sandbox events only**; the prod webhook gets both, since TestFlight and App Review buy in sandbox but talk to prod. Set the prod webhook's app filter to the **App Store app only**.
+  - On **dev only**: `npx convex env set ACCEPT_TEST_STORE true`. Without it a deployment records RevenueCat Test Store purchases but credits nothing, so free test buys can never become real balloons on prod.
+  - Recommended on both: `REVENUECAT_SECRET_KEY` (RevenueCat → API keys → a **secret key for API v1**; `GET /v1/subscribers` doesn't take v2 keys). When a restore moves Popdate+ to another account (a TRANSFER), the server then asks RevenueCat what moved instead of guessing from what it stored.
   - Each deployment ignores accounts it doesn't know, and keeps those events in `purchaseEvents` (product, `environment`, RevenueCat ids) so a lost purchase can be credited by hand. A `SANDBOX` row is a test: never credit it as real.
   - Packs and Popdate+ only reach the server this way; the app is never trusted to add balloons.
 - [ ] Apply for the **App Store Small Business Program** (15% instead of 30%), then turn it on in RevenueCat's App Store app settings.
@@ -89,7 +91,8 @@ All commands run in `mobile/`.
   ```bash
   npx @convex-dev/auth --prod
   ```
-- [ ] Production environment variables (Convex dashboard → Settings → Environment Variables): leave `LOBBY_SIZE` and `ALLOW_TEST_PLAYERS` **unset** in production, so rooms need six real people and fake test players can't be added.
+- [ ] Production environment variables (Convex dashboard → Settings → Environment Variables): leave `LOBBY_SIZE`, `ALLOW_TEST_PLAYERS` and `ACCEPT_TEST_STORE` **unset** in production, so rooms need six real people, fake test players can't be added, and Test Store purchases count for nothing.
+- [ ] Check the scheduled jobs run (Convex dashboard → Schedules → Cron jobs, from `convex/crons.ts`): the queue sweep every minute, the sweep of unsaved uploads every hour, the purge of ended chats every day.
 - [ ] Set `REVENUECAT_WEBHOOK_AUTH` with `--prod` and add the production webhook in RevenueCat (see 0.2). Without it, real purchases never reach production: nobody gets their balloons or Popdate+.
 - [ ] Seed the questions table if production starts empty (same way as on dev).
 - [ ] Run the backend tests against the code being deployed: `npm run test:backend`.

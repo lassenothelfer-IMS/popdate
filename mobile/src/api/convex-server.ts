@@ -254,6 +254,10 @@ export class ConvexServer implements PopdateApi {
       sexuality: draft.sexuality,
       pinnedAnswers: draft.pinnedAnswers,
       photos,
+    }).catch((error: unknown) => {
+      // An early upload left unsaved for a day is swept from storage: upload those again next time.
+      for (const uri of draft.photos) this.pendingUploads.delete(uri);
+      throw error;
     });
     return this.keepPhotoIds(saved);
   }
@@ -291,6 +295,10 @@ export class ConvexServer implements PopdateApi {
 
   watchQueue(onChange: (status: QueueStatus) => void) {
     return this.watch(api.queue.status, {}, onChange);
+  }
+
+  async pingQueue() {
+    await this.mutation(api.queue.pingQueue, {});
   }
 
   watchBalloons(onChange: (balloons: Balloons | null) => void) {

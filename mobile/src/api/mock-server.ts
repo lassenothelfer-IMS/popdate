@@ -305,6 +305,8 @@ type ServerRoom = {
   /** When this round's answers were due, so one sent right at the end still counts. */
   answerDeadline: number | null;
   popReminder: boolean;
+  /** The chooser picked or popped at least once. A bot chooser always counts as there. */
+  popperActed?: boolean;
   winnerId: string | null;
   matchId: string | null;
   timers: ReturnType<typeof setTimeout>[];
@@ -515,6 +517,10 @@ class MockServer implements PopdateApi {
     };
   }
 
+  async pingQueue() {
+    // Bots never close the app, and neither does the mock's own player.
+  }
+
   watchBalloons(onChange: (balloons: Balloons | null) => void) {
     this.balloonListeners.add(onChange);
     onChange(this.balloonsNow());
@@ -601,6 +607,7 @@ class MockServer implements PopdateApi {
     if (room.status !== 'picking') throw new Error('The question is already picked.');
     const question = room.questionOptions.find((option) => option.id === questionId);
     if (!question) throw new Error('That question is not one of the options.');
+    room.popperActed = true;
     this.startAnswering(room, question);
   }
 
@@ -630,6 +637,7 @@ class MockServer implements PopdateApi {
     if (room.status !== 'popping') throw new Error("It's not time to pop yet.");
     const seat = room.seats.find((s) => s.player.id === contestantId);
     if (!seat || !isActive(seat)) throw new Error('That balloon is already popped.');
+    room.popperActed = true;
     this.pop(room, seat);
   }
 
@@ -698,14 +706,16 @@ class MockServer implements PopdateApi {
 
   // Matches
 
+  // A block hides the match and its chat until it's lifted, as on the server.
   async listMatches() {
     await this.restore();
-    return [...this.matches].reverse();
+    return [...this.matches].reverse().filter((match) => !this.isBlocked(match.other.id));
   }
 
   async getMatch(matchId: string) {
     await this.restore();
-    return this.matches.find((match) => match.id === matchId) ?? null;
+    const match = this.matches.find((m) => m.id === matchId);
+    return match && !this.isBlocked(match.other.id) ? match : null;
   }
 
   async unmatch(matchId: string) {
@@ -730,7 +740,15 @@ class MockServer implements PopdateApi {
 
   async listRoomHistory() {
     await this.restore();
-    return structuredClone(this.history);
+    return structuredClone(this.history).map((entry) =>
+      entry.matchId && this.isHiddenMatch(entry.matchId) ? { ...entry, matchId: null, matchName: null } : entry,
+    );
+  }
+
+  /** A match whose other person is blocked (either way) is hidden until the block is lifted. */
+  private isHiddenMatch(matchId: string) {
+    const match = this.matches.find((m) => m.id === matchId);
+    return match !== undefined && this.isBlocked(match.other.id);
   }
 
   async getQueueStats(): Promise<QueueStats> {
@@ -983,7 +1001,8 @@ class MockServer implements PopdateApi {
 
   async listMessages(matchId: string) {
     await this.restore();
-    this.requireMatch(matchId);
+    const match = this.requireMatch(matchId);
+    if (this.isBlocked(match.other.id)) return [];
     return [...(this.messages.get(matchId) ?? [])];
   }
 
@@ -991,10 +1010,11 @@ class MockServer implements PopdateApi {
     const listeners = this.messageListeners.get(matchId) ?? new Set();
     listeners.add(onChange);
     this.messageListeners.set(matchId, listeners);
-    onChange([...(this.messages.get(matchId) ?? [])]);
+    const current = () => (this.isHiddenMatch(matchId) ? [] : [...(this.messages.get(matchId) ?? [])]);
+    onChange(current());
     // Right after a restart the chat may still be loading from the device.
     void this.restore().then(() => {
-      if (listeners.has(onChange)) onChange([...(this.messages.get(matchId) ?? [])]);
+      if (listeners.has(onChange)) onChange(current());
     });
     return () => {
       listeners.delete(onChange);
@@ -1170,9 +1190,15 @@ class MockServer implements PopdateApi {
       room.popReminder = true;
       room.deadline = Date.now() + POP_LIMIT_MS;
       this.emit(room);
-      // Past the limit a random balloon pops, so five people never wait forever.
+      // Past the limit a random balloon pops, so five people never wait forever. A chooser
+      // who never picked or popped isn't there: the room ends with no match instead.
       this.after(room, POP_LIMIT_MS, () => {
-        if (room.status === 'popping') this.pop(room, pickRandom(room.seats.filter(isActive)));
+        if (room.status !== 'popping') return;
+        if (!room.popper.isBot && !room.popperActed) {
+          this.finish(room, { withWinner: false });
+          return;
+        }
+        this.pop(room, pickRandom(room.seats.filter(isActive)));
       });
     });
     if (room.popper.isBot) {
@@ -1195,17 +1221,18 @@ class MockServer implements PopdateApi {
     this.startRound(room);
   }
 
-  private finish(room: ServerRoom) {
+  private finish(room: ServerRoom, { withWinner = true } = {}) {
     this.clearTimers(room);
     room.status = 'finished';
     room.deadline = null;
     room.popReminder = false;
-    const winner = room.seats.find(isActive)?.player ?? null;
+    const winner = withWinner ? (room.seats.find(isActive)?.player ?? null) : null;
     room.winnerId = winner?.id ?? null;
 
     const iAmPopper = room.popper.id === this.userId;
-    if (winner && (iAmPopper || winner.id === this.userId)) {
-      const other = iAmPopper ? winner : room.popper;
+    const other = iAmPopper ? winner : room.popper;
+    // A block during the room means no match, as on the server.
+    if (winner && other && (iAmPopper || winner.id === this.userId) && !this.isBlocked(other.id)) {
       const match: Match = {
         id: `match-${randomId()}`,
         roomId: room.id,
@@ -1260,7 +1287,7 @@ class MockServer implements PopdateApi {
         id: seat.player.id,
         name: seat.player.name,
         age: seat.player.age,
-        photos: seat.player.photos.slice(0, photoCount),
+        photos: this.isBlocked(seat.player.id) ? [] : seat.player.photos.slice(0, photoCount),
         popped: seat.popped,
         poppedInRound: seat.poppedInRound,
         left: seat.left,
@@ -1278,7 +1305,7 @@ class MockServer implements PopdateApi {
         id: room.popper.id,
         name: room.popper.name,
         age: room.popper.age,
-        photos: room.popper.photos.slice(0, 1),
+        photos: this.isBlocked(room.popper.id) ? [] : room.popper.photos.slice(0, 1),
       },
       contestants,
       question: room.question,
@@ -1286,7 +1313,7 @@ class MockServer implements PopdateApi {
       deadline: room.deadline,
       popReminder: room.popReminder,
       winnerId: room.winnerId,
-      matchId: room.matchId,
+      matchId: room.matchId && !this.isHiddenMatch(room.matchId) ? room.matchId : null,
       me: { id: this.userId ?? '', role: myRole },
     };
   }

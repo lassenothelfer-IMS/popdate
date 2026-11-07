@@ -38,7 +38,9 @@ const CHAT_LIMIT = 200;
 export const list = query({
   args: { matchId: v.string() },
   handler: async (ctx, { matchId }) => {
-    const { match } = await requireMyMatch(ctx, matchId);
+    const { userId, match } = await requireMyMatch(ctx, matchId);
+    const otherId = match.popperId === userId ? match.winnerId : match.popperId;
+    if (await isBlockedEitherWay(ctx, userId, otherId)) return [];
     const newest = await ctx.db
       .query('messages')
       .withIndex('by_match', (q) => q.eq('matchId', match._id))

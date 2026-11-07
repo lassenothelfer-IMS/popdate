@@ -173,6 +173,14 @@ describe('mock server', () => {
       stop();
     });
 
+    it('ends the room with no match when you choose and never pick or pop', async () => {
+      const { room, stop } = await playRoom('popper');
+      await vi.advanceTimersByTimeAsync(30_000 + 60_000 + 3_000 + 30_000 + 30_000 + 1000);
+      expect(room()).toMatchObject({ status: 'finished', winnerId: null, matchId: null });
+      expect(await mockServer.listMatches()).toEqual([]);
+      stop();
+    });
+
     it('lets you leave the line before the room forms', async () => {
       await mockServer.joinQueue();
       await expect(mockServer.leaveQueue()).resolves.toBeNull();
@@ -258,8 +266,13 @@ describe('mock server', () => {
       await mockServer.block(match.other.id);
       expect((await mockServer.listBlocked()).map((p) => p.id)).toEqual([match.other.id]);
       await expect(mockServer.sendMessage(match.id, 'Still there?')).rejects.toThrow();
+      // The match and the chat are hidden while the block stands.
+      expect(await mockServer.listMatches()).toEqual([]);
+      expect(await mockServer.getMatch(match.id)).toBeNull();
+      expect(await mockServer.listMessages(match.id)).toEqual([]);
 
       await mockServer.unblock(match.other.id);
+      expect(await mockServer.listMatches()).toHaveLength(1);
       await expect(mockServer.sendMessage(match.id, 'Sorry')).resolves.toMatchObject({ text: 'Sorry' });
       stop();
     });
