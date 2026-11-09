@@ -30,6 +30,11 @@ export function setMockNextRole(role: MockRole) {
   mockServer.nextRole = role;
 }
 
+/** Mock only: whether you have Popdate+, from RevenueCat. The real server hears it from RevenueCat itself. */
+export function setMockPlus(plus: boolean) {
+  mockServer.setPlus(plus);
+}
+
 export function getMockNextRole() {
   return mockServer.nextRole;
 }

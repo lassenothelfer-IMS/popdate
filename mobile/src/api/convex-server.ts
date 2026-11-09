@@ -6,6 +6,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { api } from '../../convex/_generated/api';
 import type { Id } from '../../convex/_generated/dataModel';
 import type {
+  Balloons,
   Match,
   Message,
   PopdateApi,
@@ -253,6 +254,10 @@ export class ConvexServer implements PopdateApi {
       sexuality: draft.sexuality,
       pinnedAnswers: draft.pinnedAnswers,
       photos,
+    }).catch((error: unknown) => {
+      // An early upload left unsaved for a day is swept from storage: upload those again next time.
+      for (const uri of draft.photos) this.pendingUploads.delete(uri);
+      throw error;
     });
     return this.keepPhotoIds(saved);
   }
@@ -290,6 +295,19 @@ export class ConvexServer implements PopdateApi {
 
   watchQueue(onChange: (status: QueueStatus) => void) {
     return this.watch(api.queue.status, {}, onChange);
+  }
+
+  async pingQueue() {
+    await this.mutation(api.queue.pingQueue, {});
+  }
+
+  watchBalloons(onChange: (balloons: Balloons | null) => void) {
+    return this.watch(api.balloons.mine, {}, onChange);
+  }
+
+  async balloonsBought(_productId: string) {
+    // RevenueCat's webhook credits the pack on the server (convex/http.ts), and the
+    // balloons query updates by itself. Trusting the app here would let anyone add balloons.
   }
 
   // Rooms

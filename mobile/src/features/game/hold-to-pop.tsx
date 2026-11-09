@@ -92,7 +92,8 @@ export function HoldToPopButton({ name, balloonColor, onPop }: HoldToPopButtonPr
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityHint={t('game.holdHint')}
+      // Screen readers pop with a double-tap, so the spoken hint says that; the hold is for touch.
+      accessibilityHint={t('game.popActionHint', { name })}
       accessibilityActions={[{ name: 'activate' }]}
       onAccessibilityAction={accessibilityAction}
       onPressIn={pressIn}

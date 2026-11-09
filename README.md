@@ -131,41 +131,43 @@ A phone can't reach a local backend on your computer; use the cloud dev deployme
 
 ## What each person does
 
-Four people, four folders, one shared repo. Each person works with their own Claude Code and stays inside their folder.
+Four people, one shared repo. The four of us split the Apple Developer account ($99 a year). Each person works with their own Claude Code and stays inside their folder.
 
-### Jonas: backend (`mobile/convex/`)
+### Lasse: everything in the app: mobile app, backend, App Store and safety (`mobile/`, `docs/`)
 
+Lasse took over the backend from Jonas in November 2026.
+
+Backend (`mobile/convex/`):
 - Create the Convex project and turn on auth
-- Write the database: profiles, queue, rooms, players, questions, answers, matches, messages, settings, reports, blocks
-- Write the server functions: queue, matchmaking, rounds, timers, pops, match, chat, safety, account deletion
+- Write the database: profiles, queue, rooms, players, questions, answers, matches, messages, settings, reports, blocks, balloons
+- Write the server functions: queue, matchmaking, rounds, timers, pops, match, chat, safety, account deletion, purchases (RevenueCat webhook)
 - Set up photo storage so each photo unlocks only in its round
-- Share the Convex project with the team (the app only needs its URL, which `npx convex dev` writes to `.env.local`)
+- Run the dev and production deployments (the app only needs the URL, which `npx convex dev` writes to `.env.local`)
 - Later: admin view for reports and selfie reviews, and sending push notifications
 
-### Lasse: mobile app (`mobile/`, except Safety)
-
-- Create the Expo app (React Native, TypeScript) and connect it to Jonas's Convex backend
+App:
+- Create the Expo app (React Native, TypeScript) and connect it to the Convex backend
 - Build onboarding and profile setup with 6 photo uploads (expo-image-picker)
 - Build the home screen and the queue screen
 - Build the game room: question picker, answers, photo reveals, timers, pop, watch or leave
 - Build the match screen
 - Test the full flow on real phones with an Expo development build
-
-### Elias: App Store and safety (`docs/`, `mobile/src/features/safety/`)
-
-- Set team and bundle ID in `mobile/app.json` and set up EAS Build
-- Create the app in App Store Connect and upload the first TestFlight build with EAS Submit
+- Set up EAS Build, create the app in App Store Connect and upload TestFlight builds with EAS Submit
 - Write the privacy policy and terms, link them in onboarding
 - Replace anonymous login with Sign in with Apple (expo-apple-authentication)
 - Own the report and block UI and the App Store review answers
 
-### Kian: marketing (`marketing/`)
+### Kian and Jonas: marketing (`marketing/`)
 
 - Pick the final name and logo
 - Build a landing page with a waitlist
 - Make TikTok and Reels content showing the pop moment
 - Recruit both men and women early, because a room only fills when the right mix is queuing at the same time
 - Find 10 to 15 guys for the first test rooms
+
+### Kevin: code review
+
+- Review `main` and pull requests, and file what he finds as GitHub issues
 
 ## Safety and App Store requirements
 
@@ -179,7 +181,7 @@ Apple treats dating apps as high risk, and missing safety features is a common r
 - Basic profanity filter on all messages, on the server
 - Terms checkbox in onboarding
 
-### Still needed before submission (Elias and Jonas)
+### Still needed before submission (Lasse)
 
 - Real privacy policy and terms, linked in the app
 - Sign in with Apple, replacing anonymous login

@@ -1,8 +1,10 @@
 import type { Id } from './_generated/dataModel';
 import { mutation, type MutationCtx } from './_generated/server';
+import { endMatch } from './matches';
 import { requireUserId } from './lib/auth';
 import { activeRoomOf, getProfile } from './lib/people';
 import { leave } from './lib/room';
+import { deleteWallet } from './lib/balloons';
 import { deleteImage } from './lib/uploads';
 import { dropQueueRow } from './queue';
 
@@ -36,10 +38,12 @@ export const prepareSignOut = mutation({
 });
 
 /**
- * Deletes the account: profile, photos, selfie, settings, push tokens, blocks,
- * matches and their messages, and the sign-in records. Apple requires this in the app.
- * Rooms you played stay for the other players, showing you as "Someone". Reports
- * about you stay, so the team can still act on them.
+ * Deletes the account: profile, photos, selfie, settings, answers, push tokens,
+ * blocks, matches and their messages, and the sign-in records. Apple requires this
+ * in the app. Rooms you played stay for the other players, showing you as
+ * "Someone". Reports about you stay, so the team can still act on them, and the
+ * last messages of each chat are kept 30 days so they can still be reported.
+ * A running Popdate+ keeps only its end date (see `deleteWallet`).
  */
 export const deleteAccount = mutation({
   args: {},
@@ -62,7 +66,10 @@ export const deleteAccount = mutation({
       await ctx.db.delete(verification._id);
     }
 
-    for (const table of ['settings', 'pushTokens'] as const) {
+    // Popdate+ may still be billing through Apple: its end date stays for a later transfer.
+    await deleteWallet(ctx, userId);
+
+    for (const table of ['settings', 'pushTokens', 'answers'] as const) {
       const rows = await ctx.db
         .query(table)
         .withIndex('by_user', (q) => q.eq('userId', userId))
@@ -104,14 +111,8 @@ export const deleteAccount = mutation({
         .withIndex('by_winner', (q) => q.eq('winnerId', userId))
         .collect()),
     ];
-    for (const match of matches) {
-      const messages = await ctx.db
-        .query('messages')
-        .withIndex('by_match', (q) => q.eq('matchId', match._id))
-        .collect();
-      for (const message of messages) await ctx.db.delete(message._id);
-      await ctx.db.delete(match._id);
-    }
+    // The chats go in batches after this, so a long one can't stop the deletion.
+    for (const match of matches) await endMatch(ctx, match);
 
     // The sign-in records last, so nothing above runs without an account.
     const sessions = await ctx.db

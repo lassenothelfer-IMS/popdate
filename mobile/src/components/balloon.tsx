@@ -3,9 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import { BrandBalloon, Ease, Motion } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { BrandBalloon, Colors, Ease, lacquerFor, Motion } from '@/constants/theme';
+import { useScheme, useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { mix } from '@/utils/color';
 
 /**
  * The balloon is drawn flat in a 24 x 34 box: a round body that tapers into a
@@ -80,23 +81,54 @@ export function Balloon({ color, size = 24, ghost = false, shine = true }: Ballo
   );
 }
 
+/** Relative luminance of a #RRGGBB color, as WCAG measures it. */
+function luminance(hex: string) {
+  const value = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => {
+    const c = parseInt(value.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** The contrast a popped mark should keep on the dark canvas and its cards. */
+const POPPED_CONTRAST = 3;
+/** The lighter of the dark page and its cards: a mark that reads there reads on both. */
+const DARK_GROUND = Math.max(luminance(Colors.dark.page), luminance(Colors.dark.field));
+
+/**
+ * A seat color for a popped mark in dark mode: the deep seats (garnet, and a
+ * little crimson) are mixed toward the text color until they read at about 3:1.
+ * Light seats, and any ink that isn't a seat color (the recap's paper), stay as given.
+ */
+function poppedInk(color: string) {
+  if (!lacquerFor(color)) return color;
+  for (let amount = 0; amount < 1; amount += 0.05) {
+    const ink = amount === 0 ? color : mix(color, Colors.dark.text, amount);
+    if ((luminance(ink) + 0.05) / (DARK_GROUND + 0.05) >= POPPED_CONTRAST) return ink;
+  }
+  return Colors.dark.text;
+}
+
 /**
  * A popped seat: a dashed ghost of the balloon with torn rubber at the knot. Never rays at rest, so it can't read as a spinner.
  */
 export function PoppedMark({ color, size = 24 }: { color: string; size?: number }) {
+  const scheme = useScheme();
+  const ink = scheme === 'dark' ? poppedInk(color) : color;
   const stroke = toUnits(strokePt(size), size);
   return (
     <Svg width={size} height={balloonHeight(size)} viewBox={VIEW_BOX}>
       <Path
         d={BODY}
         fill="none"
-        stroke={color}
+        stroke={ink}
         strokeOpacity={0.5}
         strokeWidth={stroke}
         strokeDasharray={[stroke * 1.4, stroke * 1.95]}
       />
-      <Path d={TORN} fill={color} />
-      <Path d={KNOT} fill={color} />
+      <Path d={TORN} fill={ink} />
+      <Path d={KNOT} fill={ink} />
     </Svg>
   );
 }

@@ -32,3 +32,17 @@ export const POP_LIMIT_MS = 30_000;
 
 /** A runner-up can get a second chance this long after the room ends. */
 export const SECOND_CHANCE_MS = 7 * 24 * 60 * 60_000;
+
+/** While you wait in line, the app checks in this often, so the server knows you're still there. */
+export const QUEUE_PING_MS = 30_000;
+/**
+ * Only someone who checked in this recently can be a room's chooser: the room
+ * waits on the chooser, so they have to be there. iOS pauses the app in the
+ * background, so a locked phone stops checking in.
+ */
+export const QUEUE_STALE_MS = 90_000;
+/**
+ * A contestant may be away this long (phone locked, another app) and still be
+ * seated: the "room is ready" push brings them back. Past it, the place is dropped.
+ */
+export const QUEUE_AWAY_MS = 10 * 60_000;

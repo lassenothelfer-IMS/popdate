@@ -19,7 +19,7 @@ type PlayerListProps = {
   meId: string;
   round: number;
   pendingId: string | null;
-  /** The chooser while answering: each row says whether they answered. */
+  /** While answering, for everyone: a count on top, and each row says whether they answered. */
   showAnswered: boolean;
   style: StyleProp<ViewStyle>;
 };
@@ -40,16 +40,32 @@ export function PlayerList({
 }: PlayerListProps) {
   const t = useT();
   const theme = useTheme();
-  const rows: ReactNode[] = stillIn.map((contestant) => (
-    <Animated.View key={contestant.id} layout={cardTransition}>
-      <LiveRow
-        contestant={contestant}
-        color={seatOf(contestant).color}
-        isMe={contestant.id === meId}
-        status={showAnswered ? (contestant.answered ? 'answered' : 'writing') : undefined}
-      />
-    </Animated.View>
-  ));
+  const rows: ReactNode[] = [];
+  // While answers come in, everyone sees how far the room is, not only the chooser.
+  if (showAnswered && stillIn.length > 0) {
+    rows.push(
+      <Animated.View key="answered-header" layout={cardTransition} style={styles.answeredHeader}>
+        <ThemedText type="footnote" themeColor="textSecondary" accessibilityRole="header">
+          {t('game.answeredCount', {
+            count: stillIn.filter((contestant) => contestant.answered).length,
+            total: stillIn.length,
+          })}
+        </ThemedText>
+      </Animated.View>,
+    );
+  }
+  rows.push(
+    ...stillIn.map((contestant) => (
+      <Animated.View key={contestant.id} layout={cardTransition}>
+        <LiveRow
+          contestant={contestant}
+          color={seatOf(contestant).color}
+          isMe={contestant.id === meId}
+          status={showAnswered ? (contestant.answered ? 'answered' : 'writing') : undefined}
+        />
+      </Animated.View>
+    )),
+  );
   if (popped.length > 0) {
     rows.push(
       <Animated.View key="popped-header" layout={cardTransition} style={styles.poppedHeader}>
@@ -82,6 +98,10 @@ export function PlayerList({
 }
 
 const styles = StyleSheet.create({
+  /** The count sits just under the list's top hairline. */
+  answeredHeader: {
+    marginTop: Space.sm,
+  },
   /** A new group: more space above the heading than below it. */
   poppedHeader: {
     marginTop: Space.md,

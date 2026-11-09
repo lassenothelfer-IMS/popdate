@@ -74,6 +74,7 @@ export const pickQuestion = mutation({
     if (room.status !== 'picking') fail('The question is already picked.');
     const question = room.questionOptionIds.find((id) => id === questionId);
     if (!question) fail('That question is not one of the options.');
+    if (!room.popperActed) await ctx.db.patch(room._id, { popperActed: true });
     await startAnswering(ctx, room, question);
   },
 });
@@ -120,6 +121,7 @@ export const popBalloon = mutation({
     if (room.status !== 'popping') fail("It's not time to pop yet.");
     const seat = (await seatsOf(ctx, room._id)).find((s) => s.userId === contestantId);
     if (!seat || seat.popped) fail('That balloon is already popped.');
+    if (!room.popperActed) await ctx.db.patch(room._id, { popperActed: true });
     await pop(ctx, room, seat);
   },
 });
@@ -177,12 +179,20 @@ export const popTimeUp = internalMutation({
   },
 });
 
-/** Past the pop limit a random balloon pops, so five people never wait forever. */
+/**
+ * Past the pop limit a random balloon pops, so five people never wait forever.
+ * A popper who never picked or popped anything isn't there at all (an app closed
+ * while in line): the room ends instead, with no match and no balloon spent.
+ */
 export const popLimitUp = internalMutation({
   args: { roomId: v.id('rooms'), round: v.number() },
   handler: async (ctx, { roomId, round }) => {
     const room = await ctx.db.get(roomId);
     if (room?.status !== 'popping' || room.round !== round) return;
+    if (!room.popperActed) {
+      await finish(ctx, roomId, { withWinner: false });
+      return;
+    }
     const stillIn = (await seatsOf(ctx, roomId)).filter((seat) => !seat.popped);
     if (stillIn.length === 0) return;
     await pop(ctx, room, stillIn[Math.floor(Math.random() * stillIn.length)]);

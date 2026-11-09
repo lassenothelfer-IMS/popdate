@@ -39,6 +39,9 @@ import { formatHeight } from '@/utils/units';
 /** The hero photo's height on a 844 pt phone. It grows when the name and lines under it need more. */
 const HERO = 460;
 
+/** The narrowest a stat tile gets in the single row; below it the tiles go two by two. */
+const STAT_MIN_WIDTH = 80;
+
 /**
  * Your profile as others meet it: photo 1 big at the top with your name over
  * it, your bio, the answers you pinned, and your verification. Edit opens the
@@ -57,6 +60,11 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const [refreshing, setRefreshing] = useState(false);
   const { history, reload: reloadHistory } = useRoomHistory();
   const stats = history ? roomStats(history) : null;
+  // Four tiles in one row need about 80 pt each (scaled with text size) for labels
+  // like "times choosing" to break cleanly. Narrower than that (an SE, or large
+  // text), they go two by two.
+  const { width, fontScale } = useWindowDimensions();
+  const statGrid = (width - 2 * Gutter - 3 * Space.xs) / 4 / fontScale < STAT_MIN_WIDTH;
 
   const loadVerification = useCallback(
     (isCurrent: () => boolean = () => true) =>
@@ -191,11 +199,15 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
           ) : null}
 
           {asTab && stats ? (
-            <Rise index={1} style={styles.stats}>
-              <Stat value={stats.played} label={t('you.statRooms', { count: stats.played })} />
-              <Stat value={stats.lastBalloon} label={t('you.statLastBalloon', { count: stats.lastBalloon })} />
-              <Stat value={stats.chooser} label={t('you.statChooser', { count: stats.chooser })} />
-              <Stat value={stats.streak} label={t('you.statStreak', { count: stats.streak })} />
+            <Rise index={1} style={[styles.stats, statGrid && styles.statsGrid]}>
+              <Stat half={statGrid} value={stats.played} label={t('you.statRooms', { count: stats.played })} />
+              <Stat
+                half={statGrid}
+                value={stats.lastBalloon}
+                label={t('you.statLastBalloon', { count: stats.lastBalloon })}
+              />
+              <Stat half={statGrid} value={stats.chooser} label={t('you.statChooser', { count: stats.chooser })} />
+              <Stat half={statGrid} value={stats.streak} label={t('you.statStreak', { count: stats.streak })} />
             </Rise>
           ) : null}
 
@@ -274,17 +286,17 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
 }
 
 /** One of your numbers: big, with what it counts under it. */
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({ value, label, half }: { value: number; label: string; half: boolean }) {
   const theme = useTheme();
   return (
     <View
       accessible
       accessibilityLabel={`${value} ${label}`}
-      style={[styles.stat, { backgroundColor: theme.field, borderColor: theme.border }]}>
+      style={[styles.stat, half && styles.statHalf, { backgroundColor: theme.field, borderColor: theme.border }]}>
       <ThemedText type="heading" style={styles.statValue}>
         {String(value)}
       </ThemedText>
-      <ThemedText type="caption" themeColor="textSecondary" style={styles.statLabel}>
+      <ThemedText type="caption" themeColor="textSecondary" numberOfLines={2} style={styles.statLabel}>
         {label}
       </ThemedText>
     </View>
@@ -416,6 +428,13 @@ const styles = StyleSheet.create({
   stats: {
     flexDirection: 'row',
     gap: Space.xs,
+  },
+  // Two per row: a 40% basis leaves room for the gap and flex grows each to half; rows stretch tiles to one height.
+  statsGrid: {
+    flexWrap: 'wrap',
+  },
+  statHalf: {
+    flexBasis: '40%',
   },
   stat: {
     flex: 1,

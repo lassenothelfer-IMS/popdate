@@ -9,7 +9,8 @@ import {
   QUESTION_OPTIONS_PER_ROUND,
   shuffle,
 } from './game';
-import { ageFromBirthDate, getProfile, personCard, photoUrls } from './people';
+import { spendBalloon } from './balloons';
+import { ageFromBirthDate, getProfile, isBlockedEitherWay, personCard, photoUrls } from './people';
 import { schedulePush } from '../push';
 import { questionPool } from './questions';
 
@@ -138,9 +139,21 @@ export async function endAnsweringIfEveryoneAnswered(ctx: MutationCtx, roomId: I
   if (waiting.length === 0) await startPopping(ctx, room);
 }
 
+async function answeredIn(ctx: QueryCtx, roomId: Id<'rooms'>, userId: Id<'users'>) {
+  const answers = await ctx.db
+    .query('answers')
+    .withIndex('by_room_round', (q) => q.eq('roomId', roomId))
+    .collect();
+  return answers.some((answer) => answer.userId === userId);
+}
+
 /** Pops one contestant: the next round starts, or the last balloon left wins. */
 export async function pop(ctx: MutationCtx, room: Doc<'rooms'>, seat: Doc<'roomPlayers'>) {
   await ctx.db.patch(seat._id, { popped: true, poppedInRound: room.round });
+  // A popped balloon costs its owner one of theirs, if they played: someone who never
+  // answered in this room may not even have been there (an app killed while in line,
+  // seated much later), so they aren't charged.
+  if (await answeredIn(ctx, room._id, seat.userId)) await spendBalloon(ctx, seat.userId);
   const seats = await seatsOf(ctx, room._id);
   if (seats.filter(stillIn).length <= 1) {
     await finish(ctx, room._id);
@@ -154,8 +167,10 @@ export async function pop(ctx: MutationCtx, room: Doc<'rooms'>, seat: Doc<'roomP
 export async function finish(ctx: MutationCtx, roomId: Id<'rooms'>, { withWinner = true } = {}) {
   const room = (await ctx.db.get(roomId))!;
   const winner = withWinner ? (await seatsOf(ctx, roomId)).find(stillIn) : undefined;
+  // A block during the room (either way) means no match: the winner still shows as the winner.
+  const blocked = winner ? await isBlockedEitherWay(ctx, room.popperId, winner.userId) : false;
   let matchId: Id<'matches'> | undefined;
-  if (winner) {
+  if (winner && !blocked) {
     matchId = await ctx.db.insert('matches', {
       roomId,
       popperId: room.popperId,
@@ -203,6 +218,8 @@ export async function leave(ctx: MutationCtx, room: Doc<'rooms'>, userId: Id<'us
     popped: true,
     poppedInRound: room.round,
   });
+  // Leaving while still holding your balloon costs it, as a pop would.
+  await spendBalloon(ctx, userId);
   const seats = await seatsOf(ctx, room._id);
   if (seats.filter(stillIn).length <= 1) {
     await finish(ctx, room._id);
@@ -227,9 +244,15 @@ export async function roomView(ctx: QueryCtx, room: Doc<'rooms'>, viewerId: Id<'
     .collect();
   const answerOf = new Map(answers.map((answer) => [answer.userId, answer.text]));
 
+  // Someone you blocked, or who blocked you, keeps no view of your photos, even in a
+  // room you shared before the block.
+  const blockedWith = async (otherId: Id<'users'>) =>
+    otherId !== viewerId && (await isBlockedEitherWay(ctx, viewerId, otherId));
+
   const contestants = await Promise.all(
     seats.map(async (seat) => {
-      const photoCount = seat.popped ? Math.min(revealed, seat.poppedInRound ?? 0) : revealed;
+      const shown = seat.popped ? Math.min(revealed, seat.poppedInRound ?? 0) : revealed;
+      const photoCount = (await blockedWith(seat.userId)) ? 0 : shown;
       const profile = await getProfile(ctx, seat.userId);
       // While answering, only the popper sees answers as they come in.
       const answerVisible = isPopper || room.status !== 'answering' || seat.userId === viewerId;
@@ -253,15 +276,19 @@ export async function roomView(ctx: QueryCtx, room: Doc<'rooms'>, viewerId: Id<'
     isPopper && room.status === 'picking'
       ? await Promise.all(room.questionOptionIds.map((id) => ctx.db.get(id)))
       : [];
-  // The match belongs to the popper and the winner; nobody else gets its id.
-  const ownsMatch = isPopper || room.winnerId === viewerId;
+  // The match belongs to the popper and the winner; nobody else gets its id, nor
+  // the two of them while a block stands between them.
+  const matchPartner = isPopper ? room.winnerId : room.popperId;
+  const ownsMatch =
+    (isPopper || room.winnerId === viewerId) &&
+    !(room.matchId && matchPartner && (await blockedWith(matchPartner)));
 
   return {
     id: room._id as string,
     status: room.status,
     round: room.round,
     totalRounds: room.totalRounds,
-    popper: await personCard(ctx, room.popperId, 1),
+    popper: await personCard(ctx, room.popperId, (await blockedWith(room.popperId)) ? 0 : 1),
     contestants,
     question: question ? { id: question._id as string, text: question.text } : null,
     questionOptions: options.flatMap((option) =>

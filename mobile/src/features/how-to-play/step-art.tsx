@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Balloon, PoppedMark } from '@/components/balloon';
 import { Icon } from '@/components/icon';
@@ -17,30 +17,73 @@ import { useT } from '@/i18n';
 /** The sample room's holders, in seat order. The fifth is you. */
 const HOLDERS = ['Elias', 'Nico', 'Noah', 'Ben'] as const;
 
-/** A 380 pt card on surface 1 with a hairline, the stage for one picture. */
-function ArtCard({ children, padded }: { children: ReactNode; padded?: boolean }) {
+/** The card's design height: every picture is laid out in this box. */
+const CARD_HEIGHT = 380;
+/** What a fitted card leaves for the rest of the intro page: top bar, title, body, button. */
+const PAGE_RESERVE = 410;
+/** A fitted card never draws smaller than this. */
+const MIN_CARD_HEIGHT = 240;
+
+/**
+ * How much a fitted card is scaled for a window this tall: 1 from about 790 pt
+ * up, about 0.68 on a 667 pt iPhone SE.
+ */
+export function artScale(windowHeight: number) {
+  // The web reports a zero-size window at first: keep the full card until it knows.
+  if (!windowHeight) return 1;
+  const height = Math.min(CARD_HEIGHT, Math.max(MIN_CARD_HEIGHT, windowHeight - PAGE_RESERVE));
+  return height / CARD_HEIGHT;
+}
+
+type ArtProps = {
+  /** Shrinks the card on short screens so the page around it fits without scrolling. */
+  fit?: boolean;
+};
+
+/**
+ * A 380 pt card on surface 1 with a hairline, the stage for one picture. Fitted
+ * on a short screen, the picture keeps its 380 pt layout and is scaled down whole.
+ */
+function ArtCard({ children, padded, fit }: { children: ReactNode; padded?: boolean } & ArtProps) {
   const theme = useTheme();
+  const { height } = useWindowDimensions();
+  const scale = fit ? artScale(height) : 1;
+  const shell = [styles.card, { backgroundColor: theme.field, borderColor: theme.border }];
+  if (scale >= 1) {
+    return (
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={[shell, padded && styles.padded]}>
+        {children}
+      </View>
+    );
+  }
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[
-        styles.card,
-        padded && styles.padded,
-        { backgroundColor: theme.field, borderColor: theme.border },
-      ]}>
-      {children}
+      style={[shell, { height: CARD_HEIGHT * scale }]}>
+      {/* Wider and taller by 1/scale, then scaled from the corner: it fills the card exactly. */}
+      <View
+        style={[
+          styles.scaled,
+          padded && styles.padded,
+          { width: `${100 / scale}%`, height: `${100 / scale}%`, transform: [{ scale }] },
+        ]}>
+        {children}
+      </View>
     </View>
   );
 }
 
 /** S02: Mia is choosing, over the five balloons, yours ringed. */
-export function RoomArt() {
+export function RoomArt({ fit }: ArtProps) {
   const theme = useTheme();
   const seats = useSeats();
   const t = useT();
   return (
-    <ArtCard>
+    <ArtCard fit={fit}>
       <ThemedText type="kicker" style={styles.roomKicker}>
         {t('onboarding.roomsKicker')}
       </ThemedText>
@@ -81,7 +124,7 @@ export function RoomArt() {
 }
 
 /** S03: round 1's question and the first answers, with photos still locked. */
-export function RoundsArt() {
+export function RoundsArt({ fit }: ArtProps) {
   const theme = useTheme();
   const seats = useSeats();
   const t = useT();
@@ -90,7 +133,7 @@ export function RoundsArt() {
     { name: 'Nico', text: t('onboarding.roundsAnswer2'), seat: 1 },
   ];
   return (
-    <ArtCard padded>
+    <ArtCard padded fit={fit}>
       <ThemedText type="kicker">{t('howToPlay.roundOf', { round: 1, total: 4 })}</ThemedText>
       <ThemedText style={[styles.sampleQuestion, { fontFamily: Fonts.serif }]}>
         {t('onboarding.roundsQuestion')}
@@ -130,11 +173,11 @@ export function RoundsArt() {
 }
 
 /** The four popped seats, and the one balloon left over: "Mia chose you." */
-export function LastArt() {
+export function LastArt({ fit }: ArtProps) {
   const seats = useSeats();
   const t = useT();
   return (
-    <ArtCard>
+    <ArtCard fit={fit}>
       <ThemedText type="kicker" style={styles.roomKicker}>
         {t('onboarding.lastKicker')}
       </ThemedText>
@@ -165,11 +208,17 @@ export const INTRO = [
 
 const styles = StyleSheet.create({
   card: {
-    height: 380,
+    height: CARD_HEIGHT,
     borderRadius: 20,
     borderCurve: 'continuous',
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  scaled: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    transformOrigin: 'left top',
   },
   padded: {
     padding: 24,

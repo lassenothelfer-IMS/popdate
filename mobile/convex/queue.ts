@@ -1,22 +1,40 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 
+import { v } from 'convex/values';
+
+import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
+import { hasBalloon, NO_BALLOONS } from './lib/balloons';
 import { fail } from './lib/errors';
-import { lobbySize } from './lib/game';
-import { activeRoomOf, getProfile } from './lib/people';
+import { lobbySize, QUEUE_AWAY_MS, QUEUE_PING_MS, QUEUE_STALE_MS } from './lib/game';
+import { activeRoomOf, getProfile, isBlockedEitherWay } from './lib/people';
 import { rateLimit } from './lib/rateLimit';
 import { createRoom } from './lib/room';
 
 /** How many waiting players matchmaking looks at. Plenty for the test phase. */
 const MAX_WAITING = 500;
+/** Block lookups one matchmaking run may make in all, and for each lobby it tries to build. */
+const BLOCK_LOOKUP_BUDGET = 2000;
+const BLOCK_LOOKUPS_PER_LOBBY = 100;
 
+/** Whether a waiting row's app checked in within `windowMs`. */
+function seenWithin(row: Doc<'queue'>, now: number, windowMs: number) {
+  return (row.seenAt ?? row.joinedAt) >= now - windowMs;
+}
+
+/**
+ * The waiting rows, oldest first, of people still in line: checked in within
+ * `QUEUE_AWAY_MS`. Only those within `QUEUE_STALE_MS` can be a room's chooser.
+ */
 async function waitingPlayers(ctx: QueryCtx) {
-  return await ctx.db
+  const now = Date.now();
+  const rows = await ctx.db
     .query('queue')
     .withIndex('by_room_joined', (q) => q.eq('roomId', undefined))
     .take(MAX_WAITING);
+  return rows.filter((row) => seenWithin(row, now, QUEUE_AWAY_MS));
 }
 
 /** Who's queuing right now, for Home: the `QueueStats` shape in `src/api/types.ts`. */
@@ -89,12 +107,15 @@ export const joinQueue = mutation({
     const profile = await getProfile(ctx, userId);
     if (!profile) fail('Finish your profile before you play.');
     if (await activeRoomOf(ctx, userId)) fail("You're still in a room.");
+    if (!(await hasBalloon(ctx, userId))) fail(NO_BALLOONS);
 
+    const now = Date.now();
     const entry = {
       userId,
       gender: profile.gender,
       wantsToMeet: profile.wantsToMeet,
-      joinedAt: Date.now(),
+      joinedAt: now,
+      seenAt: now,
       roomId: undefined,
     };
     const mine = await ctx.db
@@ -104,7 +125,47 @@ export const joinQueue = mutation({
     if (mine) await ctx.db.replace(mine._id, entry);
     else await ctx.db.insert('queue', entry);
 
-    await matchmake(ctx);
+    // Matchmaking runs on its own, right after: joins then don't conflict with each
+    // other over the whole queue, and Convex retries the matchmaker until it gets through.
+    await ctx.scheduler.runAfter(0, internal.queue.matchmake, { joinerId: userId });
+  },
+});
+
+/**
+ * The queue screen checks in every `QUEUE_PING_MS` while you wait. A place nobody
+ * checks in on for `QUEUE_STALE_MS` (the app was closed) no longer counts, so an
+ * absent player is never put in a room, least of all as its chooser.
+ */
+export const pingQueue = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const mine = await ctx.db
+      .query('queue')
+      .withIndex('by_user', (q) => q.eq('userId', userId))
+      .unique();
+    if (!mine || mine.roomId) return;
+    const now = Date.now();
+    // At most one write per half interval: every write wakes everyone's queue status.
+    if (seenWithin(mine, now, QUEUE_PING_MS / 2)) return;
+    const couldChoose = seenWithin(mine, now, QUEUE_STALE_MS);
+    await ctx.db.patch(mine._id, { seenAt: now });
+    // Back from the background: you can be a chooser again, which may complete a lobby.
+    if (!couldChoose) await ctx.scheduler.runAfter(0, internal.queue.matchmake, { joinerId: userId });
+  },
+});
+
+/** Every minute (`crons.ts`): deletes places in line nobody checked in on for `QUEUE_AWAY_MS`. */
+export const sweepStale = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - QUEUE_AWAY_MS;
+    const stale = await ctx.db
+      .query('queue')
+      .withIndex('by_room_seen', (q) => q.eq('roomId', undefined).lt('seenAt', cutoff))
+      .take(200);
+    for (const row of stale) await ctx.db.delete(row._id);
+    if (stale.length === 200) await ctx.scheduler.runAfter(0, internal.queue.sweepStale, {});
   },
 });
 
@@ -158,29 +219,67 @@ function fits(a: Doc<'queue'>, b: Doc<'queue'>) {
  * contestants who all want to meet each other's side, and where nobody has
  * blocked anyone else in the lobby. The longest-waiting players go first; then
  * the popper is drawn at random from everyone in the lobby who fits all the others.
- * It runs inside `joinQueue`, so a lobby forms the moment its last player joins.
+ * `joinQueue` schedules it, so a lobby forms right after its last player joins;
+ * the one who just joined always counts, even past the oldest `MAX_WAITING`.
  */
-async function matchmake(ctx: MutationCtx) {
+export const matchmake = internalMutation({
+  args: { joinerId: v.optional(v.id('users')) },
+  handler: async (ctx, { joinerId }) => {
+    const waiting = await waitingPlayers(ctx);
+    if (joinerId && !waiting.some((row) => row.userId === joinerId)) {
+      const joiner = await ctx.db
+        .query('queue')
+        .withIndex('by_user', (q) => q.eq('userId', joinerId))
+        .unique();
+      if (joiner && !joiner.roomId && seenWithin(joiner, Date.now(), QUEUE_AWAY_MS)) waiting.push(joiner);
+    }
+    // One room formed: try again, in case the queue holds another.
+    if (await formLobby(ctx, waiting)) await ctx.scheduler.runAfter(0, internal.queue.matchmake, {});
+  },
+});
+
+async function formLobby(ctx: MutationCtx, waiting: Doc<'queue'>[]) {
   const contestantsNeeded = lobbySize() - 1;
-  const waiting = await waitingPlayers(ctx);
-  const blocksOf = blockLookup(ctx);
+  const now = Date.now();
+  const blocked = blockCheck(ctx);
 
   for (const first of waiting) {
+    const candidates = waiting.filter((row) => row !== first && fits(first, row));
+    // Not enough people who fit: skip without reading a single block.
+    if (candidates.length < contestantsNeeded) continue;
+    blocked.nextLobby();
     const group = [first];
-    const clashing = new Set(await blocksOf(first.userId));
-    for (const candidate of waiting) {
-      if (candidate.userId === first.userId) continue;
-      if (!fits(first, candidate) || clashing.has(candidate.userId)) continue;
+    let outOfLookups = false;
+    for (const candidate of candidates) {
+      let clash = false;
+      for (const member of group) {
+        const result = await blocked.check(member.userId, candidate.userId);
+        if (result === null) {
+          outOfLookups = true;
+          break;
+        }
+        if (result) {
+          clash = true;
+          break;
+        }
+      }
+      // This lobby costs too many lookups: try the next one instead of stalling the line.
+      if (outOfLookups) break;
+      if (clash) continue;
       group.push(candidate);
-      for (const id of await blocksOf(candidate.userId)) clashing.add(id);
       if (group.length > contestantsNeeded) break;
     }
-    if (group.length <= contestantsNeeded) continue;
+    if (blocked.spent()) return false;
+    if (outOfLookups || group.length <= contestantsNeeded) continue;
 
-    // `first` always qualifies; anyone else who fits the other five may choose too.
-    const choosers = group.filter((member) =>
-      group.every((other) => other === member || fits(member, other)),
+    // Anyone who fits the other five may choose, if they checked in recently: the room
+    // waits on its chooser, so someone whose phone is locked can only hold a balloon.
+    const choosers = group.filter(
+      (member) =>
+        seenWithin(member, now, QUEUE_STALE_MS) &&
+        group.every((other) => other === member || fits(member, other)),
     );
+    if (choosers.length === 0) continue;
     const popper = choosers[Math.floor(Math.random() * choosers.length)];
     const roomId = await createRoom(
       ctx,
@@ -188,31 +287,36 @@ async function matchmake(ctx: MutationCtx) {
       group.filter((row) => row !== popper).map((row) => row.userId),
     );
     for (const row of group) await ctx.db.patch(row._id, { roomId });
-    return;
+    return true;
   }
+  return false;
 }
 
 /**
- * Who someone blocked or was blocked by, loaded once per person and only for the
- * people matchmaking puts in a lobby, not for the whole queue.
+ * Whether two people blocked each other, either way: two point lookups per pair,
+ * cached, so the cost follows the lobbies being built, not anyone's block list.
+ * `check` is null once this lobby's allowance or the whole run's budget is spent;
+ * the cron's next run starts afresh.
  */
-function blockLookup(ctx: QueryCtx) {
-  const cache = new Map<Id<'users'>, Id<'users'>[]>();
-  return async (userId: Id<'users'>) => {
-    const known = cache.get(userId);
-    if (known) return known;
-    const [mine, theirs] = await Promise.all([
-      ctx.db
-        .query('blocks')
-        .withIndex('by_blocker', (q) => q.eq('blockerId', userId))
-        .collect(),
-      ctx.db
-        .query('blocks')
-        .withIndex('by_blocked', (q) => q.eq('blockedId', userId))
-        .collect(),
-    ]);
-    const ids = [...mine.map((row) => row.blockedId), ...theirs.map((row) => row.blockerId)];
-    cache.set(userId, ids);
-    return ids;
+function blockCheck(ctx: QueryCtx) {
+  const cache = new Map<string, boolean>();
+  let budget = BLOCK_LOOKUP_BUDGET;
+  let lobbyAllowance = BLOCK_LOOKUPS_PER_LOBBY;
+  return {
+    nextLobby() {
+      lobbyAllowance = BLOCK_LOOKUPS_PER_LOBBY;
+    },
+    spent: () => budget <= 0,
+    async check(a: Id<'users'>, b: Id<'users'>): Promise<boolean | null> {
+      const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+      const known = cache.get(key);
+      if (known !== undefined) return known;
+      if (budget <= 0 || lobbyAllowance <= 0) return null;
+      budget -= 2;
+      lobbyAllowance -= 2;
+      const result = await isBlockedEitherWay(ctx, a, b);
+      cache.set(key, result);
+      return result;
+    },
   };
 }

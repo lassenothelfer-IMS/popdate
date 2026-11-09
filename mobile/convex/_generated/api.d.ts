@@ -10,6 +10,7 @@
 
 import type * as account from "../account.js";
 import type * as auth from "../auth.js";
+import type * as balloons from "../balloons.js";
 import type * as chat from "../chat.js";
 import type * as crons from "../crons.js";
 import type * as history from "../history.js";
@@ -17,6 +18,7 @@ import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_countries from "../lib/countries.js";
 import type * as lib_defaults from "../lib/defaults.js";
+import type * as lib_balloons from "../lib/balloons.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_game from "../lib/game.js";
 import type * as lib_people from "../lib/people.js";
@@ -34,6 +36,7 @@ import type * as safety from "../safety.js";
 import type * as secondChances from "../secondChances.js";
 import type * as settings from "../settings.js";
 import type * as testPlayers from "../testPlayers.js";
+import type * as uploads from "../uploads.js";
 import type * as users from "../users.js";
 import type * as verification from "../verification.js";
 import type * as waitlist from "../waitlist.js";
@@ -47,6 +50,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   account: typeof account;
   auth: typeof auth;
+  balloons: typeof balloons;
   chat: typeof chat;
   crons: typeof crons;
   history: typeof history;
@@ -54,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/countries": typeof lib_countries;
   "lib/defaults": typeof lib_defaults;
+  "lib/balloons": typeof lib_balloons;
   "lib/errors": typeof lib_errors;
   "lib/game": typeof lib_game;
   "lib/people": typeof lib_people;
@@ -71,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   secondChances: typeof secondChances;
   settings: typeof settings;
   testPlayers: typeof testPlayers;
+  uploads: typeof uploads;
   users: typeof users;
   verification: typeof verification;
   waitlist: typeof waitlist;

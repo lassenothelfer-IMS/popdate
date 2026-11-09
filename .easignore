@@ -1,0 +1,39 @@
+# What EAS Build leaves out of the upload. EAS packs the whole repo, and while
+# this file exists it ignores every .gitignore, so mobile/.gitignore's rules are
+# repeated below. Paths are relative to the repo root.
+
+# Not needed to build the app
+brag-output*/
+design/
+docs/
+site/
+_site/
+.claude/
+.github/
+mobile/.maestro/
+mobile/design-ref/
+
+# From mobile/.gitignore
+node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/expo-env.d.ts
+mobile/.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+mobile/example
+mobile/ios/
+mobile/android/

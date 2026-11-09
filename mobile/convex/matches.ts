@@ -1,14 +1,19 @@
 import { getAuthUserId } from '@convex-dev/auth/server';
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
-import { mutation, query, type QueryCtx } from './_generated/server';
+import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
-import { personCard } from './lib/people';
+import { isBlockedEitherWay, personCard } from './lib/people';
+
+function otherOf(match: Doc<'matches'>, viewerId: Id<'users'>) {
+  return match.popperId === viewerId ? match.winnerId : match.popperId;
+}
 
 /** A match as you see it: the `Match` shape in `src/api/types.ts`. */
 async function matchView(ctx: QueryCtx, match: Doc<'matches'>, viewerId: Id<'users'>) {
-  const otherId = match.popperId === viewerId ? match.winnerId : match.popperId;
+  const otherId = otherOf(match, viewerId);
   const other = await personCard(ctx, otherId, 1);
   return {
     id: match._id as string,
@@ -18,7 +23,7 @@ async function matchView(ctx: QueryCtx, match: Doc<'matches'>, viewerId: Id<'use
   };
 }
 
-/** Your matches, newest first. */
+/** Your matches, newest first. A block, either way, hides the match until it's lifted. */
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -35,9 +40,49 @@ export const list = query({
         .collect(),
     ]);
     const all = [...asPopper, ...asWinner].sort((a, b) => b.createdAt - a.createdAt);
-    return await Promise.all(all.map((match) => matchView(ctx, match, userId)));
+    const visible = [];
+    for (const match of all) {
+      if (!(await isBlockedEitherWay(ctx, userId, otherOf(match, userId)))) visible.push(match);
+    }
+    return await Promise.all(visible.map((match) => matchView(ctx, match, userId)));
   },
 });
+
+/** How many of the newest messages an ended chat keeps for reports. */
+const KEPT_FOR_REPORTS = 200;
+/** How long an ended chat's last messages are kept for reports. */
+export const ENDED_CHAT_DAYS = 30;
+/** Messages deleted per batch, far below Convex's per-mutation limits. */
+const PURGE_BATCH = 500;
+
+/** The two ids of a pair in a fixed order, for `endedChats`. */
+export function pairOf(a: Id<'users'>, b: Id<'users'>): [Id<'users'>, Id<'users'>] {
+  return a < b ? [a, b] : [b, a];
+}
+
+/**
+ * Ends a match for both people. The match goes now, which closes the chat at once;
+ * its last messages are kept 30 days for reports, and the messages themselves are
+ * deleted in batches afterwards, so a long chat never runs into Convex's limits.
+ */
+export async function endMatch(ctx: MutationCtx, match: Doc<'matches'>) {
+  const newest = await ctx.db
+    .query('messages')
+    .withIndex('by_match', (q) => q.eq('matchId', match._id))
+    .order('desc')
+    .take(KEPT_FOR_REPORTS);
+  if (newest.length > 0) {
+    const [aId, bId] = pairOf(match.popperId, match.winnerId);
+    await ctx.db.insert('endedChats', {
+      aId,
+      bId,
+      messages: newest.reverse().map((m) => ({ senderId: m.senderId, text: m.text, sentAt: m.sentAt })),
+      endedAt: Date.now(),
+    });
+  }
+  await ctx.db.delete(match._id);
+  await ctx.scheduler.runAfter(0, internal.matches.purgeMessages, { matchId: match._id });
+}
 
 /** Ends a match for both people: the match and its messages are deleted. */
 export const unmatch = mutation({
@@ -47,12 +92,36 @@ export const unmatch = mutation({
     const id = ctx.db.normalizeId('matches', matchId);
     const match = id ? await ctx.db.get(id) : null;
     if (!match || (match.popperId !== userId && match.winnerId !== userId)) return;
-    const messages = await ctx.db
+    await endMatch(ctx, match);
+  },
+});
+
+/** Deletes an ended match's messages, a batch at a time. */
+export const purgeMessages = internalMutation({
+  args: { matchId: v.id('matches') },
+  handler: async (ctx, { matchId }) => {
+    const batch = await ctx.db
       .query('messages')
-      .withIndex('by_match', (q) => q.eq('matchId', match._id))
-      .collect();
-    for (const message of messages) await ctx.db.delete(message._id);
-    await ctx.db.delete(match._id);
+      .withIndex('by_match', (q) => q.eq('matchId', matchId))
+      .take(PURGE_BATCH);
+    for (const message of batch) await ctx.db.delete(message._id);
+    if (batch.length === PURGE_BATCH) {
+      await ctx.scheduler.runAfter(0, internal.matches.purgeMessages, { matchId });
+    }
+  },
+});
+
+/** Daily (`crons.ts`): ended chats kept for reports go after 30 days. */
+export const purgeEndedChats = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - ENDED_CHAT_DAYS * 24 * 60 * 60_000;
+    const old = await ctx.db
+      .query('endedChats')
+      .withIndex('by_ended', (q) => q.lt('endedAt', cutoff))
+      .take(200);
+    for (const row of old) await ctx.db.delete(row._id);
+    if (old.length === 200) await ctx.scheduler.runAfter(0, internal.matches.purgeEndedChats, {});
   },
 });
 
@@ -65,6 +134,7 @@ export const get = query({
     const match = userId && id ? await ctx.db.get(id) : null;
     if (!userId || !match) return null;
     if (match.popperId !== userId && match.winnerId !== userId) return null;
+    if (await isBlockedEitherWay(ctx, userId, otherOf(match, userId))) return null;
     return await matchView(ctx, match, userId);
   },
 });

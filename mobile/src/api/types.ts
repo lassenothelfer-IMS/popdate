@@ -4,6 +4,8 @@
  * photo is shown: it only reads these and calls `PopdateApi`.
  */
 
+import type { BalloonsView } from '../shared/balloons';
+
 /**
  * The two groups rooms are matched from. How you describe your own gender is
  * `Profile.genderIdentity`; this is only the side of the room you play on.
@@ -161,6 +163,12 @@ export type Match = {
 
 export type Unsubscribe = () => void;
 
+/**
+ * Your balloons: free ones that top up every day, bought ones that keep, or
+ * unlimited with Popdate+. The rules are in `src/shared/balloons.ts`.
+ */
+export type Balloons = BalloonsView;
+
 /** `system` follows the phone. */
 export type LanguageSetting = 'system' | 'en' | 'de' | 'fr' | 'it';
 export type AppearanceSetting = 'system' | 'light' | 'dark';
@@ -227,6 +235,19 @@ export interface PopdateApi {
    */
   leaveQueue(): Promise<string | null>;
   watchQueue(onChange: (status: QueueStatus) => void): Unsubscribe;
+  /**
+   * The queue screen calls this every `QUEUE_PING_MS` while you wait: a place in
+   * line nobody checks in on (the app was closed) is dropped, so an absent player
+   * is never put in a room.
+   */
+  pingQueue(): Promise<void>;
+  /** Your balloons, live. Null while signed out. Joining the line needs one. */
+  watchBalloons(onChange: (balloons: Balloons | null) => void): Unsubscribe;
+  /**
+   * A balloon pack was just bought in the store. The real server credits packs from
+   * RevenueCat's webhook, never from the app, so there it does nothing; the mock credits it.
+   */
+  balloonsBought(productId: string): Promise<void>;
 
   watchRoom(roomId: string, onChange: (room: Room | null) => void): Unsubscribe;
   /** The room you're still playing in, if any, so reopening the app goes back to it. */

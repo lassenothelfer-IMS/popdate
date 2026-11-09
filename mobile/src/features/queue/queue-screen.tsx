@@ -1,6 +1,14 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  AppState,
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -28,6 +36,7 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
 import { seatAt, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { QUEUE_PING_MS } from '@/shared/limits';
 import { useSession } from '@/state/session';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
@@ -238,6 +247,23 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
     if (matched) return;
     const id = setInterval(() => setWaited((seconds) => seconds + 1), 1000);
     return () => clearInterval(id);
+  }, [matched]);
+
+  // Checking in while you wait, and again the moment you come back to the app: only
+  // someone who checked in lately can be a room's chooser, and a place nobody checks
+  // in on for ten minutes is dropped. iOS pauses the app in the background.
+  useEffect(() => {
+    if (matched) return;
+    const ping = () => void api.pingQueue().catch(() => {});
+    ping();
+    const id = setInterval(ping, QUEUE_PING_MS);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') ping();
+    });
+    return () => {
+      clearInterval(id);
+      subscription.remove();
+    };
   }, [matched]);
 
   // The wait starts as the line opens and ends when the room fills.

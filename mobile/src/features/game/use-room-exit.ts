@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 
 import { api } from '@/api';
+import { useBalloonCheck, useBalloons } from '@/features/balloons/use-balloons';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useT } from '@/i18n';
 import { track, type Role } from '@/utils/analytics';
@@ -30,6 +31,8 @@ export function useRoomExit(
   seat: { role: Role; round: number } | null,
 ) {
   const t = useT();
+  const balloons = useBalloons();
+  const balloonCheck = useBalloonCheck();
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [leaving, setLeaving] = useState(false);
   /** The last leave failed: the web's leave sheet shows that error, and no older one. */
@@ -89,6 +92,11 @@ export function useRoomExit(
   async function playAgain() {
     if (replaying) return;
     setReplaying(true);
+    // Your last balloon just popped: the packs first, and you stay here if you'd rather not.
+    if (!(await balloonCheck(balloons))) {
+      setReplaying(false);
+      return;
+    }
     try {
       await call(async () => {
         // A retry after the queue failed doesn't leave the room a second time.

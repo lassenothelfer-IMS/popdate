@@ -46,6 +46,7 @@ import { useTextScale } from '@/hooks/use-text-scale';
 import { seatAt, useSeats } from '@/hooks/use-theme';
 import { track, type RoomOutcome } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
+import { numberWord } from '@/utils/number-word';
 import { countRoomPlayed, useShowHints } from '@/utils/rooms-played';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
@@ -222,7 +223,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   const popperName = room.popper.name;
 
   const leaveMessage = isPopper
-    ? t('game.leavePopper')
+    ? t('game.leavePopper', { people: numberWord(t, up.length) })
     : iAmActive
       ? t('game.leaveActive')
       : t('game.leaveWatching');
@@ -551,7 +552,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                   meId={room.me.id}
                   round={room.round}
                   pendingId={pending?.id ?? null}
-                  showAnswered={isPopper && answering}
+                  showAnswered={answering}
                   style={listStyle}
                 />
               ) : null}

@@ -25,12 +25,19 @@ import { deviceRegion, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
+import {
+  manageSubscription,
+  purchasesAvailable,
+  restorePurchases,
+  showPaywall,
+  usePlus,
+} from '@/utils/purchases';
 import { enablePush, getPushPermission, type PushPermission } from '@/utils/push';
 
 const SUPPORT_EMAIL = 'support@popdate.app';
 
 
-type SectionKey = 'preferences' | 'notifications' | 'safety' | 'account';
+type SectionKey = 'plus' | 'preferences' | 'notifications' | 'safety' | 'account';
 type NotificationKey = keyof Settings['notifications'];
 
 const isWeb = Platform.OS === 'web';
@@ -54,6 +61,8 @@ export function SettingsScreen() {
   const [askedPush, setAskedPush] = useState(false);
   const [error, setError] = useState<{ section: SectionKey; message: string } | null>(null);
   const [ending, setEnding] = useState<'signOut' | 'delete' | null>(null);
+  const plus = usePlus();
+  const [restoring, setRestoring] = useState(false);
   const deniedMessage =
     Platform.OS === 'ios' ? t('settings.notificationsDeniedIos') : t('settings.notificationsDenied');
 
@@ -120,6 +129,41 @@ export function SettingsScreen() {
       ? settings.notifications
       : { roomLive: false, newMatch: false, messages: false };
     await save('notifications', { notifications: { ...base, [key]: on } });
+  }
+
+  async function openPlus() {
+    setError(null);
+    if (plus) {
+      try {
+        await manageSubscription();
+      } catch {
+        fail('plus', t('settings.plusFailed'));
+      }
+      return;
+    }
+    const outcome = await showPaywall();
+    if (outcome === 'bought') haptics.success();
+    else if (outcome === 'failed') fail('plus', t('settings.plusFailed'));
+  }
+
+  // Apple requires a way to get earlier purchases back, for a new phone or a reinstall.
+  async function restore() {
+    if (restoring) return;
+    setError(null);
+    setRestoring(true);
+    try {
+      const restored = await restorePurchases();
+      if (restored) {
+        haptics.success();
+        showNotice(t('settings.restoreDoneTitle'), t('settings.restoreDoneBody'));
+      } else {
+        showNotice(t('settings.restoreNoneTitle'), t('settings.restoreNoneBody'));
+      }
+    } catch {
+      fail('plus');
+    } finally {
+      setRestoring(false);
+    }
   }
 
   async function contactSupport() {
@@ -218,6 +262,23 @@ export function SettingsScreen() {
             onPress={() => router.push('/settings/verify')}
           />
         </SettingsSection>
+
+        {purchasesAvailable ? (
+          <SettingsSection title={t('settings.plus')} footer={errorFor('plus')}>
+            <NavRow
+              label={plus ? t('settings.plusManage') : t('settings.plusGet')}
+              value={plus ? t('settings.plusActive') : undefined}
+              valueColor="success"
+              onPress={openPlus}
+            />
+            <NavRow
+              label={t('settings.restorePurchases')}
+              value={restoring ? t('settings.restoring') : undefined}
+              onPress={restore}
+              chevron={false}
+            />
+          </SettingsSection>
+        ) : null}
 
         <SettingsSection title={t('settings.preferences')} footer={errorFor('preferences')}>
           <NavRow
