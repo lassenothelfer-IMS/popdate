@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import { api, isMockServer, setMockPlus, type Balloons } from '@/api';
+import { openBalloonShop } from '@/features/paywall/shop';
 import { showNotice } from '@/features/settings/settings-ui';
 import { useLocale, useT } from '@/i18n';
 import { BALLOON_PACKS, balloonCount } from '@/shared/balloons';
 import { haptics } from '@/utils/haptics';
-import { showBalloonShop, usePlus } from '@/utils/purchases';
+import { purchasesAvailable, usePlus } from '@/utils/purchases';
 
 export type BalloonState = {
   /** How many you have: null for unlimited, undefined until known. */
@@ -73,6 +74,17 @@ const CREDIT_WAIT_MS = 60_000;
 /** A purchase the server hasn't shown yet: until then the shop isn't offered again. */
 let creditPendingUntil = 0;
 
+/**
+ * A pack or Popdate+ was just bought, from wherever the paywall was opened. The
+ * mock is told (the real server hears from RevenueCat's webhook), and the shop
+ * isn't offered again until the purchase shows.
+ */
+export function purchaseMade(productId: string) {
+  haptics.success();
+  creditPendingUntil = Date.now() + 2 * CREDIT_WAIT_MS;
+  api.balloonsBought(productId).catch(() => {});
+}
+
 /** Resolves true once the server shows a balloon or Popdate+, false after `ms`. */
 function untilServerHasBalloon(ms: number) {
   return new Promise<boolean>((resolve) => {
@@ -96,8 +108,8 @@ function untilServerHasBalloon(ms: number) {
 
 /**
  * Run before joining the line. With balloons, it lets you straight through. With
- * none: the balloon packs from the store, or, where they can't be bought (the web,
- * or before the shop is set up), when the free ones come back. Resolves true once
+ * none: the buy-balloons sheet, or, where nothing can be bought (the web), when
+ * the free ones come back. Resolves true once
  * the server will let you in. The real server hears about a purchase from
  * RevenueCat's webhook, usually within seconds, so this waits for it.
  */
@@ -125,23 +137,21 @@ export function useBalloonCheck() {
       stillOnTheWay(true);
       return false;
     }
-    const { outcome, productId } = await showBalloonShop();
-    if (outcome === 'bought') {
-      haptics.success();
-      const pack = productId !== undefined && BALLOON_PACKS[productId] !== undefined;
-      creditPendingUntil = Date.now() + 2 * CREDIT_WAIT_MS;
-      if (productId) await api.balloonsBought(productId).catch(() => {});
-      if (await untilServerHasBalloon(CREDIT_WAIT_MS)) {
-        creditPendingUntil = 0;
-        return true;
-      }
-      stillOnTheWay(pack);
-      return false;
-    }
-    if (outcome === 'failed') {
+    // Where nothing can be bought (the web), only the free ones come back.
+    if (!purchasesAvailable) {
       const time = refillsAt ? refillTime(refillsAt, locale) : '0:00';
       showNotice(t('balloons.outTitle'), t('balloons.outBody', { time }));
+      return false;
     }
+    // The sheet records the purchase itself (`purchaseMade`); this waits for it to land.
+    const { outcome, productId } = await openBalloonShop();
+    if (outcome !== 'bought') return false;
+    const pack = productId !== undefined && BALLOON_PACKS[productId] !== undefined;
+    if (await untilServerHasBalloon(CREDIT_WAIT_MS)) {
+      creditPendingUntil = 0;
+      return true;
+    }
+    stillOnTheWay(pack);
     return false;
   };
 }

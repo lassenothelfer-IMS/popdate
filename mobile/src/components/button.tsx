@@ -42,6 +42,8 @@ type ButtonProps = {
   fullWidth?: boolean;
   /** Drawn before the title, like the target's balloon in "Pop Sara's balloon". */
   icon?: ReactNode;
+  /** Drawn after the title, in the label's color: a chevron, or a struck-through price. Not read by VoiceOver. */
+  trailing?: (labelColor: string) => ReactNode;
   /** Only the icon shows, in a circle; the title is still read by VoiceOver. */
   iconOnly?: boolean;
   disabled?: boolean;
@@ -149,6 +151,7 @@ export function Button({
   size = variant === 'plain' ? 'small' : 'large',
   fullWidth = true,
   icon,
+  trailing,
   iconOnly = false,
   disabled = false,
   loading = false,
@@ -244,6 +247,7 @@ export function Button({
                 {title}
               </Text>
             )}
+            {iconOnly ? null : trailing?.(label)}
           </View>
         )}
       </Animated.View>

@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import Purchases, { LOG_LEVEL, type CustomerInfo } from 'react-native-purchases';
-import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
+import Purchases, {
+  LOG_LEVEL,
+  PRODUCT_CATEGORY,
+  type CustomerInfo,
+  type PurchasesError,
+  type PurchasesStoreProduct,
+} from 'react-native-purchases';
+import RevenueCatUI from 'react-native-purchases-ui';
 
 import { PLUS_ENTITLEMENT } from '@/shared/balloons';
 
 /**
- * Popdate+, sold through RevenueCat. The paywall and the products are set up in
- * the RevenueCat dashboard; the app only shows them and reads what you own.
+ * Balloon packs and Popdate+, sold through RevenueCat. The app draws its own
+ * paywalls (`features/paywall`) from the store's products, by the ids in
+ * `shared/balloons.ts`, and reads what you own.
  *
  * iOS only for now: Android has no store key yet, and the web sells nothing
- * (purchases.web.ts). The server keeps its own record later, through a webhook.
+ * (purchases.web.ts). The server keeps its own record, through a webhook.
  */
 
 /** RevenueCat's public keys. They are meant to ship inside the app. */
@@ -20,9 +27,6 @@ const KEYS = {
   /** The App Store app `com.goodn8s.popdate`: sandbox in development and TestFlight, real money in the store. */
   appStore: 'appl_tPRduzQnNdgpWCgpAOvYtQDOdvP',
 };
-
-/** The RevenueCat offering with the balloon packs (and Popdate+ next to them). */
-export const BALLOONS_OFFERING = 'balloons';
 
 /** Whether this build can buy anything. */
 export const purchasesAvailable = Platform.OS === 'ios';
@@ -107,7 +111,6 @@ function hasPlus(info: CustomerInfo) {
 /** Whether you have Popdate+: null until known, and false where nothing can be bought. Follows purchases live. */
 export function usePlus(): boolean | null {
   const [plus, setPlus] = useState<boolean | null>(purchasesAvailable ? null : false);
-
   useEffect(() => {
     if (!ensureConfigured()) return;
     let active = true;
@@ -123,62 +126,67 @@ export function usePlus(): boolean | null {
       Purchases.removeCustomerInfoUpdateListener(listener);
     };
   }, []);
-
   return plus;
 }
 
-export type PaywallOutcome = 'bought' | 'closed' | 'failed';
+/** A product as the store sells it, in the shopper's own currency. */
+export type StoreProduct = {
+  id: string;
+  /** The price as a number, in `currency`. */
+  price: number;
+  /** ISO 4217, like CHF. */
+  currency: string;
+  /** The store's own label for the price, like "CHF 15.00". */
+  priceLabel: string;
+};
 
-/** Shows the Popdate+ paywall from the dashboard. */
-export async function showPaywall(): Promise<PaywallOutcome> {
-  if (!ensureConfigured()) return 'failed';
+/** The store's products from the last load, to buy them by id. */
+const loaded = new Map<string, PurchasesStoreProduct>();
+
+/**
+ * The store's products for these ids, in the order the store returns them. Ids
+ * the store doesn't sell (yet) are left out. Null where nothing can be bought, or
+ * when the store didn't answer. `kind` matters to Google Play and the Test Store.
+ */
+export async function loadStoreProducts(
+  ids: string[],
+  kind: 'subscription' | 'oneTime',
+): Promise<StoreProduct[] | null> {
+  if (!ensureConfigured()) return null;
   try {
-    if (!(await onAccount())) return 'failed';
-    const result = await RevenueCatUI.presentPaywall({ displayCloseButton: true });
-    if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) return 'bought';
-    if (result === PAYWALL_RESULT.ERROR) return 'failed';
-    return 'closed';
+    const category =
+      kind === 'subscription' ? PRODUCT_CATEGORY.SUBSCRIPTION : PRODUCT_CATEGORY.NON_SUBSCRIPTION;
+    const products = await Purchases.getProducts(ids, category);
+    for (const product of products) loaded.set(product.identifier, product);
+    return products.map((product) => ({
+      id: product.identifier,
+      price: product.price,
+      currency: product.currencyCode,
+      priceLabel: product.priceString,
+    }));
   } catch {
-    return 'failed';
+    return null;
   }
 }
 
+export type BuyOutcome = 'bought' | 'cancelled' | 'failed';
+
 /**
- * Shows the balloon packs: the paywall of the `balloons` offering. Resolves with
- * the store product bought, if any, so the mock can credit it; the real server
- * credits packs from RevenueCat's webhook. 'failed' also means no offering is set up yet.
+ * Buys a product loaded by `loadStoreProducts`, on the signed-in account. The
+ * server hears about it from RevenueCat's webhook; Popdate+ also shows at once
+ * through `usePlus`. 'cancelled' when you backed out of Apple's sheet.
  */
-export async function showBalloonShop(): Promise<{ outcome: PaywallOutcome; productId?: string }> {
-  if (!ensureConfigured()) return { outcome: 'failed' };
+export async function buyProduct(id: string): Promise<BuyOutcome> {
+  const product = loaded.get(id);
+  if (!product || !ensureConfigured()) return 'failed';
   try {
-    if (!(await onAccount())) return { outcome: 'failed' };
-    const offering = (await Purchases.getOfferings()).all[BALLOONS_OFFERING];
-    if (!offering) return { outcome: 'failed' };
-    let productId: string | undefined;
-    let restoredPlus = false;
-    const result = await RevenueCatUI.presentPaywall({
-      offering,
-      displayCloseButton: true,
-      callbacks: {
-        onPurchaseCompleted: ({ storeTransaction }) => {
-          productId = storeTransaction.productIdentifier;
-        },
-        onRestoreCompleted: ({ customerInfo }) => {
-          restoredPlus = hasPlus(customerInfo);
-        },
-      },
-    });
-    // A restore only counts when it brought back Popdate+: packs are used up, so they don't come back.
-    if (
-      result === PAYWALL_RESULT.PURCHASED ||
-      productId !== undefined ||
-      (result === PAYWALL_RESULT.RESTORED && restoredPlus)
-    ) {
-      return { outcome: 'bought', productId };
-    }
-    return { outcome: result === PAYWALL_RESULT.ERROR ? 'failed' : 'closed' };
-  } catch {
-    return { outcome: 'failed' };
+    if (!(await onAccount())) return 'failed';
+    await Purchases.purchaseStoreProduct(product);
+    return 'bought';
+  } catch (error) {
+    return (error as Partial<PurchasesError> & { userCancelled?: boolean }).userCancelled
+      ? 'cancelled'
+      : 'failed';
   }
 }
 

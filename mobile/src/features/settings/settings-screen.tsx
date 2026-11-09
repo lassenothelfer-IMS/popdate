@@ -25,13 +25,8 @@ import { deviceRegion, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
-import {
-  manageSubscription,
-  purchasesAvailable,
-  restorePurchases,
-  showPaywall,
-  usePlus,
-} from '@/utils/purchases';
+import { openBalloonShop, openPlus } from '@/features/paywall/shop';
+import { manageSubscription, purchasesAvailable, restorePurchases, usePlus } from '@/utils/purchases';
 import { enablePush, getPushPermission, type PushPermission } from '@/utils/push';
 
 const SUPPORT_EMAIL = 'support@popdate.app';
@@ -131,19 +126,17 @@ export function SettingsScreen() {
     await save('notifications', { notifications: { ...base, [key]: on } });
   }
 
-  async function openPlus() {
+  async function plusRow() {
     setError(null);
-    if (plus) {
-      try {
-        await manageSubscription();
-      } catch {
-        fail('plus', t('settings.plusFailed'));
-      }
+    if (!plus) {
+      openPlus();
       return;
     }
-    const outcome = await showPaywall();
-    if (outcome === 'bought') haptics.success();
-    else if (outcome === 'failed') fail('plus', t('settings.plusFailed'));
+    try {
+      await manageSubscription();
+    } catch {
+      fail('plus', t('settings.plusFailed'));
+    }
   }
 
   // Apple requires a way to get earlier purchases back, for a new phone or a reinstall.
@@ -264,12 +257,15 @@ export function SettingsScreen() {
         </SettingsSection>
 
         {purchasesAvailable ? (
-          <SettingsSection title={t('settings.plus')} footer={errorFor('plus')}>
+          <SettingsSection title={t('settings.balloons')} footer={errorFor('plus')}>
+            {plus ? null : (
+              <NavRow label={t('settings.buyBalloons')} onPress={() => void openBalloonShop()} />
+            )}
             <NavRow
               label={plus ? t('settings.plusManage') : t('settings.plusGet')}
               value={plus ? t('settings.plusActive') : undefined}
               valueColor="success"
-              onPress={openPlus}
+              onPress={plusRow}
             />
             <NavRow
               label={t('settings.restorePurchases')}

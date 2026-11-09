@@ -4,6 +4,7 @@ import { Alert, Platform } from 'react-native';
 
 import { api } from '@/api';
 import { useBalloonCheck, useBalloons } from '@/features/balloons/use-balloons';
+import { startLineClock } from '@/features/queue/line-clock';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useT } from '@/i18n';
 import { track, type Role } from '@/utils/analytics';
@@ -105,6 +106,7 @@ export function useRoomExit(
           setLeftForReplay(true);
         }
         await api.joinQueue();
+        startLineClock();
       }, null, t('game.replayFailed'));
       track('played_again');
       router.replace('/queue');

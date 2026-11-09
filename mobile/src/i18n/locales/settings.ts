@@ -21,6 +21,8 @@ export const settings = {
     statusRejected: 'Try again',
 
     plus: 'Popdate+',
+    balloons: 'Balloons',
+    buyBalloons: 'Buy balloons',
     plusGet: 'Get Popdate+',
     plusManage: 'Manage Popdate+',
     plusActive: 'Active',
@@ -167,6 +169,8 @@ export const settings = {
     statusRejected: 'Nochmals versuchen',
 
     plus: 'Popdate+',
+    balloons: 'Ballons',
+    buyBalloons: 'Ballons kaufen',
     plusGet: 'Popdate+ holen',
     plusManage: 'Popdate+ verwalten',
     plusActive: 'Aktiv',
@@ -318,6 +322,8 @@ export const settings = {
     statusRejected: 'À refaire',
 
     plus: 'Popdate+',
+    balloons: 'Ballons',
+    buyBalloons: 'Acheter des ballons',
     plusGet: 'Obtenir Popdate+',
     plusManage: 'Gérer Popdate+',
     plusActive: 'Actif',
@@ -470,6 +476,8 @@ export const settings = {
     statusRejected: 'Riprova',
 
     plus: 'Popdate+',
+    balloons: 'Palloncini',
+    buyBalloons: 'Compra palloncini',
     plusGet: 'Ottieni Popdate+',
     plusManage: 'Gestisci Popdate+',
     plusActive: 'Attivo',

@@ -4,6 +4,7 @@ import { AccessibilityInfo } from 'react-native';
 
 import { api } from '@/api';
 import { useBalloonCheck, useBalloons } from '@/features/balloons/use-balloons';
+import { startLineClock } from '@/features/queue/line-clock';
 import { useT } from '@/i18n';
 import { NO_BALLOONS } from '@/shared/balloons';
 import { haptics } from '@/utils/haptics';
@@ -37,6 +38,7 @@ export function useJoinQueue() {
         return;
       }
       await api.joinQueue();
+      startLineClock();
       router.push('/queue');
     } catch (cause) {
       // The server can still say none: a pack's balloons land a moment after the purchase.

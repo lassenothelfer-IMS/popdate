@@ -220,6 +220,8 @@ export const Fonts = {
     default: 'system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif',
   }),
   wordmark: 'Gloock',
+  /** Fraunces italic 400: only the "Plus" after the wordmark on the Popdate+ paywall. */
+  plus: 'Fraunces-Italic',
 } as const;
 
 /** 8pt grid with 4pt half steps. */

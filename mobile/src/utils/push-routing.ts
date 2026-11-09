@@ -21,15 +21,43 @@ function hrefFor(data: unknown): Href | null {
   return null;
 }
 
+/**
+ * The queue screen opens your room by itself when it fills. While it is in
+ * front, and for the room it opened, the "your room is open" push would only
+ * race it: a banner over round 1, and a tap that opens the room a second time.
+ */
+let queueInFront = false;
+let roomOpenedByQueue: string | null = null;
+
+/** The queue screen says when it is in front, and when it isn't any more. */
+export function setQueueInFront(inFront: boolean) {
+  queueInFront = inFront;
+}
+
+/** The queue screen says which room it is opening, as soon as it knows. */
+export function setRoomOpenedByQueue(roomId: string) {
+  roomOpenedByQueue = roomId;
+}
+
+/** A room push the queue screen already handles. */
+function queueHandles(push: Partial<PushData> | undefined) {
+  if (push?.type !== 'room') return false;
+  return queueInFront || (!!push.roomId && push.roomId === roomOpenedByQueue);
+}
+
 if (Platform.OS !== 'web') {
   // While the app is open a push still shows as a banner, quietly.
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      const push = notification.request.content.data as Partial<PushData> | undefined;
+      const banner = !queueHandles(push);
+      return {
+        shouldShowBanner: banner,
+        shouldShowList: banner,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    },
   });
 }
 
@@ -57,7 +85,11 @@ export function usePushRouting() {
       }
       if (id === handled) return;
       handled = id;
-      const href = hrefFor(response.notification.request.content.data);
+      const data = response.notification.request.content.data;
+      const push = data as Partial<PushData> | undefined;
+      // The queue screen already took you to this room: don't stack a second one.
+      if (push?.type === 'room' && push.roomId && push.roomId === roomOpenedByQueue) return;
+      const href = hrefFor(data);
       if (href) router.push(href);
     }
     // A tap that launched the app, or came in while signing in.

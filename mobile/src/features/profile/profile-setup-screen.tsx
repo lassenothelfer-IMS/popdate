@@ -17,6 +17,7 @@ import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Colors, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
 import { GenderSection } from '@/features/profile/gender-section';
+import { startLineClock } from '@/features/queue/line-clock';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import {
   DetailsSection,
@@ -244,6 +245,7 @@ function ReadyStep({ profile }: { profile: Profile }) {
     setError(null);
     try {
       await api.joinQueue();
+      startLineClock();
       // Home underneath, so leaving the queue lands there.
       router.replace('/home');
       router.push('/queue');

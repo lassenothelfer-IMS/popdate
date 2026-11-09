@@ -17,6 +17,9 @@ const ICONS = {
   eye: { ios: 'eye', android: 'visibility', web: 'visibility' },
   heart: { ios: 'heart.fill', android: 'favorite', web: 'favorite' },
   hourglass: { ios: 'hourglass', android: 'hourglass_empty', web: 'hourglass_empty' },
+  infinity: { ios: 'infinity', android: 'all_inclusive', web: 'all_inclusive' },
+  replay: { ios: 'arrow.counterclockwise', android: 'replay', web: 'replay' },
+  skip: { ios: 'forward.end', android: 'skip_next', web: 'skip_next' },
   leave: {
     ios: 'rectangle.portrait.and.arrow.right',
     android: 'logout',

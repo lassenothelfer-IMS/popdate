@@ -38,7 +38,7 @@ Popdate sells something digital (features inside the app), so Apple requires **i
 - Joining the line needs at least one balloon.
 - You lose one **only when yours gets popped**, or when you leave a room while still holding it. Winning keeps it, and the chooser never pays. A pop costs nothing if you never answered in that room (you may have closed the app while in line and been seated later).
 - **3 free balloons a day**: they top back up at UTC midnight (1:00 or 2:00 in Zurich). A new account starts with **2 extra**.
-- **Balloon packs** (consumables): `popdate.balloons.5` and `popdate.balloons.15`. Bought balloons never expire and are used after the free ones.
+- **Balloon packs** (consumables): `popdate.balloons.5`, `popdate.balloons.15` and `popdate.balloons.40`. Bought balloons never expire and are used after the free ones.
 - **Popdate+** (subscription, entitlement `plus`): unlimited balloons. Room for more perks later (seeing who almost picked you, filters).
 - Why this shape: every room needs six people, so the free refill keeps players coming back instead of leaving, and only losing costs a balloon.
 
@@ -62,7 +62,10 @@ Then build it:
   - Both paywalls were made with RevenueCat's AI editor in Popdate's colours, have a close button, and link to the Terms and Privacy pages below. The headline uses the system font; upload Gloock in RevenueCat to use the serif.
   - Test Store prices are USD placeholders and can't be edited once saved: make new products to change them.
 - [x] Terms and Privacy on GitHub Pages: https://lassenothelfer-ims.github.io/popdate/terms/ and https://lassenothelfer-ims.github.io/popdate/privacy/. Built from the app's own text (`site/build.mjs`) by `.github/workflows/pages.yml` whenever `legal-screen.tsx` changes. Use the privacy URL in App Store Connect too. Swap in Kian's website later if it gets its own pages.
-- [ ] The same products in **App Store Connect** (the app → Monetization), with the **same product ids**: a subscription group "Popdate+" with the three plans, and the two consumables, with CHF prices. Then add each App Store product to the matching package in both offerings (the "Popdate: Dating Game (App Store)" slot) and attach the three plans to `plus`.
+- [x] The app draws its own paywalls (2026-11-08, design in `design/paywall/`): the **buy-balloons sheet** (`/balloons`, when you're out, and Settings → Balloons) and **Popdate Plus** (`/plus`, from the sheet and Settings), in `mobile/src/features/paywall/`. They load the products by the ids in `src/shared/balloons.ts` and buy through RevenueCat; the RevenueCat paywalls above aren't shown any more.
+- [ ] Add `popdate.balloons.40` to RevenueCat (Test Store and, below, the App Store). Until it exists the sheet shows two packs.
+- [ ] Before release: Popdate+ today gives unlimited balloons only. The paywall also promises skip the line, see who kept you floating and replaying any recap; build those or take the rows out (App Review checks that a paywall's promises are real).
+- [ ] The same products in **App Store Connect** (the app → Monetization), with the **same product ids**: a subscription group "Popdate+" with the three plans, and the three consumables, with CHF prices. Then add each App Store product to the matching package in both offerings (the "Popdate: Dating Game (App Store)" slot) and attach the three plans to `plus`.
 - [ ] RevenueCat webhook → Convex (Lasse), **once per Convex deployment** (dev now, prod again in phase 1):
   - Set `REVENUECAT_WEBHOOK_AUTH` on that deployment to its own long random string: `npx convex env set REVENUECAT_WEBHOOK_AUTH <value>` for dev, the same with `--prod` for production.
   - In RevenueCat → Integrations → Webhooks, add one webhook per deployment: `https://<that-deployment>.convex.site/revenuecat`, with that deployment's string as the Authorization header. The dev webhook gets **sandbox events only**; the prod webhook gets both, since TestFlight and App Review buy in sandbox but talk to prod. Set the prod webhook's app filter to the **App Store app only**.
@@ -72,6 +75,7 @@ Then build it:
   - Packs and Popdate+ only reach the server this way; the app is never trusted to add balloons.
 - [ ] Apply for the **App Store Small Business Program** (15% instead of 30%), then turn it on in RevenueCat's App Store app settings.
 - [ ] Rebuild the development build (`eas build --profile development --platform ios`): RevenueCat is native code, so the build from 2026-11-04 doesn't have it.
+- [x] `react-native-purchases` and `react-native-purchases-ui` are pinned to **10.16.0** (2026-11-08). Version 11 needs the `PurchasesHybridCommon` 20.x pod, which never reached CocoaPods: publishing was frozen Nov 1–7, and CocoaPods trunk takes no new releases after 2026-12-02. With 11, `pod install` fails on EAS. RevenueCat's 11.0.0 notes say Expo apps should stay on 10.x. Don't upgrade until RevenueCat ships a version Expo can install (their Swift Package Manager route, React Native 0.88+, is still experimental).
 - [x] Backend: entitlements live on the server. `convex/http.ts` takes RevenueCat's webhook, `convex/balloons.ts` applies each event once (packs add balloons, Popdate+ events set `plusUntil`). A restore on another account (RevenueCat's TRANSFER event) moves Popdate+ along. PRODUCT_CHANGE is ignored on purpose: the new plan's RENEWAL carries its expiration. Not handled yet: refunds of packs.
 - [ ] The paywall screen must show the price, the billing period, what's included, **Restore purchases**, and links to the terms and privacy policy (Guideline 3.1.2 for subscriptions).
 - [ ] Test with Sandbox Apple accounts (App Store Connect → Users and Access → Sandbox), including buy, cancel, renew and restore on a second phone.

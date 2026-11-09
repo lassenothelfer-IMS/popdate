@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   AppState,
@@ -9,43 +9,42 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  FadeIn,
-  Keyframe,
-  ReduceMotion,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { api, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
-import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { BrandBalloon, Ease, Gutter, MaxContentWidth, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { Ease, Gutter, MaxContentWidth, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { roomSeatIndex } from '@/features/game/room-seats';
+import { PushPrompt } from '@/features/home/push-prompt';
+import { BalloonBunch } from '@/features/queue/balloon-bunch';
+import { lineClockStart, secondsSince } from '@/features/queue/line-clock';
+import { RollingCount } from '@/features/queue/rolling-count';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
-import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
 import { seatAt, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
-import { QUEUE_PING_MS } from '@/shared/limits';
+import { LOBBY_SIZE, QUEUE_PING_MS } from '@/shared/limits';
 import { useSession } from '@/state/session';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
-import { PushPrompt } from '@/features/home/push-prompt';
 import { goHome } from '@/utils/navigation';
-import { webSafeKeyframe } from '@/utils/web-motion';
+import { setQueueInFront, setRoomOpenedByQueue } from '@/utils/push-routing';
 
-/** One chooser and five balloons. While searching, the server sends the real number. */
-const ROOM_SIZE = 6;
+/** How long "Now 4 of 6." stays before the line goes back to saying waiting is free. */
+const CHANGE_LINE_MS = 4000;
+/** A rising count ticks once (the haptics' "balloon row changes"), at most once a second. */
+const TICK_GAP_MS = 1000;
+/**
+ * After you come back to the app, the first change of the count within this
+ * long is it catching up on the time away (the server connection reopens
+ * first), so it doesn't tick.
+ */
+const CATCH_UP_MS = 5000;
 /** How long the role beat holds before the room appears. A tap skips it. */
 const ROLE_BEAT_MS = 1500;
 /** With a screen reader on, the beat holds long enough for the role line to be read out. */
@@ -55,37 +54,19 @@ const ROLE_BEAT_SCREEN_READER_MS = 4000;
  * The room screen has its own loading and missing states.
  */
 const ROOM_WAIT_MS = ROLE_BEAT_MS * 2;
-/** A seat in the row: 30 pt balloons, yours at 36. */
-const SEAT = 30;
-const MY_SEAT = 36;
-/** The two rings behind the row: 160 pt, the second half a cycle behind the first. */
-const RING = 160;
-const RING_MS = 2600;
-/** The join order of the balloon colors. You are crimson; the others take the rest in order. */
-const OTHER_SEATS = [0, 1, 2, 3] as const;
 /** The role word at the count size, unless it needs less to fit on one line. */
 const WORD_SIZE = 112;
 /** On the web, which can't shrink text to fit: New York Light runs a little over half an em a letter. */
 const WORD_EM_PER_LETTER = 0.6;
 
-/** A balloon rises 140 pt into its seat, growing from .6, 300 ms after the one before. */
-const seatEntrances = new Map<number, InstanceType<typeof Keyframe>>();
-function seatLands(delay: number) {
-  let keyframe = seatEntrances.get(delay);
-  if (!keyframe) {
-    keyframe = new Keyframe({
-      0: { opacity: 0, transform: [{ translateY: 140 }, { scale: 0.6 }] },
-      100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: Ease.rise },
-    })
-      .duration(1200)
-      .delay(delay);
-    seatEntrances.set(delay, keyframe);
-  }
-  return keyframe;
-}
-
 /** The role lines replace the queue lines. Opacity only, so it stays under Reduce Motion. */
 const beatIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+
+/**
+ * The count and the bunch are there at once: the push already slides the
+ * screen in, so they only fade up, quickly. Opacity only.
+ */
+const stageIn = FadeIn.duration(Motion.enter).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /**
  * useQueueStatus starts as idle for one frame before the queue answers, so the
@@ -115,6 +96,7 @@ function waitedLabel(seconds: number) {
 }
 
 function openRoom(roomId: string) {
+  setRoomOpenedByQueue(roomId);
   router.replace({ pathname: '/room/[id]', params: { id: roomId } });
 }
 
@@ -171,14 +153,26 @@ function roleBeat(room: Room, t: Translate): RoleBeat {
 
 export function QueueScreen() {
   const status = useQueueStatus();
+  // The room size the server last sent: a found room keeps it, so the bunch doesn't change shape.
+  const [lastNeeded, setLastNeeded] = useState(LOBBY_SIZE);
+  if (status.state === 'searching' && status.needed !== lastNeeded) setLastNeeded(status.needed);
+  const needed = status.state === 'searching' ? status.needed : lastNeeded;
+
+  // While this screen is in front, it opens the room itself: no banner racing it.
+  useFocusEffect(
+    useCallback(() => {
+      setQueueInFront(true);
+      return () => setQueueInFront(false);
+    }, []),
+  );
 
   if (status.state === 'idle') return <NotInQueue />;
 
-  // The same element in both states, so the seats that already landed stay put.
+  // The same element in both states, so the balloons already in the bunch stay put.
   return (
     <FillingRoom
-      found={status.state === 'searching' ? status.found : ROOM_SIZE}
-      needed={status.state === 'searching' ? status.needed : ROOM_SIZE}
+      found={status.state === 'searching' ? status.found : needed}
+      needed={needed}
       roomId={status.state === 'matched' ? status.roomId : null}
     />
   );
@@ -220,7 +214,15 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   const celebrated = useRef(false);
   const screenReader = useScreenReader();
   const holdMs = screenReader ? ROLE_BEAT_SCREEN_READER_MS : ROLE_BEAT_MS;
-  const [waited, setWaited] = useState(0);
+  // Counted from the join itself, so time with the app in the background counts too.
+  const [startedAt] = useState(() => lineClockStart() ?? Date.now());
+  const [waited, setWaited] = useState(() => secondsSince(startedAt));
+  /** When the app last came back to the front (until the count catches up), and when it last ticked. */
+  const backAt = useRef(0);
+  const tickedAt = useRef(0);
+  const lastFound = useRef(found);
+  // Another screen over the line (a profile, Settings): no ticks or announcements meanwhile.
+  const focused = useIsFocused();
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
   /** When you got in line, for how long the wait took. Null if the room was already full on arrival. */
@@ -229,25 +231,63 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
 
   const matched = roomId !== null;
   const beat = matched && room ? roleBeat(room, t) : null;
-  const missingSeats = Math.max(needed - found, 0);
-  const seatsLine =
-    missingSeats === 0
-      ? t('queue.seatsReady', { found, needed })
-      : t('queue.seatsLine', {
-          count: missingSeats,
-          found,
-          needed,
-          missing: capitalized(numberWord(t, missingSeats)),
-        });
   const ready = matched && room !== undefined;
   const missing = room === null;
 
-  // How long you have been in line, counting up in the pill.
+  // Which way the count last moved, for a few seconds: "Now 4 of 6." Never "joined" or
+  // "left": the count is who could share a room with you, and one join can move it by five.
+  const [shownFound, setShownFound] = useState(found);
+  const [change, setChange] = useState<{ up: boolean } | null>(null);
+  if (found !== shownFound) {
+    setShownFound(found);
+    setChange({ up: found > shownFound });
+  }
+  const statusLine = change
+    ? t(change.up ? 'queue.countUp' : 'queue.countDown', { found, needed })
+    : t('queue.lineFree');
+
+  useEffect(() => {
+    if (!change) return;
+    const id = setTimeout(() => setChange(null), CHANGE_LINE_MS);
+    return () => clearTimeout(id);
+  }, [change]);
+
+  // How long you have been in line, counting up in the pill, and right again on coming back.
+  // Each tick lands just after the next whole second of the wait, so no second is skipped.
   useEffect(() => {
     if (matched) return;
-    const id = setInterval(() => setWaited((seconds) => seconds + 1), 1000);
-    return () => clearInterval(id);
-  }, [matched]);
+    let id: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      clearTimeout(id);
+      setWaited(secondsSince(startedAt));
+      id = setTimeout(tick, 1000 - ((Date.now() - startedAt) % 1000) + 20);
+    };
+    tick();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      backAt.current = Date.now();
+      tick();
+    });
+    return () => {
+      clearTimeout(id);
+      subscription.remove();
+    };
+  }, [matched, startedAt]);
+
+  // A rising count ticks once with its bloom. The full room gets the success haptic instead,
+  // and the first change after coming back is the count catching up, so it stays quiet.
+  useEffect(() => {
+    const before = lastFound.current;
+    lastFound.current = found;
+    if (found === before) return;
+    const now = Date.now();
+    const catchingUp = backAt.current !== 0 && now - backAt.current < CATCH_UP_MS;
+    backAt.current = 0;
+    if (matched || !focused || catchingUp || found < before) return;
+    if (now - tickedAt.current < TICK_GAP_MS) return;
+    tickedAt.current = now;
+    haptics.selection();
+  }, [found, matched, focused]);
 
   // Checking in while you wait, and again the moment you come back to the app: only
   // someone who checked in lately can be a room's chooser, and a place nobody checks
@@ -283,6 +323,8 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
   // The room is full: one success haptic with the role beat, then the room.
   useEffect(() => {
     if (!roomId) return;
+    // From now on its "your room is open" push is ours to handle, even once the room is in front.
+    setRoomOpenedByQueue(roomId);
     const enter = () => {
       if (entered.current) return;
       entered.current = true;
@@ -306,12 +348,12 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
     return () => clearTimeout(id);
   }, [roomId, ready, missing, holdMs]);
 
-  // The live region below only speaks on Android, so VoiceOver gets each new player announced.
+  // The live region below only speaks on Android, so VoiceOver hears each change of the count.
   useEffect(() => {
-    if (Platform.OS === 'ios' && !matched && found > 1) {
-      AccessibilityInfo.announceForAccessibility(seatsLine);
+    if (Platform.OS === 'ios' && focused && !matched && change) {
+      AccessibilityInfo.announceForAccessibility(statusLine);
     }
-  }, [matched, found, seatsLine]);
+  }, [focused, matched, change, statusLine]);
 
   // The role lines mount fresh, with no live region, so both platforms get them announced.
   const beatText = beat ? `${beat.spoken}. ${beat.line}` : null;
@@ -362,7 +404,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
 
       {/* Once the room is full a tap anywhere opens it right away, even before it answers. */}
       <Pressable accessible={false} disabled={!roomId} onPress={skipBeat} style={styles.page}>
-        <Rise index={0} style={styles.top}>
+        <View style={styles.top}>
           {beat ? (
             <Animated.View entering={beatIn} style={styles.topLabel}>
               <ThemedText type="kicker">{t('queue.roomReady')}</ThemedText>
@@ -384,7 +426,7 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
               </View>
             </>
           )}
-        </Rise>
+        </View>
         {leaveError && !beat ? <ErrorLine message={leaveError} /> : null}
 
         {beat ? (
@@ -398,21 +440,19 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             </ThemedText>
           </Animated.View>
         ) : (
-          <Rise index={1} style={styles.headline}>
+          <Animated.View entering={stageIn} style={styles.headline}>
             <View
               accessible
               accessibilityLabel={`${t('queue.seatsTaken')} ${found}. ${t('queue.countLine', { needed, people: numberWord(t, needed) })}`}
               accessibilityLiveRegion="polite"
               style={styles.headline}>
               <ThemedText type="kicker">{t('queue.seatsTaken')}</ThemedText>
-              <ThemedText type="count" maxFontSizeMultiplier={1} allowFontScaling={false}>
-                {found}
-              </ThemedText>
+              <RollingCount value={found} />
               <ThemedText type="callout" themeColor="textSecondary" style={styles.headlineLine}>
                 {t('queue.countLine', { needed, people: numberWord(t, needed) })}
               </ThemedText>
             </View>
-          </Rise>
+          </Animated.View>
         )}
 
         {beat && room ? (
@@ -420,13 +460,21 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
             <RoomSeats room={room} />
           </Animated.View>
         ) : (
-          <Rise index={2} style={styles.stage}>
-            <Rings />
-            <SeatRow found={found} needed={needed} />
-            <ThemedText type="footnote" themeColor="textTertiary" style={styles.centered}>
-              {seatsLine}
-            </ThemedText>
-          </Rise>
+          <Animated.View entering={stageIn} style={styles.stage}>
+            <BalloonBunch found={found} needed={needed} />
+            {/* The text fades in fresh on each change; the parent stays, so a screen reader's focus does too. */}
+            <View accessible accessibilityLabel={statusLine}>
+              <Animated.View
+                key={statusLine}
+                entering={beatIn}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants">
+                <ThemedText type="footnote" themeColor="textTertiary" style={styles.centered}>
+                  {statusLine}
+                </ThemedText>
+              </Animated.View>
+            </View>
+          </Animated.View>
         )}
         {/* Asked here, where it's useful: you can leave the app and still hear when the room opens. */}
         {beat ? null : <PushPrompt />}
@@ -484,93 +532,6 @@ function RoomWatcher({
   return null;
 }
 
-/** Two thin rings that keep expanding out of the row and fading, half a cycle apart. */
-function Rings() {
-  return (
-    <View
-      style={styles.rings}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants">
-      <Ring delay={0} />
-      <Ring delay={RING_MS / 2} />
-    </View>
-  );
-}
-
-function Ring({ delay }: { delay: number }) {
-  const theme = useTheme();
-  const reduced = useReduceMotion();
-  const grow = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) {
-      cancelAnimation(grow);
-      grow.set(0);
-      return;
-    }
-    grow.set(
-      withDelay(
-        delay,
-        withRepeat(withTiming(1, { duration: RING_MS, easing: Easing.bezier(0.2, 0.7, 0.3, 1) }), -1),
-      ),
-    );
-  }, [reduced, delay, grow]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 0.35 * (0.55 - 0.55 * grow.get()),
-    transform: [{ scale: 0.6 + 1.3 * grow.get() }],
-  }));
-  if (reduced) return null;
-  return <Animated.View style={[styles.ring, { borderColor: theme.text }, style]} />;
-}
-
-/**
- * Every seat in the room as a balloon: yours in crimson and a little bigger,
- * the people already here in join order, and a dashed ghost for each seat
- * still empty. Decorative: the count above carries the meaning.
- */
-function SeatRow({ found, needed }: { found: number; needed: number }) {
-  const seats = useSeats();
-  const reduced = useReduceMotion();
-  // The seats already filled when the screen opens rise in one after another; later ones rise as they arrive.
-  const [initial] = useState(found);
-  return (
-    <View style={styles.row} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {Array.from({ length: needed }, (_, index) => {
-        const filled = index < found;
-        if (!filled) return <GhostSeat key={`ghost-${index}`} />;
-        const mine = index === 0;
-        const color = mine ? BrandBalloon.color : seatAt(seats, OTHER_SEATS[(index - 1) % OTHER_SEATS.length]).color;
-        const delay = index < initial ? index * 300 : 0;
-        return (
-          <Animated.View
-            key={`seat-${index}`}
-            entering={reduced ? undefined : webSafeKeyframe(seatLands(delay))}>
-            <Balloon color={color} size={mine ? MY_SEAT : SEAT} />
-          </Animated.View>
-        );
-      })}
-    </View>
-  );
-}
-
-/** An empty seat: a dashed balloon outline that pulses softly while it waits. */
-function GhostSeat() {
-  const theme = useTheme();
-  const reduced = useReduceMotion();
-  const pulse = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) {
-      cancelAnimation(pulse);
-      pulse.set(0.5);
-      return;
-    }
-    pulse.set(withRepeat(withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }), -1, true));
-  }, [reduced, pulse]);
-  // .25 to .55 of a border that is itself the text color at half strength.
-  const style = useAnimatedStyle(() => ({ opacity: 0.5 * (0.25 + 0.3 * pulse.get()) }));
-  return <Animated.View style={[styles.ghost, { borderColor: theme.text }, style]} />;
-}
-
 /**
  * The room once it is known: the chooser's avatar, then each balloon with its
  * holder's name, and yours labeled You.
@@ -604,7 +565,7 @@ function RoomSeats({ room }: { room: Room }) {
         return (
           <View key={contestant.id} style={styles.cardSeat}>
             <View style={styles.cardBalloon}>
-              <Balloon color={seatAt(seats, index).color} size={22} />
+              <Balloon color={seatAt(seats, roomSeatIndex(room.contestants, index, room.me.id)).color} size={22} />
             </View>
             <ThemedText
               type={mine ? 'captionStrong' : 'caption'}
@@ -669,45 +630,13 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     marginTop: Space.xxs,
   },
-  // The rings and the row, in the lit middle of the screen.
+  // The bunch fills the middle of the screen, with the status line under the hand.
   stage: {
     flexGrow: 1,
-    justifyContent: 'center',
-    gap: 72,
+    gap: Space.md,
     minHeight: 260,
     marginTop: Space.lg,
-  },
-  rings: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    width: RING,
-    height: RING,
-    borderRadius: RING / 2,
-    borderWidth: 1,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: 22,
-  },
-  ghost: {
-    width: SEAT,
-    height: 38,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
-    borderBottomLeftRadius: 15,
-    borderBottomRightRadius: 15,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
+    paddingBottom: Space.md,
   },
   cardSlot: {
     flexGrow: 1,

@@ -1,3 +1,4 @@
+import { Fraunces_400Regular_Italic } from '@expo-google-fonts/fraunces';
 import { Gloock_400Regular } from '@expo-google-fonts/gloock';
 import {
   HankenGrotesk_400Regular,
@@ -43,6 +44,10 @@ export default function RootLayout() {
         { path: HankenGrotesk_600SemiBold, weight: 600 },
         { path: HankenGrotesk_700Bold, weight: 700 },
       ],
+    },
+    {
+      fontFamily: Fonts.plus,
+      fontDefinitions: [{ path: Fraunces_400Regular_Italic, weight: 400, style: 'italic' }],
     },
   ]);
   const ready = fontsLoaded || fontError !== null;
@@ -99,6 +104,12 @@ function ThemedStack() {
         <Stack.Screen name="how-to-play" options={{ presentation: 'modal' }} />
         {/* Editing your profile is a task you finish or cancel: a sheet that asks before discarding. */}
         <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
+        {/* The balloon packs: a sheet over the screen you were on. It draws its own dim and motion. */}
+        <Stack.Screen
+          name="balloons"
+          options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
+        />
+        <Stack.Screen name="plus" options={{ presentation: 'fullScreenModal' }} />
       </Stack>
       <OfflineBanner />
     </ThemeProvider>

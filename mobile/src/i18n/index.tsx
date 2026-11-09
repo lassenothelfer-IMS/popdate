@@ -10,6 +10,7 @@ import { home } from '@/i18n/locales/home';
 import { howToPlay } from '@/i18n/locales/howToPlay';
 import { match } from '@/i18n/locales/match';
 import { onboarding } from '@/i18n/locales/onboarding';
+import { paywall } from '@/i18n/locales/paywall';
 import { profile } from '@/i18n/locales/profile';
 import { queue } from '@/i18n/locales/queue';
 import { almost, checkin, rooms, you } from '@/i18n/locales/rooms';
@@ -29,6 +30,7 @@ const AREAS = {
   howToPlay,
   match,
   onboarding,
+  paywall,
   profile,
   queue,
   rooms,

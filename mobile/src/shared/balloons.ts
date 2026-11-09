@@ -19,13 +19,28 @@ export const FREE_BALLOONS = 3;
 export const STARTER_BALLOONS = 2;
 
 /**
- * The balloon packs on sale, by store product id, and how many balloons each
- * adds. The same ids have to exist in App Store Connect and in RevenueCat.
+ * Every store product id Popdate sells, in one place. The same ids have to
+ * exist in App Store Connect and in RevenueCat.
+ *
+ * The balloon packs, and how many balloons each adds: one-time purchases.
  */
 export const BALLOON_PACKS: Record<string, number> = {
   'popdate.balloons.5': 5,
   'popdate.balloons.15': 15,
+  'popdate.balloons.40': 40,
 };
+
+/** The pack the buy sheet opens on, tagged "Most popular". */
+export const FEATURED_PACK = 'popdate.balloons.15';
+
+/** Popdate+ plans: auto-renewing subscriptions that all unlock the `plus` entitlement. */
+export const PLUS_PLANS = {
+  weekly: 'popdate.plus.weekly',
+  sixMonths: 'popdate.plus.6months',
+  annual: 'popdate.plus.yearly',
+} as const;
+
+export type PlusPlan = keyof typeof PLUS_PLANS;
 
 /** What joining the line fails with when you have none; the app recognizes it. */
 export const NO_BALLOONS = 'No balloons left.';
