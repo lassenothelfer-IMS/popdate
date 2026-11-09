@@ -161,7 +161,7 @@ export function GenderSection({ form, identity, style }: GenderSectionProps) {
         />
       ) : null}
       <TextField
-        label={t('profile.genderDetails')}
+        label={t('profile.optionalLabel', { label: t('profile.genderDetails') })}
         value={form.genderDetails}
         onChangeText={form.setGenderDetails}
         maxLength={40}
@@ -169,7 +169,7 @@ export function GenderSection({ form, identity, style }: GenderSectionProps) {
         autoCapitalize="none"
       />
       <View style={styles.more}>
-        <ThemedText type="kicker">{t('profile.sexuality')}</ThemedText>
+        <ThemedText type="kicker">{t('profile.optionalLabel', { label: t('profile.sexuality') })}</ThemedText>
         <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={t('profile.sexuality')}>
           {SEXUALITIES.map((sexuality) => (
             <Chip
@@ -181,9 +181,6 @@ export function GenderSection({ form, identity, style }: GenderSectionProps) {
           ))}
         </View>
       </View>
-      <ThemedText type="footnote" themeColor="textTertiary">
-        {t('profile.genderShown')}
-      </ThemedText>
     </Section>
   );
 }

@@ -47,15 +47,15 @@ export function PlanRow({ title, detail, price, tag, selected, onPress }: PlanRo
       style={[styles.row, { backgroundColor: theme.field, borderColor: theme.outline }]}>
       <Animated.View
         pointerEvents="none"
-        style={[styles.overlay, { backgroundColor: withAlpha(theme.accent, 0.1) }, fade]}
+        style={[styles.overlay, { backgroundColor: withAlpha(theme.brand, 0.1) }, fade]}
       />
       <Animated.View
         pointerEvents="none"
-        style={[styles.overlay, styles.ring, { borderColor: theme.accent }, fade]}
+        style={[styles.overlay, styles.ring, { borderColor: theme.brand }, fade]}
       />
       <View style={styles.left}>
         <View style={[styles.radio, { borderColor: theme.control }]}>
-          <Animated.View style={[styles.check, { backgroundColor: theme.accent }, fade]}>
+          <Animated.View style={[styles.check, { backgroundColor: theme.brand }, fade]}>
             <Icon name="check" size={10} color={theme.onAccent} />
           </Animated.View>
         </View>
@@ -72,7 +72,7 @@ export function PlanRow({ title, detail, price, tag, selected, onPress }: PlanRo
         {price}
       </Text>
       {tag ? (
-        <View style={[styles.tag, { backgroundColor: theme.accent }]} pointerEvents="none">
+        <View style={[styles.tag, { backgroundColor: theme.brand }]} pointerEvents="none">
           <Text style={[styles.tagText, { color: theme.onAccent }]}>{tag}</Text>
         </View>
       ) : null}

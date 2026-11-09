@@ -44,10 +44,24 @@ const STATUS_KEYS: Record<VerificationStatus, TranslationKey> = {
   rejected: 'settings.statusRejected',
 };
 
+/** A `YYYY-MM-DD` birthday as your language and region write it, like 12 April 1998. */
+function formatBirthday(birthDate: string, locale: string, region: string | null) {
+  const [year, month, day] = birthDate.split('-').map(Number);
+  // Midnight where you are, so no time zone moves it to the day before.
+  const date = new Date(year, month - 1, day);
+  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+  try {
+    return new Intl.DateTimeFormat(region ? `${locale}-${region}` : locale, options).format(date);
+  } catch {
+    // A region the phone's Intl doesn't know: the language alone still reads right.
+    return new Intl.DateTimeFormat(locale, options).format(date);
+  }
+}
+
 export function SettingsScreen() {
   const t = useT();
-  const { settings, update } = useSettings();
-  const { signOut, deleteAccount } = useSession();
+  const { settings, locale, region, update } = useSettings();
+  const { profile, signOut, deleteAccount } = useSession();
   const [verification, setVerification] = useState<VerificationStatus | null>(null);
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
   /** Null until read, so the switches don't flicker off and on. */
@@ -246,7 +260,15 @@ export function SettingsScreen() {
           {t('settings.title')}
         </ThemedText>
 
-        <SettingsSection title={t('settings.account')}>
+        <SettingsSection
+          title={t('settings.account')}
+          footer={
+            profile ? (
+              <ThemedText type="footnote" themeColor="textSecondary">
+                {t('settings.birthdayNote')}
+              </ThemedText>
+            ) : null
+          }>
           <NavRow label={t('settings.editProfile')} onPress={() => router.push('/profile')} />
           <NavRow
             label={t('settings.verification')}
@@ -254,6 +276,13 @@ export function SettingsScreen() {
             valueColor={verificationColor}
             onPress={() => router.push('/settings/verify')}
           />
+          {/* Last, so the note about it sits right under it. */}
+          {profile ? (
+            <InfoRow
+              label={t('settings.birthday')}
+              value={formatBirthday(profile.birthDate, locale, region)}
+            />
+          ) : null}
         </SettingsSection>
 
         {purchasesAvailable ? (
@@ -296,16 +325,6 @@ export function SettingsScreen() {
             ]}
             onChange={(units) => save('preferences', { units })}
           />
-          <ChoiceRow
-            label={t('settings.appearance')}
-            value={settings.appearance}
-            options={[
-              { value: 'system', label: t('settings.appearanceSystem') },
-              { value: 'light', label: t('settings.appearanceLight') },
-              { value: 'dark', label: t('settings.appearanceDark') },
-            ]}
-            onChange={(appearance) => save('preferences', { appearance })}
-          />
         </SettingsSection>
 
         <SettingsSection
@@ -320,7 +339,7 @@ export function SettingsScreen() {
                 ) : null}
                 {showDenied ? (
                   <View style={styles.denied}>
-                    <ThemedText type="footnote" themeColor="textSecondary">
+                    <ThemedText type="footnote" themeColor="danger">
                       {deniedMessage}
                     </ThemedText>
                     <View style={styles.openSettings}>
@@ -371,6 +390,7 @@ export function SettingsScreen() {
         <SettingsSection title={t('settings.legal')}>
           <NavRow label={t('settings.terms')} onPress={() => router.push('/settings/terms' as Href)} />
           <NavRow label={t('settings.privacy')} onPress={() => router.push('/settings/privacy' as Href)} />
+          <NavRow label={t('settings.howToPlay')} onPress={() => router.push('/how-to-play')} />
           <NavRow
             label={t('settings.support')}
             value={SUPPORT_EMAIL}

@@ -1,6 +1,7 @@
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { createContext, use, useCallback, type EffectCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -71,10 +72,13 @@ type TabBarProps = {
   dotLabels?: Partial<Record<Tab, string>>;
 };
 
+/** Real Liquid Glass only where the system draws it (iOS 26); elsewhere the sheet color. */
+const GLASS = Platform.OS === 'ios' && isLiquidGlassAvailable();
+
 /**
- * The tab bar floating over the pages: a pill on the sheet color with a hairline,
- * 16 pt from the sides. Each tab is an icon over its name; the selected one sits
- * in a soft accent capsule. You is your own photo.
+ * The tab bar floating over the pages: a Liquid Glass pill (the sheet color with a
+ * hairline where glass isn't drawn), 16 pt from the sides. Each tab is an icon
+ * over its name; the selected one sits in a soft gray capsule. You is your own photo.
  */
 export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProps) {
   const theme = useTheme();
@@ -85,7 +89,19 @@ export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProp
     <View pointerEvents="box-none" style={[styles.layer, { bottom: Math.max(insets.bottom, 24) }]}>
       <View
         accessibilityRole="tablist"
-        style={[styles.pill, { backgroundColor: theme.sheet, borderColor: theme.border }]}>
+        style={[
+          styles.pill,
+          GLASS
+            ? styles.glassPill
+            : { backgroundColor: theme.sheet, borderColor: theme.border },
+        ]}>
+        {GLASS ? (
+          <GlassView
+            glassEffectStyle="regular"
+            colorScheme="light"
+            style={[StyleSheet.absoluteFill, styles.glass]}
+          />
+        ) : null}
         {TABS.map((tab) => {
           const selected = tab === active;
           const color = selected ? theme.accentText : theme.textSecondary;
@@ -137,7 +153,7 @@ export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProp
                   </Svg>
                 )}
                 {dotted ? (
-                  <View style={[styles.dot, { backgroundColor: theme.accent, borderColor: theme.sheet }]} />
+                  <View style={[styles.dot, { backgroundColor: theme.brand, borderColor: theme.sheet }]} />
                 ) : null}
               </View>
               <Text
@@ -170,6 +186,14 @@ const styles = StyleSheet.create({
     gap: 2,
     borderRadius: Radius.pill,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  glassPill: {
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  glass: {
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
   },
   item: {
     flex: 1,

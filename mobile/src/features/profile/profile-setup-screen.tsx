@@ -2,7 +2,7 @@ import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 
-import { api, type Profile } from '@/api';
+import type { Profile } from '@/api';
 import { MIN_PHOTOS } from '@/api/types';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
@@ -14,10 +14,9 @@ import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { BrandBalloon, Colors, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
+import { BrandBalloon, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
 import { GenderSection } from '@/features/profile/gender-section';
-import { startLineClock } from '@/features/queue/line-clock';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import {
   DetailsSection,
@@ -230,48 +229,25 @@ function AboutStep({ form, saving, error, onBack, onSave }: AboutStepProps) {
   );
 }
 
-/** S18: you're in. Your profile as the room sees it, then the next room. */
+/** S18: you're in. Your profile as the room sees it, then on to Home. */
 function ReadyStep({ profile }: { profile: Profile }) {
   const t = useT();
   const theme = useTheme();
   const seats = useSeats();
-  const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const age = ageFromBirthDate(profile.birthDate);
-
-  async function join() {
-    haptics.light();
-    setJoining(true);
-    setError(null);
-    try {
-      await api.joinQueue();
-      startLineClock();
-      // Home underneath, so leaving the queue lands there.
-      router.replace('/home');
-      router.push('/queue');
-    } catch {
-      setError(t('onboarding.joinFailed'));
-      setJoining(false);
-    }
-  }
 
   return (
     <Screen
       scroll
       footerStyle="plain"
       footer={
-        <View style={styles.actions}>
-          {error ? <ErrorLine message={error} /> : null}
-          <Button title={t('onboarding.joinNext')} loading={joining} onPress={join} />
-          <Button
-            title={t('onboarding.editFirst')}
-            variant="plain"
-            onPress={() => {
-              router.replace('/home');
-              router.push('/profile');
-            }}
-          />
-        </View>
+        <Button
+          title={t('common.continue')}
+          onPress={() => {
+            haptics.light();
+            router.replace('/home');
+          }}
+        />
       }>
       <Rise index={0}>
         <Wordmark />
@@ -314,9 +290,12 @@ function ReadyStep({ profile }: { profile: Profile }) {
                 <Text style={styles.cardCity}>{`  ${profile.city}`}</Text>
               </Text>
             </View>
-            <Text style={styles.cardBio} maxFontSizeMultiplier={1.3} numberOfLines={3}>
-              {profile.bio}
-            </Text>
+            {/* The bio is optional: without one, the panel is just your name. */}
+            {profile.bio ? (
+              <Text style={styles.cardBio} maxFontSizeMultiplier={1.3} numberOfLines={3}>
+                {profile.bio}
+              </Text>
+            ) : null}
           </View>
         </View>
         <View
@@ -507,7 +486,7 @@ const styles = StyleSheet.create({
   },
   cardCity: {
     fontWeight: 400,
-    color: Colors.dark.textSecondary,
+    color: Velvet.faint,
   },
   cardBio: {
     fontFamily: Fonts.serif,

@@ -7,7 +7,7 @@ import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { announce } from '@/features/game/announce';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { MAX_ANSWER_LENGTH } from '@/shared/limits';
 
@@ -58,7 +58,6 @@ export function AnswerComposer({
   deadline,
 }: AnswerComposerProps) {
   const theme = useTheme();
-  const scheme = useScheme();
   const t = useT();
   const [sending, setSending] = useState(false);
   /** The last count VoiceOver heard, so each step down is said once. */
@@ -109,7 +108,7 @@ export function AnswerComposer({
             accessibilityLabel={t('game.yourAnswer')}
             placeholder={t('game.answerPlaceholder', { name: popperName })}
             placeholderTextColor={theme.textFaint}
-            keyboardAppearance={scheme}
+            keyboardAppearance="light"
             selectionColor={theme.gold}
             // Read when the field gets focus, once the count shows.
             accessibilityHint={text.length >= COUNTER_FROM ? countLeft(t, left) : undefined}

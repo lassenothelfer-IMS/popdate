@@ -32,7 +32,7 @@ import {
 import { PLAN_ROW_HEIGHT, PlanRow } from '@/features/paywall/plan-row';
 import { settleShop, useCatalog, useMoney } from '@/features/paywall/shop';
 import { goBackOr, showNotice } from '@/features/settings/settings-ui';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT, type TranslationKey } from '@/i18n';
 import type { PlusPlan } from '@/shared/balloons';
 import { withAlpha } from '@/utils/color';
@@ -43,11 +43,8 @@ import { buyProduct, purchasesAvailable, restorePurchases } from '@/utils/purcha
 const TERMS_URL = 'https://lassenothelfer-ims.github.io/popdate/terms/';
 const PRIVACY_URL = 'https://lassenothelfer-ims.github.io/popdate/privacy/';
 
-/** Placeholder heroes from the design (Pexels, free licence), one per theme. */
-const HERO = {
-  dark: require('../../../assets/images/plus-hero-dark.jpg'),
-  light: require('../../../assets/images/plus-hero-light.jpg'),
-};
+/** Placeholder hero from the design (Pexels, free licence). */
+const HERO = require('../../../assets/images/plus-hero-light.jpg');
 
 /**
  * On the design's 844 pt screen the offer chip sits 232 pt down, the photo is
@@ -86,7 +83,6 @@ const RENEWS: Record<PlusPlan, TranslationKey> = {
  */
 export function PlusPaywall() {
   const theme = useTheme();
-  const scheme = useScheme();
   const t = useT();
   const money = useMoney();
   const insets = useSafeAreaInsets();
@@ -203,7 +199,7 @@ export function PlusPaywall() {
         showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { height: photoHeight }]} pointerEvents="none">
           <Image
-            source={HERO[scheme]}
+            source={HERO}
             contentFit="cover"
             contentPosition={{ left: '50%', top: '20%' }}
             style={StyleSheet.absoluteFill}
@@ -227,8 +223,8 @@ export function PlusPaywall() {
           {BENEFITS.map(({ icon, key }) => (
             <View key={key} style={styles.benefit}>
               <View
-                style={[styles.benefitIcon, { backgroundColor: withAlpha(theme.accent, 0.14) }]}>
-                <Icon name={icon} size={14} color={theme.accentText} />
+                style={[styles.benefitIcon, { backgroundColor: withAlpha(theme.brand, 0.14) }]}>
+                <Icon name={icon} size={14} color={theme.brand} />
               </View>
               <ThemedText type="callout" style={styles.benefitText}>
                 {t(key)}
@@ -304,6 +300,7 @@ export function PlusPaywall() {
                     })
                   : t('paywall.plusLabel')
               }
+              variant="brand"
               onPress={start}
               loading={busy === 'buy' || !plan}
               disabled={busy === 'restore'}
@@ -351,7 +348,7 @@ function PlusMark() {
       accessibilityRole="header"
       accessibilityLabel={t('paywall.plusLabel')}>
       <Wordmark size={PLUS_SIZE} compact />
-      <Text style={[styles.plusWord, { color: theme.accentText }]} maxFontSizeMultiplier={1}>
+      <Text style={[styles.plusWord, { color: theme.brand }]} maxFontSizeMultiplier={1}>
         {t('paywall.plusWord')}
       </Text>
     </View>
@@ -377,7 +374,7 @@ function OfferChip({ endsAt }: { endsAt: number }) {
     hours > 0 ? `${hours}:${two(minutes)}:${two(seconds)}` : `${two(minutes)}:${two(seconds)}`;
   return (
     <View style={[styles.chip, { backgroundColor: theme.highlight }]}>
-      <View style={[styles.chipDot, { backgroundColor: theme.accent }]} />
+      <View style={[styles.chipDot, { backgroundColor: theme.brand }]} />
       <ThemedText type="timer" style={styles.chipText}>
         {t('paywall.offerEnds', { time })}
       </ThemedText>

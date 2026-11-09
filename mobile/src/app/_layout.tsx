@@ -7,7 +7,7 @@ import {
   HankenGrotesk_700Bold,
 } from '@expo-google-fonts/hanken-grotesk';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -16,7 +16,6 @@ import { ApiProvider } from '@/api/provider';
 import { ErrorScreen } from '@/components/error-screen';
 import { OfflineBanner } from '@/components/offline-banner';
 import { Colors, Fonts } from '@/constants/theme';
-import { useScheme } from '@/hooks/use-theme';
 import { SessionProvider } from '@/state/session';
 import { SettingsProvider } from '@/state/settings';
 import { usePushRouting } from '@/utils/push-routing';
@@ -58,7 +57,7 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
-  // Settings sit above the theme, so your Appearance and Language apply to every screen.
+  // Settings sit above the stack, so your Language applies to every screen.
   return (
     <ApiProvider>
       <SessionProvider>
@@ -71,11 +70,10 @@ export default function RootLayout() {
 }
 
 function ThemedStack() {
-  const scheme = useScheme();
   // A tapped push opens its room, match or chat.
   usePushRouting();
-  const palette = Colors[scheme];
-  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const palette = Colors;
+  const base = DefaultTheme;
   const navigationTheme = {
     ...base,
     colors: {
@@ -90,7 +88,7 @@ function ThemedStack() {
 
   return (
     <ThemeProvider value={navigationTheme}>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="profile-setup" options={{ animation: 'fade' }} />

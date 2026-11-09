@@ -1,10 +1,13 @@
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { MAX_PINNED_ANSWERS, type PinnedAnswer, type RoomSummary } from '@/api/types';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
+import { Icon } from '@/components/icon';
+import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
@@ -12,14 +15,24 @@ import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { TabSwipe } from '@/components/tab-swipe';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
-import { Radius, Space } from '@/constants/theme';
+import { CssEase, Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { acknowledge } from '@/features/chat/prompts';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
+import { nativeOnly } from '@/utils/web-motion';
+
+/**
+ * The rooms under one that opens or folds slide to their new place. Off under
+ * Reduce Motion, and on web, where it would stretch a card that changes size.
+ */
+const cardMove = nativeOnly(LinearTransition.duration(Motion.enter).easing(Ease.inOut));
+/** An opened room's questions and answers fade in. */
+const detailsIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /** How a room ended for you, in a few words. */
 export function outcomeLine(t: Translate, room: RoomSummary) {
@@ -64,6 +77,9 @@ export function RoomsScreen() {
   const { join, joining, error } = useJoinQueue();
   const { show, toast } = useToast();
   const [pinning, setPinning] = useState(false);
+  const reduced = useReduceMotion();
+  /** Rooms you opened or folded yourself. The rest: the newest open, the others folded. */
+  const [toggled, setToggled] = useState<Record<string, boolean>>({});
   const pins = profile?.pinnedAnswers ?? [];
 
   async function togglePin(pin: PinnedAnswer) {
@@ -134,11 +150,25 @@ export function RoomsScreen() {
             </Rise>
           ) : (
             <View style={styles.list}>
-              {history.map((room, index) => (
-                <Rise key={room.roomId} index={Math.min(index + 1, 4)}>
-                  <RoomCard room={room} pins={pins} pinning={pinning} onPin={togglePin} />
-                </Rise>
-              ))}
+              {history.map((room, index) => {
+                const open = toggled[room.roomId] ?? index === 0;
+                return (
+                  <Animated.View key={room.roomId} layout={reduced ? undefined : cardMove}>
+                    <Rise index={Math.min(index + 1, 4)}>
+                      <RoomCard
+                        room={room}
+                        open={open}
+                        // Only a room you open yourself fades in; the newest is just there.
+                        fadeIn={room.roomId in toggled}
+                        onToggle={() => setToggled((previous) => ({ ...previous, [room.roomId]: !open }))}
+                        pins={pins}
+                        pinning={pinning}
+                        onPin={togglePin}
+                      />
+                    </Rise>
+                  </Animated.View>
+                );
+              })}
             </View>
           )}
         </Screen>
@@ -150,87 +180,122 @@ export function RoomsScreen() {
 
 type RoomCardProps = {
   room: RoomSummary;
+  /** Showing its questions and answers, or folded to its one line. */
+  open: boolean;
+  /** Fade the questions in as it opens. */
+  fadeIn: boolean;
+  onToggle: () => void;
   pins: PinnedAnswer[];
   pinning: boolean;
   onPin: (pin: PinnedAnswer) => void;
 };
 
-/** One room: when, how it went, each question with your answer, and where it led. */
-function RoomCard({ room, pins, pinning, onPin }: RoomCardProps) {
+/**
+ * One room. Folded: when and how it went, on one line. Open: who was choosing,
+ * each question with your answer, and where it led. The top line opens and folds it.
+ */
+function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCardProps) {
   const t = useT();
   const theme = useTheme();
   const locale = useLocale();
+  const reduced = useReduceMotion();
   const date = new Date(room.endedAt).toLocaleDateString(locale, {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   });
+  const outcome = outcomeLine(t, room);
   const answered = roundsYouSaw(room);
   // A room you left may still be playing, so there's no recap to see.
   const showRecap = room.outcome !== 'left';
   return (
     <View style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}>
-      <View style={styles.cardTop}>
+      <PressableHighlight
+        accessibilityRole="button"
+        accessibilityLabel={`${date}, ${outcome}`}
+        accessibilityState={{ expanded: open }}
+        accessibilityHint={open ? t('rooms.foldHint') : t('rooms.openHint')}
+        onPress={onToggle}
+        background={theme.field}
+        style={styles.cardTop}>
         <ThemedText type="kicker">{date}</ThemedText>
-        <ThemedText type="captionStrong" themeColor={room.outcome === 'won' || room.outcome === 'chose' ? 'accentText' : 'textSecondary'}>
-          {outcomeLine(t, room)}
+        <ThemedText
+          type="captionStrong"
+          themeColor={room.outcome === 'won' || room.outcome === 'chose' ? 'accentText' : 'textSecondary'}
+          style={styles.outcome}>
+          {outcome}
         </ThemedText>
-      </View>
-      <ThemedText type="footnote" themeColor="textSecondary">
-        {room.role === 'popper' ? t('rooms.youChose') : t('rooms.theyChose', { name: room.popperName })}
-      </ThemedText>
+        {/* Points right while folded, down while open. */}
+        <Animated.View
+          style={{
+            transform: [{ rotate: open ? '90deg' : '0deg' }],
+            transitionProperty: 'transform',
+            transitionDuration: reduced ? 0 : Motion.state,
+            transitionTimingFunction: CssEase.out,
+          }}>
+          <Icon name="chevronRight" size={13} color={theme.textTertiary} />
+        </Animated.View>
+      </PressableHighlight>
 
-      {answered.map((round, i) => {
-        const pin = round.answer ? { question: round.question, answer: round.answer } : null;
-        const pinned = pin ? pins.some((p) => samePin(p, pin)) : false;
-        return (
-          <View key={`${room.roomId}-${i}`} style={[styles.round, { borderTopColor: theme.border }]}>
-            <ThemedText type="questionRow">{round.question}</ThemedText>
-            {pin ? (
-              <View style={styles.answerRow}>
-                <ThemedText type="callout" themeColor="textSecondary" style={styles.answer}>
-                  {`“${pin.answer}”`}
-                </ThemedText>
+      {open ? (
+        <Animated.View entering={fadeIn ? detailsIn : undefined} style={styles.cardBody}>
+          <ThemedText type="footnote" themeColor="textSecondary">
+            {room.role === 'popper' ? t('rooms.youChose') : t('rooms.theyChose', { name: room.popperName })}
+          </ThemedText>
+
+          {answered.map((round, i) => {
+            const pin = round.answer ? { question: round.question, answer: round.answer } : null;
+            const pinned = pin ? pins.some((p) => samePin(p, pin)) : false;
+            return (
+              <View key={`${room.roomId}-${i}`} style={[styles.round, { borderTopColor: theme.border }]}>
+                <ThemedText type="questionRow">{round.question}</ThemedText>
+                {pin ? (
+                  <View style={styles.answerRow}>
+                    <ThemedText type="callout" themeColor="textSecondary" style={styles.answer}>
+                      {`“${pin.answer}”`}
+                    </ThemedText>
+                    <Button
+                      title={pinned ? t('rooms.unpin') : t('rooms.pin')}
+                      variant={pinned ? 'tinted' : 'plain'}
+                      size="small"
+                      fullWidth={false}
+                      disabled={pinning}
+                      accessibilityHint={t('rooms.pinHint')}
+                      onPress={() => onPin(pin)}
+                    />
+                  </View>
+                ) : room.role === 'contestant' ? (
+                  <ThemedText type="footnote" themeColor="textTertiary">
+                    {t('rooms.noAnswer')}
+                  </ThemedText>
+                ) : null}
+              </View>
+            );
+          })}
+
+          {/* Wraps, so a long name or a longer language puts Chat under the recap instead of cutting it. */}
+          {showRecap || room.matchId ? (
+            <View style={styles.actions}>
+              {showRecap ? (
                 <Button
-                  title={pinned ? t('rooms.unpin') : t('rooms.pin')}
-                  variant={pinned ? 'tinted' : 'plain'}
+                  title={t('rooms.recap')}
+                  variant="plain"
+                  fullWidth={false}
+                  onPress={() => router.push(`/recap/${room.roomId}` as Href)}
+                />
+              ) : null}
+              {room.matchId ? (
+                <Button
+                  title={t('rooms.openChat', { name: room.matchName ?? '' })}
+                  variant="tinted"
                   size="small"
                   fullWidth={false}
-                  disabled={pinning}
-                  accessibilityHint={t('rooms.pinHint')}
-                  onPress={() => onPin(pin)}
+                  onPress={() => router.push({ pathname: '/chat/[id]', params: { id: room.matchId! } })}
                 />
-              </View>
-            ) : room.role === 'contestant' ? (
-              <ThemedText type="footnote" themeColor="textTertiary">
-                {t('rooms.noAnswer')}
-              </ThemedText>
-            ) : null}
-          </View>
-        );
-      })}
-
-      {/* Wraps, so a long name or a longer language puts Chat under the recap instead of cutting it. */}
-      {showRecap || room.matchId ? (
-        <View style={styles.actions}>
-          {showRecap ? (
-            <Button
-              title={t('rooms.recap')}
-              variant="plain"
-              fullWidth={false}
-              onPress={() => router.push(`/recap/${room.roomId}` as Href)}
-            />
+              ) : null}
+            </View>
           ) : null}
-          {room.matchId ? (
-            <Button
-              title={t('rooms.openChat', { name: room.matchName ?? '' })}
-              variant="tinted"
-              size="small"
-              fullWidth={false}
-              onPress={() => router.push({ pathname: '/chat/[id]', params: { id: room.matchId! } })}
-            />
-          ) : null}
-        </View>
+        </Animated.View>
       ) : null}
     </View>
   );
@@ -261,18 +326,30 @@ const styles = StyleSheet.create({
   centered: {
     textAlign: 'center',
   },
+  // Clips the top line's press fill to the card's corners.
   card: {
     borderRadius: Radius.xl,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
-    padding: Space.md,
-    gap: Space.xs,
+    overflow: 'hidden',
   },
+  // The whole top line is the open and fold target, 44 pt at least.
   cardTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: Space.sm,
+    minHeight: MinTouch,
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.sm,
+  },
+  outcome: {
+    flex: 1,
+    textAlign: 'right',
+  },
+  cardBody: {
+    paddingHorizontal: Space.md,
+    paddingBottom: Space.md,
+    gap: Space.xs,
   },
   round: {
     marginTop: Space.xs,

@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "popdate",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.goodn8s.popdate",
@@ -34,13 +34,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#2B2527",
+          "backgroundColor": "#FFFDFE",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
-          "dark": {
-            "backgroundColor": "#2B2527",
-            "image": "./assets/images/splash-icon.png"
-          }
+          "imageWidth": 76
         }
       ],
       [

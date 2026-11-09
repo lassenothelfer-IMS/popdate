@@ -1,2 +1,5 @@
 # Built by site/build.mjs for GitHub Pages
 _site/
+
+# graphify knowledge graph: built locally, rebuilt by the git hooks
+graphify-out/

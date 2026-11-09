@@ -311,6 +311,7 @@ export function BuyBalloonsSheet() {
                         })
                       : t('paywall.buyTitle')
                   }
+                  variant="brand"
                   onPress={buy}
                   loading={busy === 'buy' || !ready}
                   disabled={busy === 'restore'}

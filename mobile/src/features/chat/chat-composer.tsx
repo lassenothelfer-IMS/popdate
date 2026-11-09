@@ -5,7 +5,7 @@ import { Icon } from '@/components/icon';
 import { PressableScale } from '@/components/pressable-scale';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Space } from '@/constants/theme';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { MAX_MESSAGE_LENGTH } from '@/shared/limits';
 
@@ -34,7 +34,6 @@ type ChatComposerProps = {
 export function ChatComposer({ value: text, onChangeText, onSend, sending, name }: ChatComposerProps) {
   const t = useT();
   const theme = useTheme();
-  const scheme = useScheme();
   /** The last count VoiceOver heard, so each step down is said once. */
   const spokenCount = useRef<number | null>(null);
   const canSend = text.trim().length > 0 && !sending;
@@ -71,7 +70,7 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
           accessibilityLabel={t('chat.messageLabel')}
           placeholder={t('chat.placeholder', { name })}
           placeholderTextColor={theme.textTertiary}
-          keyboardAppearance={scheme}
+          keyboardAppearance="light"
           selectionColor={theme.text}
           // Read when the field gets focus, once the count shows.
           accessibilityHint={text.length >= COUNTER_FROM ? countLabel : undefined}

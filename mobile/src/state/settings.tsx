@@ -21,8 +21,7 @@ const SettingsContext = createContext<SettingsState | null>(null);
 
 /**
  * Your settings, loaded from the server once you're signed in, and applied
- * app-wide: the language (through the locale provider) and the appearance
- * (read by useScheme).
+ * app-wide: the language (through the locale provider).
  */
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { ready, profile } = useSession();

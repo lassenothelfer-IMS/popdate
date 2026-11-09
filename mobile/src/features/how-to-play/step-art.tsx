@@ -84,10 +84,7 @@ export function RoomArt({ fit }: ArtProps) {
   const t = useT();
   return (
     <ArtCard fit={fit}>
-      <ThemedText type="kicker" style={styles.roomKicker}>
-        {t('onboarding.roomsKicker')}
-      </ThemedText>
-      <View style={[styles.chooser, { backgroundColor: theme.accentWash }]}>
+      <View style={[styles.chooser,{ backgroundColor: theme.accentWash }]}>
         <Text style={[styles.chooserInitial, { color: theme.accentText }]}>M</Text>
       </View>
       <View style={styles.chooserText}>
@@ -232,7 +229,7 @@ const styles = StyleSheet.create({
   chooser: {
     position: 'absolute',
     left: 24,
-    top: 70,
+    top: 44,
     width: 64,
     height: 64,
     borderRadius: 32,
@@ -247,7 +244,7 @@ const styles = StyleSheet.create({
   chooserText: {
     position: 'absolute',
     left: 100,
-    top: 78,
+    top: 52,
     gap: 2,
   },
   small: {
@@ -258,14 +255,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 24,
     right: 24,
-    top: 164,
+    top: 138,
     height: 1,
   },
   roomSeats: {
     position: 'absolute',
     left: 24,
     right: 24,
-    top: 190,
+    top: 164,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

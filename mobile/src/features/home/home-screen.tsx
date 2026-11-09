@@ -46,6 +46,8 @@ const MOCK_ROLES: { role: MockRole; label: TranslationKey }[] = [
 const LIVE_REFRESH_MS = 20_000;
 /** Home shows your newest matches; the Matches tab has them all. */
 const HOME_MATCHES = 2;
+/** After this many rooms you know the game: How to play leaves Home and stays in Settings. */
+const HOW_TO_PLAY_ROOMS = 5;
 
 type DayPart = 'Morning' | 'Afternoon' | 'Evening' | 'Night';
 
@@ -108,9 +110,13 @@ export function HomeScreen() {
   const { join, joining, error, balloons } = useJoinQueue();
   /** Null until it loads, or while it can't: the line then falls back to the day and city. */
   const [live, setLive] = useState<QueueStats | null>(null);
-  const { history, reload: reloadHistory } = useRoomHistory();
+  const { history, failed: historyFailed, reload: reloadHistory } = useRoomHistory();
   const lastRoom = history?.[0];
-  const streak = history ? roomStats(history).streak : 0;
+  const stats = history ? roomStats(history) : null;
+  const streak = stats?.streak ?? 0;
+  // Waits for your rooms, so it doesn't flash and go for someone who has played
+  // plenty. If they can't load, it shows.
+  const showHowToPlay = stats ? stats.played < HOW_TO_PLAY_ROOMS : historyFailed;
 
   const loadLive = useCallback(
     (isCurrent: () => boolean = () => true) =>
@@ -273,16 +279,19 @@ export function HomeScreen() {
               }
             />
           ) : null}
-          <LinkRow
-            title={t('home.howToPlay')}
-            subtitle={t('home.howToPlayNote')}
-            onPress={() => router.push('/how-to-play')}
-            icon={
-              <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
-                <Balloon color={BrandBalloon.color} size={14} />
-              </View>
-            }
-          />
+          {/* Only for your first few rooms; after that it lives in Settings. */}
+          {showHowToPlay ? (
+            <LinkRow
+              title={t('home.howToPlay')}
+              subtitle={t('home.howToPlayNote')}
+              onPress={() => router.push('/how-to-play')}
+              icon={
+                <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
+                  <Balloon color={BrandBalloon.color} size={14} />
+                </View>
+              }
+            />
+          ) : null}
           {(matches ?? []).map((thread) => {
             const { match } = thread;
             return (

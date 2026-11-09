@@ -233,7 +233,7 @@ function Seat({ index, scale, filled, delay, color, stringColor, clock, still }:
           color={stringColor}
         />
         <View style={[styles.place, { left: (slot.cx - slot.size / 2) * scale, top: slot.top * scale }]}>
-          <Balloon color={color} size={size} />
+          <Balloon color={color} size={size} string={false} />
         </View>
         {index === 0 ? (
           <View style={[styles.tag, { top: (knot.y + TAG_GAP) * scale }]}>

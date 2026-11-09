@@ -15,7 +15,7 @@ export function VerifiedCheck({ size = 14 }: { size?: number }) {
       viewBox="0 0 14 14"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
-      <Circle cx={7} cy={7} r={7} fill={theme.inverse} />
+      <Circle cx={7} cy={7} r={7} fill={theme.success} />
       <Path
         d="M4.1 7.2l2 2 3.8-4.2"
         stroke={theme.onInverse}

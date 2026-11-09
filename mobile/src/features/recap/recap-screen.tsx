@@ -32,8 +32,8 @@ import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
 
 /** The recap card is always drawn in Cream, whatever the app's theme, so it shares the same everywhere. */
-const paper = Colors.light;
-const paperSeats = SeatColors.light;
+const paper = Colors;
+const paperSeats = SeatColors;
 /** The card is 340 pt wide at most and as tall as what it holds. */
 const CARD = { width: 340, radius: 24, padding: 24 };
 /** Taller than any card, so the sheen always crosses all of it. */
@@ -189,7 +189,7 @@ function Recap({ room }: { room: Room }) {
             },
           ]}>
           <Sheen reduced={reduced} />
-          <Wordmark size={16} tone="cream" compact />
+          <Wordmark size={16} compact />
           <Text style={[styles.meta, { color: paper.textSecondary }]}>{dateLine}</Text>
 
           <View style={styles.headline}>

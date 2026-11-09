@@ -17,7 +17,7 @@ import { ErrorIcon, errorEnter } from '@/components/error-line';
 import { useRevealField } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Space } from '@/constants/theme';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
 type TextFieldProps = TextInputProps & {
@@ -49,7 +49,6 @@ export function TextField({
   ...rest
 }: TextFieldProps) {
   const theme = useTheme();
-  const scheme = useScheme();
   const t = useT();
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<TextInputInstance>(null);
@@ -92,7 +91,7 @@ export function TextField({
           inputAccessoryViewID={numberPad ? padId : undefined}
           accessibilityLabel={rest.accessibilityLabel ?? label}
           placeholderTextColor={theme.textFaint}
-          keyboardAppearance={scheme}
+          keyboardAppearance="light"
           selectionColor={theme.text}
           multiline={multiline}
           onFocus={(event) => {

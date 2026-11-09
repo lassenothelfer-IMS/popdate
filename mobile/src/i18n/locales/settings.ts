@@ -19,6 +19,9 @@ export const settings = {
     statusPending: 'In review',
     statusVerified: 'Verified',
     statusRejected: 'Try again',
+    birthday: 'Birthday',
+    birthdayNote:
+      "Your profile only shows your age. Your birthday can't be changed, so write to us if it's wrong.",
 
     plus: 'Popdate+',
     balloons: 'Balloons',
@@ -51,10 +54,6 @@ export const settings = {
     units: 'Units',
     unitsMetric: 'Metric (cm)',
     unitsImperial: 'Imperial (ft, in)',
-    appearance: 'Appearance',
-    appearanceSystem: 'Match system',
-    appearanceLight: 'Cream',
-    appearanceDark: 'Velvet',
 
     notifications: 'Notifications',
     notifyRoomLive: 'When your room is ready',
@@ -78,6 +77,7 @@ export const settings = {
     legal: 'Legal and help',
     terms: 'Terms of service',
     privacy: 'Privacy policy',
+    howToPlay: 'How to play',
     support: 'Contact support',
     supportHint: 'Writes an email to support',
     comingSoon: 'Coming soon',
@@ -167,6 +167,9 @@ export const settings = {
     statusPending: 'In Prüfung',
     statusVerified: 'Verifiziert',
     statusRejected: 'Nochmals versuchen',
+    birthday: 'Geburtstag',
+    birthdayNote:
+      'Dein Profil zeigt nur dein Alter. Deinen Geburtstag kannst du nicht ändern. Schreib uns, wenn er nicht stimmt.',
 
     plus: 'Popdate+',
     balloons: 'Ballons',
@@ -199,10 +202,6 @@ export const settings = {
     units: 'Masseinheiten',
     unitsMetric: 'Metrisch (cm)',
     unitsImperial: 'Imperial (ft, in)',
-    appearance: 'Erscheinungsbild',
-    appearanceSystem: 'Wie das System',
-    appearanceLight: 'Cream',
-    appearanceDark: 'Velvet',
 
     notifications: 'Mitteilungen',
     notifyRoomLive: 'Wenn dein Raum bereit ist',
@@ -226,6 +225,7 @@ export const settings = {
     legal: 'Rechtliches und Hilfe',
     terms: 'Nutzungsbedingungen',
     privacy: 'Datenschutzerklärung',
+    howToPlay: 'So wird gespielt',
     support: 'Support kontaktieren',
     supportHint: 'Schreibt eine E-Mail an den Support',
     comingSoon: 'Bald verfügbar',
@@ -320,6 +320,9 @@ export const settings = {
     statusPending: 'En vérification',
     statusVerified: 'Vérifié',
     statusRejected: 'À refaire',
+    birthday: 'Date de naissance',
+    birthdayNote:
+      'Ton profil affiche seulement ton âge. Ta date de naissance ne peut pas être modifiée. Écris-nous si elle est fausse.',
 
     plus: 'Popdate+',
     balloons: 'Ballons',
@@ -352,10 +355,6 @@ export const settings = {
     units: 'Unités',
     unitsMetric: 'Métrique (cm)',
     unitsImperial: 'Impérial (ft, in)',
-    appearance: 'Apparence',
-    appearanceSystem: 'Comme le système',
-    appearanceLight: 'Cream',
-    appearanceDark: 'Velvet',
 
     notifications: 'Notifications',
     notifyRoomLive: 'Quand ta salle est prête',
@@ -379,6 +378,7 @@ export const settings = {
     legal: 'Mentions légales et aide',
     terms: 'Conditions d’utilisation',
     privacy: 'Politique de confidentialité',
+    howToPlay: 'Comment jouer',
     support: 'Contacter l’assistance',
     supportHint: 'Écrit un e-mail à l’assistance',
     comingSoon: 'Bientôt disponible',
@@ -474,6 +474,9 @@ export const settings = {
     statusPending: 'In revisione',
     statusVerified: 'Verificato',
     statusRejected: 'Riprova',
+    birthday: 'Data di nascita',
+    birthdayNote:
+      'Sul tuo profilo si vede solo la tua età. La data di nascita non si può cambiare. Scrivici se è sbagliata.',
 
     plus: 'Popdate+',
     balloons: 'Palloncini',
@@ -506,10 +509,6 @@ export const settings = {
     units: 'Unità di misura',
     unitsMetric: 'Metrico (cm)',
     unitsImperial: 'Imperiale (ft, in)',
-    appearance: 'Aspetto',
-    appearanceSystem: 'Come il sistema',
-    appearanceLight: 'Cream',
-    appearanceDark: 'Velvet',
 
     notifications: 'Notifiche',
     notifyRoomLive: 'Quando la tua stanza è pronta',
@@ -533,6 +532,7 @@ export const settings = {
     legal: 'Note legali e aiuto',
     terms: 'Termini di servizio',
     privacy: 'Informativa sulla privacy',
+    howToPlay: 'Come si gioca',
     support: 'Contatta l’assistenza',
     supportHint: 'Scrive un’e-mail all’assistenza',
     comingSoon: 'Presto disponibile',

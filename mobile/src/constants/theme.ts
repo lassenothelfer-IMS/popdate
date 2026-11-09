@@ -1,8 +1,8 @@
 /**
- * The Popdate design handoff (design/DESIGN.md), recolored "wine and sand": a
- * warm charcoal dark theme (the default; still called Velvet in code) and a
- * sand light theme (Cream in code). Wine is the one accent; coral is for
- * destructive only.
+ * The Popdate design handoff (design/DESIGN.md), in one light palette. Black does
+ * the work (buttons, selection, progress) and plum is the brand, kept for the
+ * balloon, the wordmark, the paywall and tiny badges; destructive red is for
+ * destructive actions only, and teal is for success.
  * New York for display, SF Pro for text, Gloock only in the wordmark.
  */
 
@@ -11,153 +11,118 @@ import '@/global.css';
 import { Platform } from 'react-native';
 import { cubicBezier, Easing } from 'react-native-reanimated';
 
-const velvet = {
-  /** Canvas: the screen background, flat. */
-  page: '#2B2527',
-  /** Surface 2, a soft rose: chips, the timer pill, slots, inactive buttons. */
-  surface: '#40373A',
-  /** Surface 3: pressed surface 2, the toggle track when on. */
-  surfacePressed: '#4B4145',
-  /** Surface 1: cards, list cells, inputs, option rows, sheets, their chat bubbles. */
-  field: '#352E31',
-  text: '#F3EDE7',
-  textSecondary: '#C9BDB8',
-  /** Hints, timestamps, placeholders. */
-  textTertiary: '#C9BDB8',
-  /** Placeholders and decoration. Same as tertiary. */
-  textFaint: '#C9BDB8',
-  /** Hairline: card borders, list separators. */
-  border: 'rgba(255, 255, 255, 0.09)',
-  /** The edge of cards and option rows. */
-  outline: 'rgba(255, 255, 255, 0.09)',
-  /** Input border: interactive borders, input borders, a ghost seat. */
-  borderStrong: 'rgba(208, 130, 138, 0.35)',
-  /** The empty ring of a radio or checkbox. */
-  control: '#C9BDB8',
-  /** Ink: selected chips, radios and checkboxes, the You tag. Primary buttons use the accent. */
-  inverse: '#F3EDE7',
-  onInverse: '#2B2527',
-  /** A light edge for fills that want one. */
-  highlight: 'rgba(255, 255, 255, 0.25)',
-  /** Accent: primary buttons, Pop and Match, active progress, the toggle on, the unread dot. */
-  accent: '#D0828A',
-  onAccent: '#2B2527',
-  /** Accent as text, sparingly: Save, "Write your own". Links and text buttons use the text tones. */
-  accentText: '#D0828A',
-  /** Accent soft: error cards, the selected question row. */
-  accentWash: '#43343A',
-  /** Accent pressed: balloon strings, the caret in answers. */
-  gold: '#B86C74',
-  /** Inactive: progress segments, the toggle track when off. */
-  track: '#4B4145',
-  /** Cards that read like paper: the recap card and print mats. */
-  paper: '#F3EDE7',
-  onPaper: '#2B2527',
-  /** Coral, for destructive actions and errors only, always with an icon. */
-  danger: '#FF9A8C',
-  /** Checks for "answered", online status. Never a dot on its own. */
-  success: '#7FC9A0',
-  successFill: '#7FC9A0',
-  /** The dim behind sheets. */
-  scrim: 'rgba(20, 16, 18, 0.6)',
-  /** Sheets, the tab bar. */
-  sheet: '#352E31',
-  /** Peach: secondary buttons. */
-  secondary: '#40373A',
-  onSecondary: '#F3EDE7',
+/** The palette's raw colors. Screens read the semantic keys below. */
+const Ink = {
+  background: '#FFFDFE',
+  surface1: '#F3F0F1',
+  surface2: '#EBE8E9',
+  surface3: '#E5E2E3',
+  textPrimary: '#191919',
+  textSecondary: '#5F5F5F',
+  textTertiary: '#818181',
+  /** The brand plum. */
+  brand: '#5D2355',
+  /** The brand balloon's knot and string. */
+  brandDeep: '#2C0B28',
+  brandTint: 'rgba(93, 35, 85, 0.1)',
+  /** The text color at 6%: selected fills and icon circles. */
+  inkTint: 'rgba(25, 25, 25, 0.06)',
+  onAccent: '#FFFDFE',
+  hairline: 'rgba(25, 25, 25, 0.1)',
+  /** The outline of a secondary button. */
+  outline: 'rgba(25, 25, 25, 0.18)',
+  success: '#0D6765',
+  destructive: '#B02A3A',
 } as const;
 
-const cream: Palette = {
-  page: '#F6F1EA',
-  surface: '#EFE7DC',
-  surfacePressed: '#E6DCCE',
-  field: '#FFFDF9',
-  text: '#2A2222',
-  textSecondary: '#6E625E',
-  textTertiary: '#6E625E',
-  textFaint: '#6E625E',
-  border: 'rgba(42, 34, 34, 0.1)',
-  outline: 'rgba(42, 34, 34, 0.1)',
-  borderStrong: 'rgba(42, 34, 34, 0.18)',
-  control: '#6E625E',
-  inverse: '#2A2222',
-  onInverse: '#FFFDF9',
+const light = {
+  /** Canvas: the screen background, flat. */
+  page: Ink.background,
+  /** Surface 2: chips, the timer pill, slots, inactive buttons. */
+  surface: Ink.surface2,
+  /** Pressed surface 2 (pressed rows on surface 1 use it too), so a press always shows. */
+  surfacePressed: Ink.surface3,
+  /** Surface 1: cards, list cells, inputs, option rows, their chat bubbles. */
+  field: Ink.surface1,
+  text: Ink.textPrimary,
+  textSecondary: Ink.textSecondary,
+  /** Hints, timestamps, placeholders. */
+  textTertiary: Ink.textTertiary,
+  /** Placeholders and decoration. Same as tertiary. */
+  textFaint: Ink.textTertiary,
+  /** Hairline: card borders, list separators. */
+  border: Ink.hairline,
+  /** The edge of cards and option rows. */
+  outline: Ink.hairline,
+  /** Input borders, dividers on surfaces, a ghost seat. */
+  borderStrong: Ink.surface3,
+  /** The empty ring of a radio or checkbox. */
+  control: Ink.textTertiary,
+  /** Selected chips, radios and checkboxes, the You tag. */
+  inverse: Ink.textPrimary,
+  onInverse: Ink.onAccent,
+  /** A light edge for fills that want one. */
   highlight: 'rgba(255, 255, 255, 0.25)',
-  accent: '#7A2E3A',
-  onAccent: '#FFFDF9',
-  accentText: '#7A2E3A',
-  accentWash: '#F3E4E1',
-  gold: '#5E2230',
-  track: '#E6DCCE',
-  paper: '#FFFDF9',
-  onPaper: '#2A2222',
-  danger: '#B23A2E',
-  success: '#1F7A4C',
-  successFill: '#1F7A4C',
-  scrim: 'rgba(42, 34, 34, 0.35)',
-  sheet: '#FFFDF9',
-  secondary: '#EADFD2',
-  onSecondary: '#2A2222',
-};
+  /** Accent: primary buttons, active progress, the toggle on. Black, like the text. */
+  accent: Ink.textPrimary,
+  onAccent: Ink.onAccent,
+  /** Links and text buttons. */
+  accentText: Ink.textPrimary,
+  /** Selected fills, icon circles. */
+  accentWash: Ink.inkTint,
+  /** The brand plum: the brand balloon, the wordmark dot, the paywall, Pop, tiny badges. Nowhere else. */
+  brand: Ink.brand,
+  onBrand: Ink.onAccent,
+  /** The brand balloon's knot and string. */
+  brandDeep: Ink.brandDeep,
+  /** The brand plum at 10%, behind the paywall's selected plan. */
+  brandWash: Ink.brandTint,
+  /** Balloon strings, the caret in answers. */
+  gold: Ink.textPrimary,
+  /** Inactive: progress segments, the toggle track when off. */
+  track: Ink.surface2,
+  /** Cards that read like paper: the recap card and print mats. */
+  paper: Ink.surface1,
+  onPaper: Ink.textPrimary,
+  /** Destructive actions and errors only, always with an icon. */
+  danger: Ink.destructive,
+  /** Checks for "answered", verified, online status. Never a dot on its own. */
+  success: Ink.success,
+  successFill: Ink.success,
+  /** The dim behind sheets: the text color at 35%. */
+  scrim: 'rgba(25, 25, 25, 0.35)',
+  /** Sheets, the tab bar. */
+  sheet: Ink.surface1,
+  /** Secondary buttons: the page with an outline. */
+  secondary: Ink.background,
+  onSecondary: Ink.textPrimary,
+  secondaryEdge: Ink.outline,
+} as const;
 
-export type Palette = { [K in keyof typeof velvet]: string };
+export type Palette = { [K in keyof typeof light]: string };
 
-/** `dark` is warm charcoal with rose-wine, `light` is sand with deep wine. */
-export const Colors: { light: Palette; dark: Palette } = { light: cream, dark: velvet };
+/** The one palette: light. */
+export const Colors: Palette = light;
 
 export type ThemeColor = keyof Palette;
 
-/** Both canvases are flat: the glow and the lamp draw in the canvas color, so they don't show. */
-export const CanvasGlow = {
-  stops: ['#2B2527', '#2B2527', '#2B2527'],
-  offsets: [0, 0.45, 1],
-  /** The ellipse: 100% x 45% of the screen, centered at 50% x 62%. */
-  rx: 1,
-  ry: 0.45,
-  cy: 0.62,
-} as const;
-
-export const Lamp = {
-  color: '#2B2527',
-  opacity: 0,
-  /** 60% x 40% of the screen, centered at 50% x 62%, fading out by 70%. */
-  rx: 0.6,
-  ry: 0.4,
-  cy: 0.62,
-  fadeAt: 0.7,
-} as const;
-
-/** The dark theme's soft glow behind the hero balloon on the welcome screen. */
-export const HeroGlow = { color: '#40373A', opacity: 0.9 } as const;
-
-/** The soft glow under the primary and accent buttons. */
-export const ButtonShadow = {
-  light: '0 10px 24px -10px rgba(122, 46, 58, 0.45)',
-  dark: '0 10px 24px -10px rgba(208, 130, 138, 0.35)',
-} as const;
-
 /**
- * Raw colors for the few places that are the same in both themes: text and
- * glass over photos. Screens use the palette above.
+ * Raw colors for text and glass over photos, the same on every screen.
+ * Screens use the palette above.
  */
 export const Velvet = {
-  deep: '#2B2527',
-  base: '#352E31',
-  lift: '#40373A',
-  plush: '#4B4145',
-  cream: '#F3EDE7',
-  gold: '#B86C74',
-  goldOnPaper: '#5E2230',
-  paper: '#F3EDE7',
-  faint: '#C9BDB8',
+  deep: Ink.textPrimary,
+  cream: Ink.onAccent,
+  /** Secondary text over dark glass: the light text at 72%. */
+  faint: 'rgba(255, 253, 254, 0.72)',
 } as const;
 
 /** Dark glass over photos: the "Photo n" tag, the info panel, the page dots. */
 export const PhotoGlass = {
-  tag: 'rgba(30, 24, 26, 0.55)',
-  info: 'rgba(30, 24, 26, 0.85)',
-  scrim: 'rgba(30, 24, 26, 0.8)',
-  dot: 'rgba(243, 237, 231, 0.4)',
+  tag: 'rgba(25, 25, 25, 0.55)',
+  info: 'rgba(25, 25, 25, 0.85)',
+  scrim: 'rgba(25, 25, 25, 0.8)',
+  dot: 'rgba(255, 253, 254, 0.4)',
 } as const;
 
 /**
@@ -188,23 +153,17 @@ const balloons = [
 ] as const;
 
 /** Photo tint tiles, in the same order as the balloons. */
-const tints = {
-  dark: ['#5A4320', '#5A2F3F', '#4A2F45', '#2F4458', '#30452E'],
-  light: ['#EFE3D0', '#E8D6DF', '#E8DEE6', '#DDE4EA', '#DFE6DB'],
-} as const;
+const tints = ['#EFE3D0', '#E8D6DF', '#E8DEE6', '#DDE4EA', '#DFE6DB'] as const;
 
-export const SeatColors: { light: readonly Seat[]; dark: readonly Seat[] } = {
-  dark: balloons.map((b, i) => ({ ...b, tint: tints.dark[i], onInk: b.shadow })),
-  light: balloons.map((b, i) => ({ ...b, tint: tints.light[i], onInk: b.hi })),
-};
+export const SeatColors: readonly Seat[] = balloons.map((b, i) => ({ ...b, tint: tints[i], onInk: b.hi }));
 
-/** The brand balloon (wordmark, hero, pop) is crimson in both themes. */
-export const BrandBalloon = SeatColors.dark[4];
+/** The brand balloon (wordmark, hero, pop) is crimson. */
+export const BrandBalloon = SeatColors[4];
 
 /** The gradient stops for a balloon color, when it is one of the five. */
 export function lacquerFor(color: string): Seat | undefined {
   const key = color.toLowerCase();
-  return SeatColors.dark.find((seat) => seat.color.toLowerCase() === key);
+  return SeatColors.find((seat) => seat.color.toLowerCase() === key);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { createContext, use, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -6,7 +6,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  useWindowDimensions,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -16,118 +15,10 @@ import {
   type ViewInstance,
   type ViewStyle,
 } from 'react-native';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { useTabActive } from '@/components/tab-bar';
-import { CanvasGlow, Gutter, Lamp, MaxContentWidth, Space } from '@/constants/theme';
-import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { useScheme, useTheme } from '@/hooks/use-theme';
-
-/**
- * Behind every full screen. Velvet draws the canvas glow (the only background
- * gradient in the app) and the lamp over it, which breathes. Cream is a flat
- * canvas: no gradient, no lamp. Decorative, behind everything.
- */
-export function Grain() {
-  const scheme = useScheme();
-  const { width, height } = useWindowDimensions();
-  const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  // The web reports a zero-size window at first; the gradients' stops would be NaN.
-  if (scheme !== 'dark' || !width || !height) return null;
-  return (
-    <View
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants">
-      <Svg width={width} height={height}>
-        <Defs>
-          <RadialGradient
-            id={`canvas${id}`}
-            cx="50%"
-            cy={`${CanvasGlow.cy * 100}%`}
-            rx={`${CanvasGlow.rx * 100}%`}
-            ry={`${CanvasGlow.ry * 100}%`}>
-            {CanvasGlow.stops.map((color, i) => (
-              <Stop key={i} offset={CanvasGlow.offsets[i]} stopColor={color} />
-            ))}
-          </RadialGradient>
-        </Defs>
-        <Rect width={width} height={height} fill={`url(#canvas${id})`} />
-      </Svg>
-      <BreathingLamp width={width} height={height} gradient={`lamp${id}`} />
-    </View>
-  );
-}
-
-/** One breath in or out. */
-const BREATH_MS = 3500;
-
-/**
- * The lamp: a warm ellipse over the canvas that breathes, opacity .55 to 1 and
- * scale 1 to 1.06 over 7 s, forever. Holds still under Reduce Motion, and pauses
- * on a tab page that's off screen.
- */
-function BreathingLamp({ width, height, gradient }: { width: number; height: number; gradient: string }) {
-  const reduced = useReduceMotion();
-  const showing = useTabActive();
-  const breath = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) {
-      cancelAnimation(breath);
-      breath.set(1);
-      return;
-    }
-    if (!showing) {
-      cancelAnimation(breath);
-      return;
-    }
-    // Breathes in from wherever it paused, so a page you swipe back to doesn't jump.
-    const easing = Easing.inOut(Easing.ease);
-    const from = breath.get();
-    breath.set(
-      withSequence(
-        withTiming(1, { duration: BREATH_MS * (1 - from), easing }),
-        withRepeat(withTiming(0, { duration: BREATH_MS, easing }), -1, true),
-      ),
-    );
-  }, [reduced, showing, breath]);
-  const style = useAnimatedStyle(() => ({
-    opacity: 0.55 + 0.45 * breath.get(),
-    transform: [{ scale: 1 + 0.06 * breath.get() }],
-  }));
-  // The overlay reaches 20% past every edge, as in the mockups, so scaling never shows its rim.
-  const w = width * 1.4;
-  const h = height * 1.4;
-  return (
-    <Animated.View style={[styles.lamp, { left: -width * 0.2, top: -height * 0.2, width: w, height: h }, style]}>
-      <Svg width={w} height={h}>
-        <Defs>
-          <RadialGradient
-            id={gradient}
-            cx="50%"
-            cy={`${((Lamp.cy * height + height * 0.2) / h) * 100}%`}
-            rx={`${((Lamp.rx * width) / w) * 100}%`}
-            ry={`${((Lamp.ry * height) / h) * 100}%`}>
-            <Stop offset="0" stopColor={Lamp.color} stopOpacity={Lamp.opacity} />
-            <Stop offset={Lamp.fadeAt} stopColor={Lamp.color} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width={w} height={h} fill={`url(#${gradient})`} />
-      </Svg>
-    </Animated.View>
-  );
-}
+import { Gutter, MaxContentWidth, Space } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 /** Room left between a revealed field and the edge of what you can see. */
 const REVEAL_MARGIN = Space.md;
@@ -268,7 +159,6 @@ export function Screen({
 
   return (
     <View style={[styles.root, { backgroundColor: theme.page }]}>
-      <Grain />
       {background}
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <KeyboardAvoidingView
@@ -352,9 +242,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     alignItems: 'center',
-  },
-  lamp: {
-    position: 'absolute',
   },
   safeArea: {
     flex: 1,

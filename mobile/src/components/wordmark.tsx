@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { Colors, MinTouch } from '@/constants/theme';
+import { MinTouch } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** "Popdate" as Gloock glyph outlines with a little tracking, never retyped in the font. */
@@ -23,16 +23,13 @@ const VIEW_BOX = { x: -20, y: -800, width: 3958, height: 1022 };
 type WordmarkProps = {
   /** The font size in points: 20 in headers, 16 on the recap card. */
   size?: number;
-  /** Draw in one theme whatever the app's theme is, like the recap card, which is always Cream. */
-  tone?: 'velvet' | 'cream';
   /** Just the mark's own height, for a card. Headers keep a full touch row. */
   compact?: boolean;
 };
 
 /** "Popdate" in Gloock with a rose dot. Small on purpose: the content leads. */
-export function Wordmark({ size = 20, tone, compact = false }: WordmarkProps) {
-  const current = useTheme();
-  const theme = tone ? Colors[tone === 'cream' ? 'light' : 'dark'] : current;
+export function Wordmark({ size = 20, compact = false }: WordmarkProps) {
+  const theme = useTheme();
   const height = (size * VIEW_BOX.height) / 1000;
   const width = (height * VIEW_BOX.width) / VIEW_BOX.height;
   return (
@@ -45,7 +42,7 @@ export function Wordmark({ size = 20, tone, compact = false }: WordmarkProps) {
         {GLYPHS.map((d, i) => (
           <Path key={i} d={d} fill={theme.text} />
         ))}
-        <Circle cx={DOT.cx} cy={DOT.cy} r={DOT.r} fill={theme.accent} />
+        <Circle cx={DOT.cx} cy={DOT.cy} r={DOT.r} fill={theme.brand} />
       </Svg>
     </View>
   );

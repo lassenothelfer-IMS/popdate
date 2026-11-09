@@ -24,11 +24,11 @@ import { Rise } from '@/components/rise';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
 import { VerifiedCheck } from '@/components/verified-check';
-import { Gutter, MinTouch, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
+import { Gutter, MinTouch, PhotoAspect, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { useScheme, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
+import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
-import { identityLine } from '@/features/profile/identity';
+import { asSexuality, identityLabel, identityOf, sexualityLabel } from '@/features/profile/identity';
 import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
@@ -42,11 +42,18 @@ const HERO = 460;
 /** The narrowest a stat tile gets in the single row; below it the tiles go two by two. */
 const STAT_MIN_WIDTH = 80;
 
+/** The space under the name block, to the photo's foot. */
+const HERO_FOOT = 24;
+
+/** How far above the name the photo scrim fades in. */
+const SCRIM_FADE = 120;
+
 /**
- * Your profile as others meet it: photo 1 big at the top with your name over
- * it, your bio, the answers you pinned, and your verification. Edit opens the
- * editor. As the You tab it also shows your numbers, and a gear for Settings
- * takes the place of Back.
+ * Your profile as others meet it: photo 1 big at the top with your name and
+ * city over it, your bio, everything else you filled in, the answers you
+ * pinned, your other photos, and your verification. Edit opens the editor. As
+ * the You tab it also shows your numbers, and a gear for Settings takes the
+ * place of Back.
  */
 export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const { profile, updateProfile } = useSession();
@@ -54,6 +61,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const { show, toast } = useToast();
   const [unpinning, setUnpinning] = useState(false);
   const theme = useTheme();
+  const you = youSeat(useSeats());
   const t = useT();
   const insets = useSafeAreaInsets();
   const [verification, setVerification] = useState<VerificationStatus | null>(null);
@@ -65,6 +73,8 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   // text), they go two by two.
   const { width, fontScale } = useWindowDimensions();
   const statGrid = (width - 2 * Gutter - 3 * Space.xs) / 4 / fontScale < STAT_MIN_WIDTH;
+  /** Photos 2 and on go two by two. */
+  const photoTile = (width - 2 * Gutter - Space.xs) / 2;
 
   const loadVerification = useCallback(
     (isCurrent: () => boolean = () => true) =>
@@ -117,13 +127,22 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
 
   const verified = verification === 'verified';
   const name = t('common.nameAge', { name: profile.name, age: ageFromBirthDate(profile.birthDate) });
-  const meta = [
-    profile.city,
-    profile.heightCm ? formatHeight(profile.heightCm, settings.units) : null,
-    profile.job,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const sexuality = asSexuality(profile.sexuality);
+  /** What you filled in about yourself, under the photo: only what's there. Gender is always set. */
+  const about = [
+    { label: t('profile.jobOrSchool'), value: profile.job.trim() },
+    {
+      label: t('profile.height'),
+      value: profile.heightCm ? formatHeight(profile.heightCm, settings.units) : '',
+    },
+    {
+      label: t('profile.gender'),
+      value: [identityLabel(t, identityOf(profile)), profile.genderDetails?.trim()]
+        .filter(Boolean)
+        .join(' · '),
+    },
+    { label: t('profile.sexuality'), value: sexuality ? sexualityLabel(t, sexuality) : '' },
+  ].filter((row) => row.value);
 
   function back() {
     if (router.canGoBack()) router.back();
@@ -150,7 +169,6 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             a large text size grows the hero instead of climbing over the photo dots. */}
         <View style={[styles.hero, { paddingTop: insets.top + Space.xs + MinTouch + Space.lg }]}>
           <HeroPhoto uri={profile.photos[0] ?? 'mock://'} name={profile.name} />
-          <HeroScrim />
           <View style={[styles.heroTop, { top: insets.top + Space.xs }]}>
             {asTab ? (
               <GlassButton
@@ -165,6 +183,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             <GlassButton label={t('home.profileEdit')} onPress={() => router.push('/profile')} />
           </View>
           <View style={styles.heroText}>
+            <HeroScrim />
             <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               {profile.photos.map((uri, index) => (
                 <View key={`${uri}-${index}`} style={[styles.dot, index === 0 ? styles.dotActive : styles.dotRest]} />
@@ -175,17 +194,16 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               accessible
               accessibilityRole="header"
               accessibilityLabel={verified ? `${name}, ${t('home.verifiedLabel')}` : name}>
-              <ThemedText type="title" maxFontSizeMultiplier={1.3}>
+              <ThemedText type="title" maxFontSizeMultiplier={1.3} style={styles.onPhoto}>
                 {name}
               </ThemedText>
               {verified ? <VerifiedCheck /> : null}
             </View>
-            <ThemedText type="callout" themeColor="textSecondary">
-              {meta}
-            </ThemedText>
-            <ThemedText type="callout" themeColor="textSecondary">
-              {identityLine(t, profile)}
-            </ThemedText>
+            {profile.city ? (
+              <ThemedText type="callout" style={styles.onPhotoFaint}>
+                {profile.city}
+              </ThemedText>
+            ) : null}
           </View>
         </View>
 
@@ -197,6 +215,26 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               </ThemedText>
             </Rise>
           ) : null}
+
+          <Rise index={1} style={styles.pins}>
+            <ThemedText type="kicker" accessibilityRole="header">
+              {t('profile.aboutYou')}
+            </ThemedText>
+            <View style={[styles.about, { backgroundColor: theme.field, borderColor: theme.border }]}>
+              {about.map((row, index) => (
+                <View
+                  key={row.label}
+                  accessible
+                  accessibilityLabel={`${row.label}, ${row.value}`}
+                  style={[styles.aboutRow, index > 0 && [styles.aboutRule, { borderTopColor: theme.border }]]}>
+                  <ThemedText type="footnote" themeColor="textSecondary">
+                    {row.label}
+                  </ThemedText>
+                  <ThemedText type="body">{row.value}</ThemedText>
+                </View>
+              ))}
+            </View>
+          </Rise>
 
           {asTab && stats ? (
             <Rise index={1} style={[styles.stats, statGrid && styles.statsGrid]}>
@@ -249,6 +287,26 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               <ThemedText type="footnote" themeColor="textSecondary">
                 {t('you.pinnedEmpty')}
               </ThemedText>
+            </Rise>
+          ) : null}
+
+          {profile.photos.length > 1 ? (
+            <Rise index={1} style={styles.pins}>
+              <ThemedText type="kicker" accessibilityRole="header">
+                {t('profile.photos')}
+              </ThemedText>
+              <View style={styles.photoGrid}>
+                {profile.photos.slice(1).map((uri, index) => (
+                  <Photo
+                    key={`${uri}-${index}`}
+                    uri={uri}
+                    name={profile.name}
+                    tone={you}
+                    accessibilityLabel={t('profile.photoMenuTitle', { position: index + 2 })}
+                    style={[styles.photoTile, { width: photoTile }]}
+                  />
+                ))}
+              </View>
             </Rise>
           ) : null}
 
@@ -369,22 +427,28 @@ function HeroPhoto({ uri, name }: { uri: string; name: string }) {
   );
 }
 
-/** The photo scrim: the canvas rising from the bottom so the name reads. */
+/**
+ * The photo scrim: the deep ink behind the name, the photo dots and the city, at
+ * .75 to the photo's foot, fading out over 120 pt above them. It sits behind the
+ * text, so it covers it at any text size, and the cream name reads on any
+ * photo, light or dark. The photo then ends in a clean edge on the page.
+ */
 function HeroScrim() {
-  const theme = useTheme();
-  const ink = useScheme() === 'dark' ? theme.page : theme.text;
-  // Fills the hero at whatever height it grew to.
   return (
-    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Defs>
-        <LinearGradient id="heroScrim" x1="0" y1="1" x2="0" y2="0">
-          <Stop offset="0" stopColor={theme.page} stopOpacity={1} />
-          <Stop offset="0.3" stopColor={ink} stopOpacity={0.6} />
-          <Stop offset="0.6" stopColor={ink} stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#heroScrim)" />
-    </Svg>
+    <View style={styles.scrim} pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Defs>
+          {/* In points from the top: clear at 0, full at SCRIM_FADE, and full on down from there. */}
+          <LinearGradient id="heroScrim" x1="0" y1="0" x2="0" y2={SCRIM_FADE} gradientUnits="userSpaceOnUse">
+            <Stop offset="0" stopColor={Velvet.deep} stopOpacity={0} />
+            <Stop offset="0.3" stopColor={Velvet.deep} stopOpacity={0.12} />
+            <Stop offset="0.65" stopColor={Velvet.deep} stopOpacity={0.5} />
+            <Stop offset="1" stopColor={Velvet.deep} stopOpacity={0.75} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#heroScrim)" />
+      </Svg>
+    </View>
   );
 }
 
@@ -477,9 +541,10 @@ const styles = StyleSheet.create({
     minHeight: HERO,
     justifyContent: 'flex-end',
     paddingHorizontal: Gutter,
-    paddingBottom: 24,
+    paddingBottom: HERO_FOOT,
     overflow: 'hidden',
   },
+  // Above the scrim, which can reach up to the buttons at large text sizes.
   heroTop: {
     position: 'absolute',
     left: Gutter,
@@ -487,6 +552,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 1,
+  },
+  // From SCRIM_FADE above the name block to the photo's foot and edges (the hero's padding).
+  scrim: {
+    position: 'absolute',
+    top: -SCRIM_FADE,
+    bottom: -HERO_FOOT,
+    left: -Gutter,
+    right: -Gutter,
+  },
+  onPhoto: {
+    color: Velvet.cream,
+  },
+  onPhotoFaint: {
+    color: Velvet.faint,
   },
   dots: {
     flexDirection: 'row',
@@ -522,6 +602,27 @@ const styles = StyleSheet.create({
   bio: {
     fontSize: 19,
     lineHeight: 25,
+  },
+  about: {
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  aboutRow: {
+    gap: 2,
+    paddingVertical: Space.sm,
+  },
+  aboutRule: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Space.xs,
+  },
+  photoTile: {
+    aspectRatio: PhotoAspect,
+    borderRadius: Radius.lg,
   },
   verify: {
     flexDirection: 'row',

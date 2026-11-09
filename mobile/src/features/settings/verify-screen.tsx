@@ -20,7 +20,7 @@ import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { VerifiedCheck } from '@/components/verified-check';
-import { MinTouch, Radius, Space } from '@/constants/theme';
+import { Radius, Space } from '@/constants/theme';
 import { goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -195,18 +195,20 @@ export function VerifyScreen() {
 
   return (
     <Screen scroll={mode === 'info'} footer={footer} footerStyle="plain">
-      <Rise index={0} style={styles.bar}>
-        <Button title={t('common.cancel')} variant="plain" fullWidth={false} onPress={close} />
-        <ThemedText type="headline" accessibilityRole="header">
+      {/* Cancel on its own row, so the title centers on the full width, not beside Cancel. */}
+      <Rise index={0}>
+        <View style={styles.bar}>
+          <Button title={t('common.cancel')} variant="plain" fullWidth={false} onPress={close} />
+        </View>
+        <ThemedText type="display" accessibilityRole="header" style={styles.checkTitle}>
           {t('settings.verifyCheckTitle')}
         </ThemedText>
-        <View style={styles.barButton} />
       </Rise>
 
       {mode === 'info' ? (
         <>
           <Rise index={1}>
-            <ThemedText type="display" style={styles.title}>
+            <ThemedText type="heading" style={styles.title}>
               {t('settings.verifyTitle')}
             </ThemedText>
             <ThemedText type="callout" themeColor="textSecondary" style={styles.intro}>
@@ -354,7 +356,7 @@ function Oval({ children, scanning }: { children: ReactNode; scanning: boolean }
     pass.set(withRepeat(withTiming(1, { duration: SCAN_MS, easing: Easing.inOut(Easing.ease) }), -1, true));
   }, [animate, pass]);
   const from = theme.text;
-  const to = theme.gold;
+  const to = theme.textTertiary;
   const ring = useAnimatedStyle(() => ({
     borderColor: interpolateColor(pass.get(), [0, 1], [from, to]),
   }));
@@ -389,12 +391,10 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  barButton: {
-    minHeight: MinTouch,
-    minWidth: MinTouch,
-    justifyContent: 'center',
+  checkTitle: {
+    marginTop: Space.xs,
+    textAlign: 'center',
   },
   title: {
     marginTop: Space.lg,

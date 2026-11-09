@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Balloon } from '@/components/balloon';
-import { MinTouch } from '@/constants/theme';
+import { Colors, MinTouch } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
@@ -19,10 +19,10 @@ const HOLD_MS = 1000;
 /** Letting go early drains the fill. */
 const DRAIN_MS = 300;
 const HEIGHT = 52;
-/** The Pop action's own coral, as on the coral Button. */
-const CORAL = '#F0695C';
-const CORAL_FINISH = 'inset 0 1px 0 rgba(255,255,255,0.3), 0 10px 28px -10px rgba(240,105,92,0.55)';
-/** The hold fills the capsule from the left in a lighter coral. */
+/** The Pop action's color, as on the coral Button: the accent. */
+const CORAL = Colors.brand;
+const CORAL_FINISH = 'inset 0 1px 0 rgba(255,255,255,0.3), 0 10px 28px -10px rgba(93,35,85,0.55)';
+/** The hold fills the capsule from the left in a lighter accent. */
 const FILL = 'rgba(255,255,255,0.28)';
 
 type HoldToPopButtonProps = {
@@ -147,13 +147,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  // The Button's label: SF Pro 17 semibold, white on coral.
+  // The Button's label: SF Pro 17 semibold, on-accent on the accent.
   label: {
     fontSize: 17,
     lineHeight: 22,
     fontWeight: 600,
     letterSpacing: -0.2,
     textAlign: 'center',
-    color: '#FFFFFF',
+    color: Colors.onAccent,
   },
 });

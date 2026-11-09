@@ -1,8 +1,8 @@
 import { Redirect, router, type Href } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  Alert,
   BackHandler,
   Platform,
   ScrollView,
@@ -17,6 +17,7 @@ import {
   type ViewInstance,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import type { Interest } from '@/api';
 import { Button } from '@/components/button';
@@ -30,7 +31,7 @@ import { VideoBackground } from '@/components/video-background';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { Colors, Fonts, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { Fonts, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { artScale, INTRO } from '@/features/how-to-play/step-art';
 import { BackButton } from '@/features/onboarding/back-button';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
@@ -42,7 +43,7 @@ import {
 } from '@/features/profile/gender-section';
 import { testProfileDetails } from '@/features/profile/test-profile';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { ForcedScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
@@ -179,8 +180,23 @@ export function OnboardingScreen() {
     } else if (step === 'meet') {
       goTo('rules');
     } else {
-      finish();
+      confirmAge();
     }
+  }
+
+  /** One last native check that you're 18 or older; the profile only follows on yes. */
+  function confirmAge() {
+    const title = t('onboarding.ageConfirmTitle');
+    const message = t('onboarding.ageConfirmBody');
+    // Alert does nothing on the web, so the web asks with the browser's own confirm.
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n\n${message}`)) finish();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('onboarding.ageConfirmYes'), onPress: finish },
+    ]);
   }
 
   function finish() {
@@ -245,17 +261,26 @@ export function OnboardingScreen() {
   if (failed) return <Redirect href="/" />;
 
   if (step === 'welcome') {
-    // Always the dark treatment: light text over the video, whatever the Appearance setting.
     return (
-      <ForcedScheme value="dark">
-      <StatusBar style="light" />
       <Screen
         key="welcome"
-        // Scrolls at large text sizes, so the copy never runs under the buttons.
-        scroll
         footerStyle="plain"
-        contentStyle={styles.welcomeContent}
-        background={<VideoBackground video={WELCOME_VIDEO} poster={WELCOME_POSTER} tint={Colors.dark.page} />}
+        contentStyle={styles.bare}
+        background={
+          <>
+            <VideoBackground video={WELCOME_VIDEO} poster={WELCOME_POSTER} tint={theme.page} />
+            {/* The canvas color over the lower video, so the dark copy reads on it without a glow. */}
+            <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
+              <Defs>
+                <LinearGradient id="welcomeWash" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0.3" stopColor={theme.page} stopOpacity={0} />
+                  <Stop offset="0.5" stopColor={theme.page} stopOpacity={0.6} />
+                </LinearGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill="url(#welcomeWash)" />
+            </Svg>
+          </>
+        }
         footer={
           <Rise index={3} style={styles.welcomeActions}>
             <Button
@@ -270,32 +295,34 @@ export function OnboardingScreen() {
             ) : null}
           </Rise>
         }>
-        <Rise index={0}>
-          {/* On the web a shadow draws around the box, not the glyphs, so only iOS gets one. */}
-          <View style={Platform.OS === 'ios' ? styles.logoShadow : styles.logo}>
+        {/* Fits the screen and never bounces. Only large text sizes make it scroll, so the copy never runs under the buttons. */}
+        <ScrollView
+          bounces={false}
+          overScrollMode="never"
+          style={styles.flex}
+          contentContainerStyle={styles.welcomeContent}>
+          <Rise index={0}>
             <Wordmark />
+          </Rise>
+          <View style={styles.welcomeStage}>
+            <Rise index={1} style={styles.welcomeHero}>
+              <View
+                ref={headingRef}
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={t('onboarding.heroLabel')}>
+                <ThemedText type="hero" maxFontSizeMultiplier={1.4} style={styles.heroLine}>
+                  {t('onboarding.hero')}
+                </ThemedText>
+              </View>
+            </Rise>
+            <Rise index={2}>
+              {/* The text color, not secondary: it has to read over the video. */}
+              <ThemedText style={styles.welcomeBody}>{t('onboarding.welcomeBody')}</ThemedText>
+            </Rise>
           </View>
-        </Rise>
-        <View style={styles.welcomeStage}>
-          <Rise index={1} style={styles.welcomeHero}>
-            <View
-              ref={headingRef}
-              accessible
-              accessibilityRole="header"
-              accessibilityLabel={t('onboarding.heroLabel')}>
-              <ThemedText type="hero" maxFontSizeMultiplier={1.4} style={[styles.heroLine, styles.onVideo]}>
-                {t('onboarding.hero')}
-              </ThemedText>
-            </View>
-          </Rise>
-          <Rise index={2}>
-            <ThemedText themeColor="textSecondary" style={[styles.welcomeBody, styles.onVideo]}>
-              {t('onboarding.welcomeBody')}
-            </ThemedText>
-          </Rise>
-        </View>
+        </ScrollView>
       </Screen>
-      </ForcedScheme>
     );
   }
 
@@ -443,11 +470,6 @@ export function OnboardingScreen() {
                 {t('onboarding.termsAfter')}
               </ThemedText>
             </PressableHighlight>
-            {__DEV__ ? (
-              <ThemedText type="footnote" themeColor="textTertiary">
-                {t('onboarding.testAccount')}
-              </ThemedText>
-            ) : null}
           </View>
         ) : null}
       </Rise>
@@ -487,10 +509,6 @@ export function OnboardingScreen() {
 /** The welcome's looping background and its first frame (see VideoBackground). */
 const WELCOME_VIDEO = require('../../../assets/video/popdate_welcome_loop.mp4');
 const WELCOME_POSTER = require('../../../assets/images/popdate_welcome_poster.jpg');
-
-/** AutoFill hints for the three birthday fields. */
-const CONTENT_TYPES = { day: 'birthdateDay', month: 'birthdateMonth', year: 'birthdateYear' } as const;
-const AUTOCOMPLETE = { day: 'birthdate-day', month: 'birthdate-month', year: 'birthdate-year' } as const;
 
 /** Three dots over the intro cards, the current one a 20 pt bar. */
 function PageDots({ count, active, label }: { count: number; active: number; label: string }) {
@@ -603,8 +621,9 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
                 if (nativeEvent.key === 'Backspace' && birth[part.key] === '') part.previous?.current?.focus();
               }}
               autoFocus={part.key === 'day' && birth.day === ''}
-              textContentType={CONTENT_TYPES[part.key]}
-              autoComplete={AUTOCOMPLETE[part.key]}
+              // No birthday AutoFill hints: iOS shows and hides its suggestion bar over the
+              // number pad as each field fills, and every change of the keyboard's height
+              // moved Continue and the page while you typed.
               keyboardType="number-pad"
               placeholder={part.placeholder}
               error={error !== null}
@@ -614,7 +633,8 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
           </View>
         ))}
       </View>
-      <View accessibilityLiveRegion="polite">
+      {/* Holds the age card's room from the start, so the page never grows or shrinks as the age or an error comes and goes. */}
+      <View accessibilityLiveRegion="polite" style={styles.birthResult}>
         {error ? (
           <Animated.View key="error" entering={errorEnter} style={styles.error}>
             <ErrorIcon />
@@ -638,7 +658,9 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
 const styles = StyleSheet.create({
   welcomeContent: {
     flexGrow: 1,
+    paddingHorizontal: Gutter,
     paddingTop: 10,
+    paddingBottom: Space.lg,
   },
   // The line and copy sit low; the balloon floats above them in the space left.
   welcomeStage: {
@@ -652,22 +674,6 @@ const styles = StyleSheet.create({
   },
   heroLine: {
     maxWidth: 260,
-  },
-  // A soft shadow lifts the logo and the copy off the video.
-  onVideo: {
-    textShadowColor: 'rgba(0, 0, 0, 0.45)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 12,
-  },
-  logo: {
-    alignSelf: 'flex-start',
-  },
-  logoShadow: {
-    alignSelf: 'flex-start',
-    shadowColor: '#000000',
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 1 },
   },
   welcomeBody: {
     lineHeight: 23,
@@ -733,6 +739,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Space.xs,
+  },
+  // The age card's height: 14 pt padding twice, the 30 pt number and its 1 pt border.
+  birthResult: {
+    minHeight: 60,
   },
   ageCard: {
     flexDirection: 'row',

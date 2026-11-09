@@ -16,21 +16,21 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { MinTouch, type Palette } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/utils/haptics';
 
 /**
- * `prominent`: the one main action of a screen.
- * `tinted`: a quieter filled alternative.
+ * `prominent`: the one main action of a screen, black.
+ * `tinted`: the second option, the page color with an outline.
  * `glass`: only for buttons floating over content (photos, the balloon stage, sheets).
  * `plain`: a text button, transparent at rest.
- * `coral`: the Pop action only. Never anywhere else.
+ * `coral`: the Pop action only, in the brand plum. Never anywhere else.
+ * `brand`: the paywall's buy button, in the brand plum. Never anywhere else.
  */
-export type ButtonVariant = 'prominent' | 'tinted' | 'glass' | 'plain' | 'coral';
+export type ButtonVariant = 'prominent' | 'tinted' | 'glass' | 'plain' | 'coral' | 'brand';
 
 type ButtonProps = {
   title: string;
@@ -60,57 +60,54 @@ type Look = {
   label: string;
   /** Inner rims, plus the cast shadow glass and coral keep at rest. */
   finish?: string;
-  /** The 0.5 pt edge of glass. */
+  /** The edge: 0.5 pt on glass, 1 pt on the outlined secondary button. */
   edge?: string;
+  edgeWidth?: number;
 };
 
 /**
- * Each variant's colors, from the theme so they follow the palette: the accent
- * for prominent, tinted and plain, the text color on glass. Rims and shadows
- * are from the iOS 26 button spec. Coral is the Pop action's own color.
+ * Each variant's colors, from the theme so they follow the palette: black for
+ * prominent and plain, an outline for tinted, the brand plum for Pop and the
+ * paywall, the text color on glass. Rims and shadows are from the iOS 26 button spec.
  */
-function looks(theme: Palette, scheme: 'light' | 'dark'): Record<ButtonVariant, Look> {
-  const dark = scheme === 'dark';
+function looks(theme: Palette): Record<ButtonVariant, Look> {
+  const brand: Look = {
+    fill: theme.brand,
+    pressed: mix(theme.brand, '#FFFFFF', 0.1),
+    label: theme.onBrand,
+    finish: 'inset 0 1px 0 rgba(255,255,255,0.16)',
+  };
   return {
     prominent: {
       fill: theme.accent,
-      pressed: mix(theme.accent, '#FFFFFF', dark ? 0.16 : 0.1),
+      pressed: mix(theme.accent, '#FFFFFF', 0.14),
       label: theme.onAccent,
-      finish: dark
-        ? 'inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.06)'
-        : 'inset 0 1px 0 rgba(255,255,255,0.16)',
+      finish: 'inset 0 1px 0 rgba(255,255,255,0.12)',
     },
     tinted: {
-      fill: withAlpha(theme.accent, dark ? 0.16 : 0.12),
-      pressed: withAlpha(theme.accent, dark ? 0.24 : 0.2),
-      label: theme.accentText,
+      fill: theme.secondary,
+      pressed: theme.field,
+      label: theme.onSecondary,
+      edge: theme.secondaryEdge,
+      edgeWidth: 1,
     },
-    glass: dark
-      ? {
-          fill: 'rgba(255,255,255,0.08)',
-          pressed: 'rgba(255,255,255,0.16)',
-          label: theme.text,
-          finish: 'inset 0 1px 0 rgba(255,255,255,0.28), 0 10px 30px -12px rgba(0,0,0,0.6)',
-          edge: 'rgba(255,255,255,0.14)',
-        }
-      : {
-          fill: 'rgba(255,255,255,0.42)',
-          pressed: 'rgba(255,255,255,0.56)',
-          label: theme.text,
-          finish: `inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(0,0,0,0.05), 0 8px 24px -12px ${withAlpha(theme.text, 0.28)}`,
-          edge: 'rgba(255,255,255,0.5)',
-        },
+    glass: {
+      fill: 'rgba(255,255,255,0.42)',
+      pressed: 'rgba(255,255,255,0.56)',
+      label: theme.text,
+      finish: `inset 0 1px 0 rgba(255,255,255,0.9), inset 0 -1px 0 rgba(0,0,0,0.05), 0 8px 24px -12px ${withAlpha(theme.text, 0.28)}`,
+      edge: 'rgba(255,255,255,0.5)',
+    },
     plain: {
       fill: withAlpha(theme.accentText, 0),
       pressed: withAlpha(theme.accentText, 0.08),
       label: theme.accentText,
     },
     coral: {
-      fill: '#F0695C',
-      pressed: '#F27C70',
-      label: '#FFFFFF',
-      finish: 'inset 0 1px 0 rgba(255,255,255,0.3), 0 10px 28px -10px rgba(240,105,92,0.55)',
+      ...brand,
+      finish: `inset 0 1px 0 rgba(255,255,255,0.3), 0 10px 28px -10px ${withAlpha(theme.brand, 0.55)}`,
     },
+    brand,
   };
 }
 
@@ -158,19 +155,17 @@ export function Button({
   accessibilityHint,
   style,
 }: ButtonProps) {
-  const scheme = useScheme();
   const theme = useTheme();
   const reduced = useReduceMotion();
   const pressed = useSharedValue(0);
   // Real glass only where the system draws it (iOS 26); elsewhere glass falls back to tinted.
   const nativeGlass = variant === 'glass' && Platform.OS === 'ios' && isLiquidGlassAvailable();
   const shown: ButtonVariant = variant === 'glass' && !nativeGlass ? 'tinted' : variant;
-  const look = looks(theme, scheme)[shown];
+  const look = looks(theme)[shown];
   const inactive = disabled && !loading;
-  const fill = inactive && shown === 'prominent' ? withAlpha(look.fill, 0.28) : look.fill;
-  const label = inactive
-    ? withAlpha(look.label, shown === 'prominent' ? 0.85 : 0.4)
-    : look.label;
+  const solid = shown === 'prominent' || shown === 'brand';
+  const fill = inactive && solid ? withAlpha(look.fill, 0.28) : look.fill;
+  const label = inactive ? withAlpha(look.label, solid ? 0.85 : 0.4) : look.label;
   const grow = variant === 'glass' ? 0.03 : 0.02;
   const height = HEIGHT[size];
 
@@ -184,7 +179,7 @@ export function Button({
 
   function pressIn() {
     pressed.set(withSpring(1, SPRING));
-    if (variant === 'prominent' || variant === 'coral') haptics.light();
+    if (variant === 'prominent' || variant === 'coral' || variant === 'brand') haptics.light();
   }
   function pressOut() {
     pressed.set(withSpring(0, SPRING));
@@ -224,19 +219,17 @@ export function Button({
           styles.capsule,
           { minHeight: height, paddingHorizontal: iconOnly ? 0 : size === 'large' ? 20 : 16 },
           !inactive && look.finish ? { boxShadow: look.finish } : null,
-          look.edge && !nativeGlass ? { borderWidth: 0.5, borderColor: look.edge } : null,
+          look.edge && !nativeGlass ? { borderWidth: look.edgeWidth ?? 0.5, borderColor: look.edge } : null,
           capsule,
         ]}>
         {nativeGlass ? (
           <GlassView
             isInteractive
             glassEffectStyle="regular"
-            colorScheme={scheme}
+            colorScheme="light"
             style={[StyleSheet.absoluteFill, styles.capsule]}
           />
         ) : null}
-        {/* Velvet glass: a top sheen, white 14% fading out by 45%. */}
-        {nativeGlass && scheme === 'dark' ? <Sheen /> : null}
         {loading ? (
           <ActivityIndicator size="small" color={label} />
         ) : (
@@ -252,20 +245,6 @@ export function Button({
         )}
       </Animated.View>
     </Pressable>
-  );
-}
-
-function Sheen() {
-  return (
-    <Svg style={[StyleSheet.absoluteFill, styles.capsule]} width="100%" height="100%" pointerEvents="none">
-      <Defs>
-        <LinearGradient id="buttonSheen" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.14} />
-          <Stop offset="0.45" stopColor="#FFFFFF" stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" rx={999} fill="url(#buttonSheen)" />
-    </Svg>
   );
 }
 

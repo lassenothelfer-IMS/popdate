@@ -28,6 +28,8 @@ export const rooms = {
     recap: 'See recap',
     recapInProgress: 'This room is still being played. Its recap shows up when it ends.',
     openChat: 'Chat with %{name}',
+    openHint: 'Shows the questions and your answers',
+    foldHint: 'Hides the questions and your answers',
   },
   de: {
     title: 'Deine Räume',
@@ -55,6 +57,8 @@ export const rooms = {
     recap: 'Rückblick ansehen',
     recapInProgress: 'In diesem Raum wird noch gespielt. Der Rückblick erscheint, wenn er vorbei ist.',
     openChat: 'Chat mit %{name}',
+    openHint: 'Zeigt die Fragen und deine Antworten',
+    foldHint: 'Blendet die Fragen und deine Antworten aus',
   },
   fr: {
     title: 'Tes salles',
@@ -82,6 +86,8 @@ export const rooms = {
     recap: 'Voir le récap',
     recapInProgress: 'Cette salle est encore en jeu. Son récap apparaîtra à la fin.',
     openChat: 'Écrire à %{name}',
+    openHint: 'Affiche les questions et tes réponses',
+    foldHint: 'Masque les questions et tes réponses',
   },
   it: {
     title: 'Le tue stanze',
@@ -109,6 +115,8 @@ export const rooms = {
     recap: 'Vedi il riepilogo',
     recapInProgress: 'In questa stanza si sta ancora giocando. Il riepilogo arriva quando finisce.',
     openChat: 'Scrivi a %{name}',
+    openHint: 'Mostra le domande e le tue risposte',
+    foldHint: 'Nasconde le domande e le tue risposte',
   },
 } satisfies Strings;
 

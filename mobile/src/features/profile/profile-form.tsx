@@ -639,7 +639,8 @@ function PhotoSlot({
             style={StyleSheet.absoluteFill}
           />
           {/* The order is the point of this grid, so every photo says which round sees it,
-              or that it's an extra. The lead on the text color; the rest on dark glass. */}
+              or that it's an extra; the lead also says it's your face. The lead on the text
+              color; the rest on dark glass. */}
           <View
             style={[
               styles.number,
@@ -653,7 +654,11 @@ function PhotoSlot({
               maxFontSizeMultiplier={1.2}
               numberOfLines={1}
               style={[styles.tagText, { color: lead ? theme.onInverse : Velvet.cream }]}>
-              {round ? t('profile.roundTag', { round }) : t('profile.extraTag')}
+              {lead
+                ? t('profile.faceTag')
+                : round
+                  ? t('profile.roundTag', { round })
+                  : t('profile.extraTag')}
             </ThemedText>
           </View>
         </PressableScale>
@@ -670,7 +675,7 @@ function PhotoSlot({
   }
 
   if (isNext && lead) {
-    // The first photo: the one place to tap, on accent soft with a coral edge.
+    // The first photo, your face for round 1: the one place to tap, on accent soft with a coral edge.
     return (
       <PressableHighlight
         accessibilityRole="button"
@@ -693,7 +698,7 @@ function PhotoSlot({
           numberOfLines={2}
           adjustsFontSizeToFit
           style={[styles.addLabel, styles.addTitle]}>
-          {t('profile.firstPhoto')}
+          {t('profile.facePhoto')}
         </ThemedText>
         <ThemedText type="caption" themeColor="accentText" style={[styles.addLabel, styles.addNote]}>
           {t('profile.roundSees', { round: 1 })}
@@ -828,7 +833,6 @@ export function DetailsSection({ form, style, bare = false }: DetailsSectionProp
         maxLength={BIO_MAX}
         multiline
         placeholder={t('profile.bioPlaceholder')}
-        hint={t('profile.bioShown')}
         counter={t('profile.charactersLeft', { count: bioLeft })}
       />
     </View>

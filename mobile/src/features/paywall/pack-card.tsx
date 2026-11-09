@@ -112,11 +112,11 @@ export function PackCard({
           style={[styles.card, { backgroundColor: theme.sheet, borderColor: theme.outline }]}>
           <Animated.View
             pointerEvents="none"
-            style={[styles.overlay, { backgroundColor: withAlpha(theme.accent, 0.1) }, fade]}
+            style={[styles.overlay, { backgroundColor: withAlpha(theme.brand, 0.1) }, fade]}
           />
           <Animated.View
             pointerEvents="none"
-            style={[styles.overlay, styles.ring, { borderColor: theme.accent }, fade]}
+            style={[styles.overlay, styles.ring, { borderColor: theme.brand }, fade]}
           />
           <BalloonCluster balloons={balloons} />
           <ThemedText type="display" style={styles.name} maxFontSizeMultiplier={1.2}>
@@ -131,7 +131,7 @@ export function PackCard({
         </Pressable>
         {tag ? (
           <View style={styles.tagRow} pointerEvents="none">
-            <View style={[styles.tag, { backgroundColor: theme.accent }]}>
+            <View style={[styles.tag, { backgroundColor: theme.brand }]}>
               <Text style={[styles.tagText, { color: theme.onAccent }]}>{tag}</Text>
             </View>
           </View>

@@ -1,42 +1,62 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { G, Path } from 'react-native-svg';
 
-import { BrandBalloon, Colors, Ease, lacquerFor, Motion } from '@/constants/theme';
-import { useScheme, useTheme } from '@/hooks/use-theme';
+import { BrandBalloon, Ease, lacquerFor, Motion, type Palette } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { mix } from '@/utils/color';
 
 /**
- * The balloon is drawn flat in a 24 x 34 box: a round body that tapers into a
- * small knot, and one thin highlight. One color, no gradient, no string, so it
- * stays crisp from the tab bar up to the role reveal.
+ * The hand-made balloon (design/balloon/b-handmade), drawn flat in a 24 x 34 box:
+ * a slightly lumpy body with a fuller right shoulder, a knot tied like a little
+ * bow, one brushy highlight and a wiggly string. The body is the seat's color, the
+ * knot and string its dark tone. Small marks drop the highlight and the string.
  */
 const VIEW_BOX = '0 0 24 34';
-const BODY = 'M12 2C6.8 2 3.5 6.2 3.5 11.5c0 5.9 4.5 10.9 8.5 11.7 4-.8 8.5-5.8 8.5-11.7C20.5 6.2 17.2 2 12 2z';
-const KNOT = 'M10.6 23.1h2.8l-1.4 1.9z';
-const HIGHLIGHT = 'M7.4 9.5c.4-2.2 1.9-3.8 3.9-4.3';
-/** What a pop leaves at the knot: a ragged collar of rubber. */
-const TORN = 'M8.8 23.4l.7-3.4 1.2 1.9.9-3.1.9 3.1 1.2-1.9.7 3.4z';
+const BODY =
+  'M12.3 2.1C17.4 1.8 20.8 5.9 20.6 11.2C20.4 16.4 16.2 20.9 12.6 23.1C9.4 21.6 4.2 18.4 3.6 13.4C3.3 10.6 3.9 8.1 5.2 6.2C6.8 3.6 9.3 2.2 12.3 2.1z';
+const KNOT =
+  'M11.6 22.4L13.6 22.4L12.6 24.1zM12.6 24C12 23.2 10.7 23 10.7 24C10.7 25 11.9 24.7 12.6 24C13.3 24.9 14.9 25.2 14.8 23.9C14.7 22.8 13.2 23.2 12.6 24z';
+/** A filled brush stroke, tapered at both ends. */
+const HIGHLIGHT =
+  'M6.5 11.8C5.9 8.6 7.5 5.6 10.5 4.5C10.9 4.4 11.1 4.8 10.8 5.1C8.7 6.5 7.6 8.8 7.6 11.6C7.6 12.3 6.6 12.4 6.5 11.8z';
+const STRING = 'M12.6 24.6c-1 1.2.9 2 0 3.1s.9 2-.1 3.1s.8 1.6.2 2.6';
+const STRING_SHORT = 'M12.6 24.4c-.9 1.1.8 1.8 0 2.8s.8 1.8-.1 2.8';
+/** What a pop leaves at the knot: a ragged crown of rubber. */
+const TORN =
+  'M10.4 23.2C9.6 22.4 9.2 21.4 9.6 20.4L10.6 21.2L10.9 19.4L11.9 20.6L12.6 18.9L13.3 20.5L14.4 19.3L14.5 21L15.6 20.4C15.8 21.6 15.2 22.6 14.4 23.2L12.6 24z';
+const TORN_SHINE = 'M10.6 21.2L10.9 19.4L11.9 20.6L11.3 22.4z';
+/** The torn rubber, enlarged and tipped a little so it fills the box. */
+const TORN_PLACE = 'translate(12 17) scale(1.5) rotate(-10) translate(-12.4 -24.5)';
 /** The middle of the body, where a pop bursts from. */
-const BODY_CENTER = { x: 12, y: 12 };
+const BODY_CENTER = { x: 12.2, y: 12 };
 /** Below this width the highlight is a smudge, so it is left off. */
 const HIGHLIGHT_MIN = 14;
-/** The highlight's width in box units: about 1 pt on a seat, thin on the hero. */
-const HIGHLIGHT_WIDTH = 1.1;
+/** Below this width the string is a scribble, so it is left off. */
+const STRING_MIN = 20;
+const SHINE_OPACITY = 0.45;
 
 /** Rendered height for a balloon of the given width. */
 export function balloonHeight(size: number) {
   return (size * 34) / 24;
 }
 
-/** Lines stay about 1pt wide at list sizes and thicken a little on big marks. */
-function strokePt(size: number) {
-  return Math.max(0.8, 0.8 + (size - 14) * 0.0225);
-}
 function toUnits(points: number, size: number) {
   return (points * 24) / size;
+}
+
+/** The string: 1.1 box units, so about 1 pt on a seat, but never thicker than 4 pt on the hero. */
+function stringWidth(size: number) {
+  return toUnits(Math.min((1.1 * size) / 24, 4), size);
+}
+
+/** The body and the knot's colors. The brand balloon (and you) wears the brand plum. */
+function inks(color: string, theme: Palette) {
+  if (color.toLowerCase() === BrandBalloon.color.toLowerCase()) {
+    return { fill: theme.brand, knot: theme.brandDeep };
+  }
+  return { fill: color, knot: lacquerFor(color)?.knot ?? color };
 }
 
 type BalloonProps = {
@@ -45,15 +65,16 @@ type BalloonProps = {
   size?: number;
   /** An outline for a seat that isn't filled yet. */
   ghost?: boolean;
-  /** The thin highlight on the body. Off for the smallest marks. */
+  /** The highlight on the body. Off for the smallest marks. */
   shine?: boolean;
+  /** The wiggly string. Off where the screen draws its own string. */
+  string?: boolean;
 };
 
-export function Balloon({ color, size = 24, ghost = false, shine = true }: BalloonProps) {
+export function Balloon({ color, size = 24, ghost = false, shine = true, string = true }: BalloonProps) {
   const theme = useTheme();
   const height = balloonHeight(size);
-  // The brand balloon (and you) wears the theme's accent, so it follows the palette.
-  const fill = color.toLowerCase() === BrandBalloon.color.toLowerCase() ? theme.accent : color;
+  const { fill, knot } = inks(color, theme);
 
   if (ghost) {
     return (
@@ -65,70 +86,49 @@ export function Balloon({ color, size = 24, ghost = false, shine = true }: Ballo
   }
   return (
     <Svg width={size} height={height} viewBox={VIEW_BOX}>
-      <Path d={KNOT} fill={fill} />
-      <Path d={BODY} fill={fill} />
-      {shine && size >= HIGHLIGHT_MIN ? (
+      {string && size >= STRING_MIN ? (
         <Path
-          d={HIGHLIGHT}
+          d={STRING}
           fill="none"
-          stroke="#FFFFFF"
-          strokeOpacity={0.4}
-          strokeWidth={Math.max(HIGHLIGHT_WIDTH, toUnits(1, size))}
+          stroke={knot}
+          strokeWidth={stringWidth(size)}
           strokeLinecap="round"
+          strokeLinejoin="round"
         />
       ) : null}
+      <Path d={BODY} fill={fill} />
+      {shine && size >= HIGHLIGHT_MIN ? (
+        <Path d={HIGHLIGHT} fill="#FFFFFF" fillOpacity={SHINE_OPACITY} />
+      ) : null}
+      <Path d={KNOT} fill={knot} />
     </Svg>
   );
 }
 
-/** Relative luminance of a #RRGGBB color, as WCAG measures it. */
-function luminance(hex: string) {
-  const value = hex.replace('#', '');
-  const [r, g, b] = [0, 2, 4].map((i) => {
-    const c = parseInt(value.slice(i, i + 2), 16) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-/** The contrast a popped mark should keep on the dark canvas and its cards. */
-const POPPED_CONTRAST = 3;
-/** The lighter of the dark page and its cards: a mark that reads there reads on both. */
-const DARK_GROUND = Math.max(luminance(Colors.dark.page), luminance(Colors.dark.field));
-
 /**
- * A seat color for a popped mark in dark mode: the deep seats (garnet, and a
- * little crimson) are mixed toward the text color until they read at about 3:1.
- * Light seats, and any ink that isn't a seat color (the recap's paper), stay as given.
- */
-function poppedInk(color: string) {
-  if (!lacquerFor(color)) return color;
-  for (let amount = 0; amount < 1; amount += 0.05) {
-    const ink = amount === 0 ? color : mix(color, Colors.dark.text, amount);
-    if ((luminance(ink) + 0.05) / (DARK_GROUND + 0.05) >= POPPED_CONTRAST) return ink;
-  }
-  return Colors.dark.text;
-}
-
-/**
- * A popped seat: a dashed ghost of the balloon with torn rubber at the knot. Never rays at rest, so it can't read as a spinner.
+ * A popped seat: the torn crown of rubber left at the knot, with the bow and a
+ * short string. Never rays at rest, so it can't read as a spinner.
  */
 export function PoppedMark({ color, size = 24 }: { color: string; size?: number }) {
-  const scheme = useScheme();
-  const ink = scheme === 'dark' ? poppedInk(color) : color;
-  const stroke = toUnits(strokePt(size), size);
+  const theme = useTheme();
+  const { fill, knot } = inks(color, theme);
   return (
     <Svg width={size} height={balloonHeight(size)} viewBox={VIEW_BOX}>
-      <Path
-        d={BODY}
-        fill="none"
-        stroke={ink}
-        strokeOpacity={0.5}
-        strokeWidth={stroke}
-        strokeDasharray={[stroke * 1.4, stroke * 1.95]}
-      />
-      <Path d={TORN} fill={ink} />
-      <Path d={KNOT} fill={ink} />
+      <G transform={TORN_PLACE}>
+        {size >= HIGHLIGHT_MIN ? (
+          <Path
+            d={STRING_SHORT}
+            fill="none"
+            stroke={knot}
+            strokeWidth={stringWidth(size) / 1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : null}
+        <Path d={TORN} fill={fill} />
+        {size >= HIGHLIGHT_MIN ? <Path d={TORN_SHINE} fill="#FFFFFF" fillOpacity={SHINE_OPACITY} /> : null}
+        <Path d={KNOT} fill={knot} />
+      </G>
     </Svg>
   );
 }

@@ -178,13 +178,7 @@ export function EditProfileScreen() {
           />
           <Section title={t('onboarding.titleMeet')} style={[styles.meetSection, styles.aboutSection]}>
             <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={t('onboarding.titleMeet')} />
-            <ThemedText type="footnote" themeColor="textTertiary">
-              {t('onboarding.subtitleMeet')}
-            </ThemedText>
           </Section>
-          <ThemedText type="caption" themeColor="textTertiary" style={styles.locked}>
-            {t('profile.birthdayLocked')}
-          </ThemedText>
         </Rise>
       </Screen>
       {toast}
@@ -213,8 +207,5 @@ const styles = StyleSheet.create({
   },
   meetSection: {
     gap: 16,
-  },
-  locked: {
-    marginTop: 14,
   },
 });

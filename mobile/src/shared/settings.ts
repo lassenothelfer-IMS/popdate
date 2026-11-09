@@ -5,7 +5,7 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'system',
   region: null,
   units: 'metric',
-  appearance: 'dark',
+  appearance: 'light',
   commentFilter: true,
   notifications: { roomLive: true, newMatch: true, messages: true },
 };
