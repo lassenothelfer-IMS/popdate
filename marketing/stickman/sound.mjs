@@ -3,11 +3,16 @@
 //   out/quiet-one-mix.wav  music bed (96 BPM, the beat drops in at the reveal, pops on the beat,
 //                          silence before the last pop) + effects
 //   out/quiet-one-sfx.wav  effects only, for posting with a trending song added in Instagram
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { BEAT, DURATION, T, POPS, FLIGHT, LABELS } from './quiet-one-timeline.js';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { BEAT, DURATION, T, POPS, FLIGHT, LABELS, PART1 } from './quiet-one-timeline.js';
+
+// `--part 1` makes the sound for Part 1 of the series: longer, with the cliffhanger and a voice track.
+const PART = process.argv.includes('--part') ? process.argv[process.argv.indexOf('--part') + 1] : null;
+const LENGTH = PART === '1' ? PART1.end : DURATION;
+const BASE = PART ? `out/quiet-one-part${PART}` : 'out/quiet-one';
 
 const RATE = 48000;
-const N = Math.round(RATE * DURATION);
+const N = Math.round(RATE * LENGTH);
 const bus = () => ({ dry: [new Float32Array(N), new Float32Array(N)], wet: [new Float32Array(N), new Float32Array(N)] });
 const music = bus(), sfx = bus();
 
@@ -34,7 +39,7 @@ const NOTE = { A1: 55, C2: 65.41, F1: 43.65, G1: 49, A3: 220, C4: 261.63, E4: 32
 
 // Beats where the song changes: a sparse groove while they answer and he types, the full beat
 // when his answer appears, silence before the last pop, then the payoff.
-const REVEAL = 16, SILENCE = 30, LAST_POP = 31, END = 36;
+const REVEAL = 16, SILENCE = 30, LAST_POP = 31, END = PART ? 38 : 36;
 
 const CHORDS = [
   [0, 4, NOTE.A1, [NOTE.A3, NOTE.C4, NOTE.E4]],
@@ -46,7 +51,7 @@ const CHORDS = [
   [24, 4, NOTE.C2, [NOTE.G3, NOTE.C4, NOTE.E4]],
   [28, 2, NOTE.G1, [NOTE.G3, NOTE.B3, NOTE.D4]],
   [31, 2, NOTE.F1, [NOTE.F3, NOTE.A3, NOTE.C4]],
-  [33, 3, NOTE.C2, [NOTE.G3, NOTE.C4, NOTE.E4]],
+  [33, END - 33, NOTE.C2, [NOTE.G3, NOTE.C4, NOTE.E4]],
 ];
 
 for (const [start, beats, root, triad] of CHORDS) {
@@ -176,7 +181,80 @@ for (let time = T.aims[0][0], gap = 0.62; time < POPS.B - 0.15; time += gap, gap
 
 // The match: a bell chord.
 for (const [freq, pan] of [[NOTE.C5, -0.3], [NOTE.E5, 0.3], [NOTE.G5, -0.15], [NOTE.D6, 0.15]]) {
-  add(sfx, T.match, DURATION - T.match, (t) => Math.min(1, t / 0.004) * Math.exp(-t / 1.1) * (tone(freq, t) + 0.3 * tone(freq * 2.01, t) * Math.exp(-t / 0.3)), { gain: 0.08, pan, send: 0.6 });
+  add(sfx, T.match, LENGTH - T.match, (t) => Math.min(1, t / 0.004) * Math.exp(-t / 1.1) * (tone(freq, t) + 0.3 * tone(freq * 2.01, t) * Math.exp(-t / 0.3)), { gain: 0.08, pan, send: 0.6 });
+}
+
+// ---------------------------------------------------------------- Part 1: the cliffhanger
+
+if (PART === '1') {
+  // A low drone of two clashing notes while the camera finds Brick.
+  const drone = PART1.cut - PART1.turn;
+  for (const [freq, pan] of [[55, -0.2], [58.27, 0.2], [110, 0], [116.54, 0]]) {
+    add(sfx, PART1.turn, drone, (t) => env(t, 1.2, drone, 0.05) * Math.tanh(1.5 * tone(freq, t)), { gain: freq < 100 ? 0.22 : 0.06, pan, send: 0.4 });
+  }
+  for (const time of [PART1.turn + 0.9, PART1.turn + 1.6, PART1.turn + 2.3]) {
+    for (const [offset, gain] of [[0, 0.7], [0.15, 0.45]]) add(sfx, time + offset, 0.25, (t) => tone(55 - 18 * t, t) * Math.exp(-t / 0.07), { gain, send: 0.05 });
+  }
+  // "this isn't over.": a low hit with a dissonant stab.
+  add(sfx, PART1.threat, 1.2, (t) => tone(38 + 60 * Math.exp(-t / 0.05), t) * Math.exp(-t / 0.4), { gain: 0.9, send: 0.2 });
+  for (const freq of [110, 116.54, 164.81]) {
+    add(sfx, PART1.threat, 1, (t) => Math.tanh(3 * tone(freq, t)) * Math.exp(-t / 0.35) * Math.min(1, t / 0.005), { gain: 0.07, send: 0.5 });
+  }
+  // The cut to the app: one boom, a whoosh as the phone rises, and the beat comes back.
+  add(sfx, PART1.cut, 1.8, (t) => tone(32 + 50 * Math.exp(-t / 0.06), t) * Math.exp(-t / 0.6), { gain: 1, send: 0.3 });
+  whoosh(PART1.cut, 0.5, 0.5, 0, 0);
+  for (const [time] of PART1.screens.slice(1)) whoosh(time - 0.05, 0.22, 0.25, 0.6, -0.2);
+  const CUT = PART1.cut / BEAT, LAST = PART1.end / BEAT - 1;
+  const OUTRO = [[NOTE.A1, CHORDS[0][3]], [NOTE.F1, CHORDS[1][3]], [NOTE.C2, CHORDS[2][3]], [NOTE.G1, CHORDS[3][3]]];
+  for (let beat = CUT; beat < LAST + 1; beat += 2) {
+    const [root, triad] = OUTRO[((beat - CUT) / 2) % 4];
+    const len = b(beat === LAST ? 1 : 2) + (beat === LAST ? 1.5 : 0.05);
+    triad.forEach((freq, i) => add(music, b(beat), len, (t) => env(t, 0.05, len, 0.2) * (tone(freq * 0.997, t) + tone(freq * 1.003, t) + 0.3 * tone(freq * 2, t)), { gain: 0.03, pan: (i - 1) * 0.4, send: 0.6 }));
+    for (let k = 0; k < 2 && beat + k <= LAST; k++) {
+      add(music, b(beat + k), BEAT, (t) => Math.exp(-t / 0.3) * Math.min(1, t / 0.004) * Math.tanh(2 * tone(root, t) + 0.4 * tone(root * 2, t)), { gain: 0.36, send: 0.05 });
+      for (let h = 0; h < 2; h++) {
+        const freq = triad[[0, 1, 2, 1][(k * 2 + h) % 4]] * 2;
+        add(music, b(beat + k + h / 2), 0.4, (t) => Math.exp(-t / 0.12) * Math.min(1, t / 0.002) * (tone(freq, t) + 0.25 * tone(freq * 2, t)), { gain: 0.05, pan: h ? 0.35 : -0.35, send: 0.45 });
+      }
+    }
+  }
+  for (let beat = CUT; beat <= LAST; beat++) {
+    kick(beat, beat === LAST ? 1 : 0.85);
+    if (beat % 2 === 1 && beat < LAST) clap(beat);
+    if (beat < LAST) { hat(beat, 0.05); hat(beat + 0.5, 0.09); }
+  }
+  // The call to action: two bright plucks going up, like his answer appearing.
+  [[NOTE.E5, 0], [NOTE.A4 * 2, 0.09]].forEach(([freq, delay]) => add(sfx, PART1.cta + 0.45 + delay, 0.8, (t) => (tone(freq, t) + 0.3 * tone(freq * 2, t)) * Math.exp(-t / 0.25) * Math.min(1, t / 0.003), { gain: 0.1, send: 0.5 }));
+}
+
+// The narrator (voice/*.wav from voice.mjs), through the cliffhanger and the app at the end.
+const voice = bus();
+const talking = new Float32Array(N);
+if (PART === '1') {
+  for (const [start, , , file] of PART1.narration) {
+    const wav = readFileSync(`voice/${file}.wav`);
+    let pos = 12;
+    while (wav.toString('ascii', pos, pos + 4) !== 'data') pos += 8 + wav.readUInt32LE(pos + 4);
+    const size = wav.readUInt32LE(pos + 4), samples = size / 2;
+    for (let k = 0; k < samples; k++) {
+      const i = at(start) + k;
+      if (i >= N) break;
+      const v = wav.readInt16LE(pos + 8 + k * 2) / 32768;
+      voice.dry[0][i] += v * 2; voice.dry[1][i] += v * 2;
+      voice.wet[0][i] += v * 0.1; voice.wet[1][i] += v * 0.1;
+      talking[i] = 1;
+    }
+  }
+}
+// Music dips under the voice, with soft 150 ms ramps.
+const duck = new Float32Array(N);
+{
+  let level = 1;
+  const step = 1 / at(0.15);
+  for (let i = 0; i < N; i++) {
+    level += Math.sign((talking[i] ? 0.4 : 1) - level) * step;
+    duck[i] = level;
+  }
 }
 
 // ---------------------------------------------------------------- mix down
@@ -210,9 +288,12 @@ function reverb(input, offset) {
 
 function render(buses, file, targetRms) {
   const L = new Float32Array(N), R = new Float32Array(N);
-  for (const { dry, wet } of buses) {
+  for (const { dry, wet, gain } of buses) {
     const room = [reverb(wet[0], 0), reverb(wet[1], 23)];
-    for (let i = 0; i < N; i++) { L[i] += dry[0][i] + room[0][i] * 0.6; R[i] += dry[1][i] + room[1][i] * 0.6; }
+    for (let i = 0; i < N; i++) {
+      const g = gain ? gain[i] : 1;
+      L[i] += (dry[0][i] + room[0][i] * 0.6) * g; R[i] += (dry[1][i] + room[1][i] * 0.6) * g;
+    }
   }
   let sum = 0;
   for (let i = 0; i < N; i++) sum += L[i] ** 2 + R[i] ** 2;
@@ -234,5 +315,6 @@ function render(buses, file, targetRms) {
 }
 
 mkdirSync('out', { recursive: true });
-render([music, sfx], 'out/quiet-one-mix.wav', 0.24);
-render([sfx], 'out/quiet-one-sfx.wav', 0.12);
+render([music, sfx], `${BASE}-mix.wav`, 0.24);
+render([sfx], `${BASE}-sfx.wav`, 0.12);
+if (PART === '1') render([{ ...music, gain: duck }, { ...sfx, gain: duck }, voice], `${BASE}-voice.wav`, 0.24);

@@ -41,8 +41,10 @@ export function solve(pose, { x, y, s = 1, face = 1, hip = null, muscle = false 
   const lf = leg(pose.tF, pose.kF), lb = leg(pose.tB, pose.kB);
   const h = hip ?? [x + (pose.x ?? 0) * s, y - Math.max(lf.foot[1], lb.foot[1]) + (pose.y ?? 0) * s];
   const up = dir(180 - pose.lean, face);
-  // Across the body, pointing to the side the character faces.
-  const across = [-up[1] * face, up[0] * face];
+  // Across the body, pointing to the side the character faces. It keeps its full length while
+  // the character turns, so a broad build stays broad when facing the camera.
+  const side = face < 0 ? -1 : 1;
+  const across = [-up[1] * side, up[0] * side];
   const neck = add(h, up, L.torso);
   const shoulder = add(h, up, L.torso * 0.9);
   const sw = muscle ? MUSCLE.shoulders * s : 0, hw = muscle ? MUSCLE.hips * s : 0;

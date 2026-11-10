@@ -11,6 +11,22 @@ Code-animated stickman videos for Instagram Reels and TikTok, in the style resea
 
 Caption: "They laughed until he was the last balloon 🎈 Would you have kept him? Waitlist in bio"
 
+## Part 1 of the series "Last Balloon"
+
+35.6 s. The same Reel with narrator captions (word by word, top left) and a cliffhanger after the match: the camera pushes in on Brick, the muscle guy, who turns to the camera and says "this isn't over". Then a hard cut, like a Stitch, to the real app on a phone: "so we made it a real app", four screens that tell the same story (ask, listen, pop, match), and "join the waitlist / link in bio". The scripts for all five parts are in `../stickman-series.md`.
+
+The phone shows the design mockups from `design/screens/game-velvet/`; `node app-shots.mjs` shoots them again into `app/`. Swap in real screenshots from a phone once the app looks final (same names, 780 x 1688).
+
+- `out/quiet-one-part1-voice.mp4`: the one to post. A narrator reads the captions, and the music dips under her.
+- `out/quiet-one-part1.mp4`: music and captions, no voice (to record your own voice over it in Instagram or CapCut)
+- `out/quiet-one-part1-sfx-only.mp4`: effects only, for a trending song
+
+The narrator is Kokoro (`af_heart`), a free text-to-speech model that runs on this computer. It's Apache-2.0, so it's fine for ads. `node voice.mjs --samples` writes one test sentence in eight voices to `out/voice-samples/`. To switch, run `node voice.mjs --voice am_fenrir` (add `--speed 0.9` for slower), copy the printed lengths into `PART1.narration` in `quiet-one-timeline.js`, and render again:
+
+```bash
+npm run part1
+```
+
 ## Making and changing it
 
 ```bash

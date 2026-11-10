@@ -13,7 +13,10 @@
 <script type="module">
   import { BODY, KNOT, RED } from '../endcard/balloon.js';
   import { EYE, LEN, POSES, blend, solve, drawStickman } from './stickman.js';
-  import { DURATION, T, POPS, FLIGHT, LABELS } from './quiet-one-timeline.js';
+  import { DURATION, T, POPS, FLIGHT, LABELS, PART1 } from './quiet-one-timeline.js';
+
+  // `?part=1` renders Part 1 of the series: narration captions and a cliffhanger after the match.
+  const PART = new URLSearchParams(location.search).get('part') === '1';
 
   const W = 1080, H = 1920, M = 90; // M: background margin, so camera shake never shows an edge
   const GROUND = 1650, LEDGE = 722;
@@ -67,6 +70,7 @@
     windup: { lean: -8, tilt: -4, aF: -140, eF: -55, aB: 40, eB: 20, tF: 12, kF: -4, tB: -14, kB: -4 },
     release: { lean: 12, tilt: 8, aF: 62, eF: -4, aB: -30, eB: 10, tF: 16, kF: -10, tB: -12, kB: -2 },
     reach: { lean: 0, tilt: -22, aF: 150, eF: 4, aB: -10, eB: 10, tF: 7, kF: -3, tB: -7, kB: -2 },
+    determined: { lean: 0, tilt: 2, aF: 14, eF: 24, aB: -14, eB: 24, tF: 9, kF: -3, tB: -9, kB: -2 },
   };
 
   const FLEXERS = [
@@ -118,7 +122,17 @@
       look = [frozen.face > 0 ? -0.5 : 0.5, -1];
     }
     const fade = outCubic(span(dt, 0.2, 0.6));
-    return { pose, face: frozen.face, expression, look, color: hexMix(INK, FADED, fade), rim: mix(0.45, 0.18, fade) };
+    let face = frozen.face, color = hexMix(INK, FADED, fade), rim = mix(0.45, 0.18, fade);
+    if (PART && f.id === 'B' && t > PART1.turn) {
+      // Part 1's cliffhanger: he straightens up, comes back to full black and turns to face us.
+      const back = outCubic(span(t, PART1.turn + 0.4, 0.8));
+      pose = blend(pose, P.determined, back);
+      face = mix(frozen.face, 0.02, inOutCubic(span(t, PART1.turn + 0.9, 0.5)));
+      color = hexMix(FADED, INK, back);
+      rim = mix(0.18, 0.6, back);
+      if (back > 0.5) { expression = 'smug'; look = [0, 0]; }
+    }
+    return { pose, face, expression, look, color, rim };
   }
 
   function quietState(t) {
@@ -665,8 +679,14 @@
   // Camera: a slow push-in, tighter while she aims, then it follows him up.
   function camera(ctx, t) {
     const tension = win(t, T.aims[0][0], POPS.B + 0.15, 0.6) * (t > POPS.B ? 1 - outExpo(span(t, POPS.B, 0.3)) : 1);
-    const zoom = mix(1, 1.045, inOutCubic(span(t, 0, POPS.B - 0.1))) + 0.035 * tension;
+    let zoom = mix(1, 1.045, inOutCubic(span(t, 0, POPS.B - 0.1))) + 0.035 * tension;
     const cy = mix(1180, 990, inOutCubic(span(t, T.lift, 2.2)));
+    // Part 1 ends by pushing in on Brick. (fx, fy) is the world point that lands on screen at (540, sy0).
+    let fx = 540, fy = cy, sy0 = cy;
+    if (PART) {
+      const c = inOutCubic(span(t, PART1.turn, 1.4));
+      zoom = mix(zoom, 2.1, c); fx = mix(540, 548, c); fy = mix(cy, 1330, c); sy0 = mix(cy, 1060, c);
+    }
     let sx = 0, sy = 0;
     for (const [id, at] of Object.entries(POPS)) {
       const dt = t - at;
@@ -674,9 +694,9 @@
       const amp = (id === 'B' ? 16 : 7) * Math.exp(-dt / 0.14);
       sx += amp * Math.sin(dt * 50); sy += amp * Math.cos(dt * 43);
     }
-    ctx.translate(540 + sx, cy + sy);
+    ctx.translate(540 + sx, sy0 + sy);
     ctx.scale(zoom, zoom);
-    ctx.translate(-540, -cy);
+    ctx.translate(-fx, -fy);
   }
 
   function drawWorld(ctx, t) {
@@ -779,7 +799,7 @@
     LABELS.forEach(([at, text], i) => {
       const next = LABELS[i + 1]?.[0] ?? Infinity;
       const inP = i === 0 ? 1 : outCubic(span(t, at, 0.3)), outP = inCubic(span(t, next, 0.2));
-      const a = inP * (1 - outP);
+      const a = inP * (1 - outP) * (PART ? 1 - span(t, PART1.turn, 0.4) : 1);
       if (a <= 0) return;
       const y = 172 + (1 - inP) * 30 - outP * 30;
       const color = text === 'MATCH' ? '#F0695C' : EYE;
@@ -804,7 +824,141 @@
   const wctx = work.getContext('2d');
   let grain = null;
 
-  window.DURATION = DURATION;
+  /** The narrator's lines, word by word, top left. */
+  function drawCaptions(ctx, t) {
+    ctx.save();
+    ctx.font = '600 50px HankenGrotesk';
+    ctx.fillStyle = EYE;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+    ctx.shadowBlur = 14;
+    for (const [start, length, text] of PART1.narration) {
+      if (start >= PART1.cut) continue;
+      const out = span(t, start + length + 0.5, 0.25);
+      if (t < start || out >= 1) continue;
+      const words = text.split(' ');
+      let x = 72, y = 268;
+      words.forEach((word, i) => {
+        const w = ctx.measureText(word + ' ').width;
+        if (x + w > 640 && x > 72) { x = 72; y += 62; }
+        const p = outCubic(span(t, start + (i * length) / words.length, 0.14));
+        ctx.globalAlpha = p * (1 - out);
+        ctx.fillText(word, x, y + (1 - p) * 14);
+        x += w;
+      });
+    }
+    ctx.restore();
+  }
+
+  /** Brick's last word, above his head (drawn under the camera, so sizes are in world units). */
+  function drawThreat(ctx, t) {
+    const p = span(t, PART1.threat, 0.3);
+    if (p <= 0) return;
+    const head = flexerJoints(FLEXERS[1], t).head;
+    const text = 'this isn’t over.';
+    ctx.font = '600 24px HankenGrotesk';
+    const w = ctx.measureText(text).width + 34, h = 44, x = head[0] - w / 2, bottom = head[1] - 62;
+    const scale = outBack(p);
+    bubbleBox(ctx, x, bottom, w, h, head[0], scale);
+    ctx.save();
+    ctx.translate(head[0], bottom + 16); ctx.scale(scale, scale); ctx.translate(-head[0], -bottom - 16);
+    ctx.fillStyle = '#141210';
+    ctx.fillText(text, x + 17, bottom - 14);
+    ctx.restore();
+  }
+
+  /** Hard cut to black: PART 2. */
+  /** The ending: a hard cut to the real app on a phone (the design mockups, shot by app-shots.mjs), then the waitlist. */
+  const SHOTS = {};
+  const PHONE = { w: 520, h: 1126, r: 74, bezel: 16 };
+  function drawHeadline(ctx, lines, t0, t, top) {
+    ctx.font = '400 104px Gloock';
+    lines.forEach((line, i) => {
+      const p = outCubic(span(t, t0 + i * 0.32, 0.45));
+      ctx.globalAlpha = p;
+      ctx.fillText(line, 540, top + i * 116 + (1 - p) * 30);
+    });
+    ctx.globalAlpha = 1;
+  }
+  function drawApp(ctx, t) {
+    const sky = ctx.createRadialGradient(540, 820, 80, 540, 900, 1250);
+    sky.addColorStop(0, '#4a2530');
+    sky.addColorStop(0.55, '#24141a');
+    sky.addColorStop(1, '#0e0809');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = EYE;
+
+    // Headline: what the narrator says, big. It swaps to the waitlist at the call to action.
+    const swap = span(t, PART1.cta - 0.25, 0.25);
+    if (swap < 1) {
+      ctx.save();
+      ctx.globalAlpha = 1 - swap;
+      drawHeadline(ctx, ['so we made it', 'a real app.'], PART1.cut + 0.3, t, 250);
+      ctx.restore();
+    }
+    if (t >= PART1.cta) drawHeadline(ctx, ['join the', 'waitlist.'], PART1.cta, t, 250);
+
+    // The phone rises in, floats, and sinks a little at the call to action to make room for the button.
+    const rise = outBack(span(t, PART1.cut + 0.05, 0.7), 1.1);
+    const sink = inOutCubic(span(t, PART1.cta, 0.6));
+    const x = 540 - PHONE.w / 2, y = 470 + (1 - rise) * 1500 + 6 * Math.sin(t * 2.2) + 150 * sink;
+    const tilt = 0.035 * (1 - rise) + 0.008 * Math.sin(t * 1.3);
+    ctx.save();
+    ctx.translate(540, y + PHONE.h / 2);
+    ctx.rotate(tilt);
+    ctx.translate(-540, -(y + PHONE.h / 2));
+    ctx.shadowColor = 'rgba(240, 105, 92, 0.35)';
+    ctx.shadowBlur = 90;
+    ctx.fillStyle = '#050405';
+    ctx.beginPath(); ctx.roundRect(x - PHONE.bezel, y - PHONE.bezel, PHONE.w + 2 * PHONE.bezel, PHONE.h + 2 * PHONE.bezel, PHONE.r + PHONE.bezel); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // The screen: the current shot slides in from the right over the last one.
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(x, y, PHONE.w, PHONE.h, PHONE.r); ctx.clip();
+    const k = PART1.screens.findLastIndex(([start]) => t >= start);
+    const shot = (i, dx) => ctx.drawImage(SHOTS[PART1.screens[i][1]], x + dx, y, PHONE.w, PHONE.h);
+    const slide = outExpo(span(t, PART1.screens[k][0], 0.32));
+    if (k > 0 && slide < 1) shot(k - 1, -0.3 * PHONE.w * slide);
+    shot(k, k > 0 ? (1 - slide) * PHONE.w : 0);
+    ctx.restore();
+    ctx.fillStyle = '#050405';
+    ctx.beginPath(); ctx.roundRect(540 - 62, y + 18, 124, 36, 18); ctx.fill();
+    ctx.restore();
+
+    // The call to action: a button with a balloon, over the bottom of the phone.
+    const c = outBack(span(t, PART1.cta + 0.45, 0.5));
+    if (c > 0) {
+      const pulse = 1 + 0.03 * Math.sin(Math.max(0, t - PART1.cta - 1) * 7);
+      ctx.save();
+      ctx.translate(540, 1500);
+      ctx.scale(c * pulse, c * pulse);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = '#F0695C';
+      ctx.beginPath(); ctx.roundRect(-300, -66, 600, 132, 66); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#1a0e10';
+      ctx.font = '600 50px HankenGrotesk';
+      ctx.letterSpacing = '2px';
+      ctx.fillText('link in bio', 0, 18);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 0.6;
+    ctx.font = '400 44px Gloock';
+    ctx.fillText('popdate', 540, 1862);
+    ctx.restore();
+
+    // The cut itself: one bright frame.
+    const flash = 1 - span(t, PART1.cut, 0.12);
+    if (flash > 0) { ctx.fillStyle = `rgba(255, 244, 234, ${0.85 * flash})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  window.DURATION = PART ? PART1.end : DURATION;
   window.renderAt = (t) => {
     // Motion blur: average three moments spread over a 240° shutter.
     for (let i = 0; i < 3; i++) {
@@ -819,9 +973,9 @@
     camera(out, t);
     drawCard(out, solve(popperState(t, balloonAt).pose, { x: POPPER.x, y: LEDGE, s: POPPER.s, face: -1 }), t);
     drawAnswers(out, t);
+    if (PART) drawThreat(out, t);
     out.restore();
     drawLabels(out, t);
-    window.debug = { b: sim.b.map((b) => [Math.round(b.x), Math.round(b.y)]), hands: FLEXERS.map((f) => flexerJoints(f, t).handB.map(Math.round)) };
 
     const tension = win(t, T.aims[0][0], POPS.B, 0.6);
     const vig = out.createRadialGradient(540, 980, 520 - 120 * tension, 540, 980, 1300);
@@ -829,6 +983,17 @@
     vig.addColorStop(1, `rgba(0, 0, 0, ${0.6 + 0.2 * tension})`);
     out.fillStyle = vig;
     out.fillRect(0, 0, W, H);
+    if (PART) {
+      // A spotlight on Brick for the cliffhanger.
+      const d = outCubic(span(t, PART1.turn + 0.3, 1.0));
+      const spot = out.createRadialGradient(540, 1180, 300, 540, 1180, 950);
+      spot.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      spot.addColorStop(1, `rgba(0, 0, 0, ${0.75 * d})`);
+      out.fillStyle = spot;
+      out.fillRect(0, 0, W, H);
+      drawCaptions(out, t);
+      if (t >= PART1.cut) drawApp(out, t);
+    }
 
     const flash = 0.3 * (1 - outCubic(span(t - POPS.B, 0, 0.25))) * (t >= POPS.B ? 1 : 0);
     if (flash > 0) { out.fillStyle = `rgba(255, 244, 234, ${flash})`; out.fillRect(0, 0, W, H); }
@@ -847,7 +1012,8 @@
   image.src = '../endcard/grain.png';
   await image.decode();
   grain = out.createPattern(image, 'repeat');
-  await Promise.all(['600 44px HankenGrotesk', '500 25px HankenGrotesk', '400 40px Gloock'].map((f) => document.fonts.load(f)));
+  if (PART) await Promise.all(PART1.screens.map(async ([, name]) => { const img = new Image(); img.src = `app/${name}.png`; await img.decode(); SHOTS[name] = img; }));
+  await Promise.all(['600 44px HankenGrotesk', '500 25px HankenGrotesk', '400 40px Gloock', '400 104px Gloock', '600 50px HankenGrotesk'].map((f) => document.fonts.load(f)));
   paintBackground();
   window.renderAt(0);
   window.ready = true;
