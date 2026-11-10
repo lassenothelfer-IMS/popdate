@@ -206,10 +206,12 @@ function ThreadRow({
   const preview = previewLine(t, filter, thread, myId);
   const time = shortTime(t, locale, last?.sentAt ?? match.createdAt);
   const quiet = highlighted ? 'textSecondary' : 'textTertiary';
+  /** They wrote last: the row says so with a plum dot and a darker preview. */
+  const replied = !!last && last.senderId !== myId;
   return (
     <PressableHighlight
       accessibilityRole="button"
-      accessibilityLabel={`${name}. ${preview}`}
+      accessibilityLabel={replied ? `${name}. ${t('home.newMessage')}. ${preview}` : `${name}. ${preview}`}
       accessibilityHint={t('home.openChatHint')}
       onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
       onLongPress={onMore}
@@ -241,9 +243,16 @@ function ThreadRow({
             {time}
           </ThemedText>
         </View>
-        <ThemedText type="callout" themeColor={quiet} numberOfLines={1} style={styles.preview}>
-          {preview}
-        </ThemedText>
+        <View style={styles.previewRow}>
+          <ThemedText
+            type="callout"
+            themeColor={replied ? 'text' : quiet}
+            numberOfLines={1}
+            style={[styles.preview, replied && styles.previewNew]}>
+            {preview}
+          </ThemedText>
+          {replied ? <View style={[styles.newDot, { backgroundColor: theme.brand }]} /> : null}
+        </View>
       </View>
     </PressableHighlight>
   );
@@ -373,8 +382,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 600,
   },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+  },
   preview: {
+    flex: 1,
     fontSize: 14,
+  },
+  previewNew: {
+    fontWeight: 600,
+  },
+  newDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   earned: {
     marginTop: Space.xl,

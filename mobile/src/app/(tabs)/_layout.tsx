@@ -15,9 +15,9 @@ import { haptics } from '@/utils/haptics';
 const ORDER = TABS;
 const ROUTES = TAB_ROUTES;
 
+/** The tab a path belongs to, or -1 for a screen over the tabs, like Edit profile or Settings. */
 function tabOf(pathname: string): number {
-  const index = ORDER.findIndex((tab) => pathname.startsWith(`/${tab}`));
-  return index < 0 ? 0 : index;
+  return ORDER.findIndex((tab) => pathname.startsWith(`/${tab}`));
 }
 
 /**
@@ -33,8 +33,10 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const yourTurn = useYourTurnCount();
   const pager = useRef<PagerView>(null);
-  const routeIndex = tabOf(pathname);
-  const [page, setPage] = useState(routeIndex);
+  const routeTab = tabOf(pathname);
+  const [page, setPage] = useState(Math.max(0, routeTab));
+  // While a sheet or a pushed screen is over the tabs, the page under it stays where it is.
+  const routeIndex = routeTab < 0 ? page : routeTab;
 
   // Arriving by a link (Back to home from a match, a push): slide to that page.
   useEffect(() => {
@@ -58,7 +60,7 @@ export default function TabsLayout() {
           if (index === page) return;
           setPage(index);
           haptics.selection();
-          if (index !== tabOf(pathname)) router.navigate(ROUTES[ORDER[index]]);
+          if (index !== routeIndex) router.navigate(ROUTES[ORDER[index]]);
         }}>
         <View key="home" style={styles.fill}>
           <TabPageContext value={page === 0}>
@@ -90,7 +92,7 @@ export default function TabsLayout() {
           you: t('home.tabYou'),
         }}
         onSelect={select}
-        dots={{ matches: yourTurn > 0 }}
+        counts={{ matches: yourTurn }}
         dotLabels={{ matches: t('home.tabMatchesYourTurn') }}
       />
       {/* The routes themselves render nothing; the pages above are the screens. */}

@@ -66,9 +66,9 @@ type TabBarProps = {
   labels: Record<Tab, string>;
   /** Called instead of navigating, like the phone's pager sliding to that page. */
   onSelect?: (tab: Tab) => void;
-  /** Tabs that wear a small dot, like Matches while a chat is waiting on you. */
-  dots?: Partial<Record<Tab, boolean>>;
-  /** What a screen reader says for a tab while it wears its dot, like "Matches, your turn". */
+  /** Tabs that wear a numbered badge, like Matches with the chats waiting on you. Zero shows none. */
+  counts?: Partial<Record<Tab, number>>;
+  /** What a screen reader says for a tab while it wears its badge, like "Matches, your turn". */
   dotLabels?: Partial<Record<Tab, string>>;
 };
 
@@ -80,7 +80,7 @@ const GLASS = Platform.OS === 'ios' && isLiquidGlassAvailable();
  * hairline where glass isn't drawn), 16 pt from the sides. Each tab is an icon
  * over its name; the selected one sits in a soft gray capsule. You is your own photo.
  */
-export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProps) {
+export function TabBar({ active, labels, onSelect, counts, dotLabels }: TabBarProps) {
   const theme = useTheme();
   const seats = useSeats();
   const { profile } = useSession();
@@ -105,7 +105,8 @@ export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProp
         {TABS.map((tab) => {
           const selected = tab === active;
           const color = selected ? theme.accentText : theme.textSecondary;
-          const dotted = dots?.[tab] ?? false;
+          const count = counts?.[tab] ?? 0;
+          const dotted = count > 0;
           return (
             <Pressable
               key={tab}
@@ -153,7 +154,11 @@ export function TabBar({ active, labels, onSelect, dots, dotLabels }: TabBarProp
                   </Svg>
                 )}
                 {dotted ? (
-                  <View style={[styles.dot, { backgroundColor: theme.brand, borderColor: theme.sheet }]} />
+                  <View style={[styles.badge, { backgroundColor: theme.brand, borderColor: theme.sheet }]}>
+                    <Text maxFontSizeMultiplier={1} style={[styles.badgeText, { color: theme.onBrand }]}>
+                      {count > 9 ? '9+' : count}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
               <Text
@@ -215,14 +220,23 @@ const styles = StyleSheet.create({
     borderRadius: (AVATAR + 4) / 2,
     borderWidth: 1,
   },
-  dot: {
+  badge: {
     position: 'absolute',
-    top: 1,
-    right: 0,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    top: -5,
+    right: -9,
+    minWidth: 19,
+    height: 19,
+    paddingHorizontal: 4,
+    borderRadius: 10,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: 700,
+    fontVariant: ['tabular-nums'],
   },
   label: {
     fontFamily: Fonts.sans,

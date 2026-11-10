@@ -25,7 +25,7 @@ export default function TabsLayout() {
           matches: t('home.tabMatches'),
           you: t('home.tabYou'),
         }}
-        dots={{ matches: yourTurn > 0 }}
+        counts={{ matches: yourTurn }}
         dotLabels={{ matches: t('home.tabMatchesYourTurn') }}
       />
     </View>
