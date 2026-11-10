@@ -14,21 +14,25 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
  * knot and string its dark tone. Small marks drop the highlight and the string.
  */
 const VIEW_BOX = '0 0 24 34';
-const BODY =
+export const BALLOON_BODY =
   'M12.3 2.1C17.4 1.8 20.8 5.9 20.6 11.2C20.4 16.4 16.2 20.9 12.6 23.1C9.4 21.6 4.2 18.4 3.6 13.4C3.3 10.6 3.9 8.1 5.2 6.2C6.8 3.6 9.3 2.2 12.3 2.1z';
-const KNOT =
+export const BALLOON_KNOT =
   'M11.6 22.4L13.6 22.4L12.6 24.1zM12.6 24C12 23.2 10.7 23 10.7 24C10.7 25 11.9 24.7 12.6 24C13.3 24.9 14.9 25.2 14.8 23.9C14.7 22.8 13.2 23.2 12.6 24z';
 /** A filled brush stroke, tapered at both ends. */
 const HIGHLIGHT =
   'M6.5 11.8C5.9 8.6 7.5 5.6 10.5 4.5C10.9 4.4 11.1 4.8 10.8 5.1C8.7 6.5 7.6 8.8 7.6 11.6C7.6 12.3 6.6 12.4 6.5 11.8z';
 const STRING = 'M12.6 24.6c-1 1.2.9 2 0 3.1s.9 2-.1 3.1s.8 1.6.2 2.6';
-const STRING_SHORT = 'M12.6 24.4c-.9 1.1.8 1.8 0 2.8s.8 1.8-.1 2.8';
+export const BALLOON_STRING_SHORT = 'M12.6 24.4c-.9 1.1.8 1.8 0 2.8s.8 1.8-.1 2.8';
 /** What a pop leaves at the knot: a ragged crown of rubber. */
-const TORN =
+export const BALLOON_TORN =
   'M10.4 23.2C9.6 22.4 9.2 21.4 9.6 20.4L10.6 21.2L10.9 19.4L11.9 20.6L12.6 18.9L13.3 20.5L14.4 19.3L14.5 21L15.6 20.4C15.8 21.6 15.2 22.6 14.4 23.2L12.6 24z';
 const TORN_SHINE = 'M10.6 21.2L10.9 19.4L11.9 20.6L11.3 22.4z';
 /** The torn rubber, enlarged and tipped a little so it fills the box. */
 const TORN_PLACE = 'translate(12 17) scale(1.5) rotate(-10) translate(-12.4 -24.5)';
+const BODY = BALLOON_BODY;
+const KNOT = BALLOON_KNOT;
+const STRING_SHORT = BALLOON_STRING_SHORT;
+const TORN = BALLOON_TORN;
 /** The middle of the body, where a pop bursts from. */
 const BODY_CENTER = { x: 12.2, y: 12 };
 /** Below this width the highlight is a smudge, so it is left off. */
@@ -51,12 +55,16 @@ function stringWidth(size: number) {
   return toUnits(Math.min((1.1 * size) / 24, 4), size);
 }
 
-/** The body and the knot's colors. The brand balloon (and you) wears the brand plum. */
-function inks(color: string, theme: Palette) {
+/**
+ * The body's color, the knot's, and the pale inside of the rubber. The brand
+ * balloon (and you) wears the brand plum.
+ */
+export function balloonInks(color: string, theme: Palette) {
   if (color.toLowerCase() === BrandBalloon.color.toLowerCase()) {
-    return { fill: theme.brand, knot: theme.brandDeep };
+    return { fill: theme.brand, knot: theme.brandDeep, hi: theme.brandPale };
   }
-  return { fill: color, knot: lacquerFor(color)?.knot ?? color };
+  const seat = lacquerFor(color);
+  return { fill: color, knot: seat?.knot ?? color, hi: seat?.hi ?? color };
 }
 
 type BalloonProps = {
@@ -74,7 +82,7 @@ type BalloonProps = {
 export function Balloon({ color, size = 24, ghost = false, shine = true, string = true }: BalloonProps) {
   const theme = useTheme();
   const height = balloonHeight(size);
-  const { fill, knot } = inks(color, theme);
+  const { fill, knot } = balloonInks(color, theme);
 
   if (ghost) {
     return (
@@ -111,7 +119,7 @@ export function Balloon({ color, size = 24, ghost = false, shine = true, string 
  */
 export function PoppedMark({ color, size = 24 }: { color: string; size?: number }) {
   const theme = useTheme();
-  const { fill, knot } = inks(color, theme);
+  const { fill, knot } = balloonInks(color, theme);
   return (
     <Svg width={size} height={balloonHeight(size)} viewBox={VIEW_BOX}>
       <G transform={TORN_PLACE}>

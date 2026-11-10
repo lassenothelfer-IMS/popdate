@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Pop preview</title>
+<style>
+  html, body { margin: 0; background: #FFFDFE; }
+  svg { display: block; width: 400px; height: 520px; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="-20 -16 64 83.2" xmlns="http://www.w3.org/2000/svg"></svg>
+<script>
+// The pop, as one function of time: draw(t) in seconds. Everything is plain SVG
+// transforms and opacity, so it ports to react-native-svg + Reanimated as is.
+const params = new URLSearchParams(location.search);
+const COLORS = {
+  plum: ['#5D2355', '#2C0B28', '#B77FAE'],
+  gold: ['#E2B566', '#6A4212', '#FFF3D6'],
+  coral: ['#DD6A60', '#6E1A25', '#FFC9B6'],
+  blush: ['#E6A3A2', '#7C3341', '#FCE0D8'],
+  garnet: ['#8E1430', '#2E020B', '#E57A8E'],
+};
+const [FILL, DARK, HI] = COLORS[params.get('color') || 'plum'];
+
+const BODY = 'M12.3 2.1C17.4 1.8 20.8 5.9 20.6 11.2C20.4 16.4 16.2 20.9 12.6 23.1C9.4 21.6 4.2 18.4 3.6 13.4C3.3 10.6 3.9 8.1 5.2 6.2C6.8 3.6 9.3 2.2 12.3 2.1z';
+const KNOT = 'M11.6 22.4L13.6 22.4L12.6 24.1zM12.6 24C12 23.2 10.7 23 10.7 24C10.7 25 11.9 24.7 12.6 24C13.3 24.9 14.9 25.2 14.8 23.9C14.7 22.8 13.2 23.2 12.6 24z';
+const SHINE = 'M6.5 11.8C5.9 8.6 7.5 5.6 10.5 4.5C10.9 4.4 11.1 4.8 10.8 5.1C8.7 6.5 7.6 8.8 7.6 11.6C7.6 12.3 6.6 12.4 6.5 11.8z';
+const TORN = 'M10.4 23.2C9.6 22.4 9.2 21.4 9.6 20.4L10.6 21.2L10.9 19.4L11.9 20.6L12.6 18.9L13.3 20.5L14.4 19.3L14.5 21L15.6 20.4C15.8 21.6 15.2 22.6 14.4 23.2L12.6 24z';
+
+const KNOT_AT = { x: 12.6, y: 23.4 };
+const CENTER = { x: 12.2, y: 12.2 };
+/** Where the rubber gives: up on the right shoulder. The tear runs from here. */
+const PUNCTURE = { x: 16.4, y: 7.2 };
+
+const T_SWELL = 1.15;   // the balloon fills and trembles
+const T_END = 3.0;
+
+const NS = 'http://www.w3.org/2000/svg';
+const stage = document.getElementById('stage');
+const el = (tag, attrs = {}, parent = stage) => {
+  const node = document.createElementNS(NS, tag);
+  for (const k in attrs) node.setAttribute(k, attrs[k]);
+  parent.appendChild(node);
+  return node;
+};
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const outCubic = (p) => 1 - Math.pow(1 - clamp(p), 3);
+const outExpo = (p) => (p >= 1 ? 1 : 1 - Math.pow(2, -10 * clamp(p)));
+const inOut = (p) => { p = clamp(p); return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+const inQuad = (p) => clamp(p) * clamp(p);
+// A fixed "random" per index, so every frame of a recording agrees.
+const rnd = (i, salt = 0) => { const x = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+const defs = el('defs');
+const root = el('g');
+
+// The whole balloon, before it bursts.
+const stringPath = el('path', { fill: 'none', stroke: DARK, 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, root);
+const whole = el('g', {}, root);
+el('path', { d: BODY, fill: FILL }, whole);
+const shine = el('path', { d: SHINE, fill: '#fff', 'fill-opacity': 0.45 }, whole);
+const knot = el('path', { d: KNOT, fill: DARK }, root);
+
+// The flash and the ring.
+const flash = el('circle', { cx: CENTER.x, cy: CENTER.y, r: 10, fill: HI, opacity: 0 }, root);
+const ring = el('circle', { cx: CENTER.x, cy: CENTER.y, r: 10, fill: 'none', stroke: FILL, opacity: 0 }, root);
+
+// The rubber: the body cut into wedges that meet at the puncture.
+const EDGES = [-170, -128, -84, -40, 2, 44, 88, 132, 170, 190].map((a, i) => a + (rnd(i, 3) - 0.5) * 14);
+const pieces = [];
+for (let i = 0; i < EDGES.length - 1; i++) {
+  const a0 = (EDGES[i] * Math.PI) / 180;
+  const a1 = (EDGES[i + 1] * Math.PI) / 180;
+  const mid = (a0 + a1) / 2;
+  const R = 44;
+  const clip = el('clipPath', { id: `wedge${i}` }, defs);
+  el('polygon', {
+    points: `${PUNCTURE.x},${PUNCTURE.y} ${PUNCTURE.x + R * Math.cos(a0)},${PUNCTURE.y + R * Math.sin(a0)} ${PUNCTURE.x + R * Math.cos(a1)},${PUNCTURE.y + R * Math.sin(a1)}`,
+  }, clip);
+  // Roughly the middle of this wedge of rubber: further from the puncture on the far side.
+  const reach = 5 + 7 * (0.5 - 0.5 * Math.cos(mid - Math.atan2(CENTER.y - PUNCTURE.y, CENTER.x - PUNCTURE.x) + Math.PI));
+  const at = { x: PUNCTURE.x + reach * Math.cos(mid), y: PUNCTURE.y + reach * Math.sin(mid) };
+  const g = el('g', { opacity: 0 }, root);
+  const inner = el('g', { 'clip-path': `url(#wedge${i})` }, g);
+  const skin = el('path', { d: BODY, fill: FILL }, inner);
+  pieces.push({ g, skin, at, mid, speed: 0.75 + rnd(i, 1) * 0.6, spin: (rnd(i, 2) - 0.5) * 2, flips: i % 3 === 1 });
+}
+
+// Specks of rubber and air thrown out by the burst.
+const specks = [];
+for (let i = 0; i < 16; i++) {
+  const angle = (i / 16) * Math.PI * 2 + (rnd(i, 5) - 0.5) * 0.5;
+  const node = el('line', { stroke: i % 4 === 0 ? HI : FILL, 'stroke-linecap': 'round', opacity: 0 }, root);
+  specks.push({ node, angle, far: 15 + rnd(i, 6) * 13, len: 0.8 + rnd(i, 7) * 1.6, w: 0.5 + rnd(i, 8) * 0.6 });
+}
+
+// What stays: the torn crown at the knot.
+const mark = el('g', { opacity: 0 }, root);
+el('path', { d: TORN, fill: FILL }, mark);
+el('path', { d: KNOT, fill: DARK }, mark);
+const markString = el('path', { fill: 'none', stroke: DARK, 'stroke-width': 1.1, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, mark);
+
+/** The wiggly string from the knot, `sway` bends it and `slack` lets it curl. */
+function stringD(sway = 0, slack = 1, length = 9) {
+  const x = KNOT_AT.x, y = KNOT_AT.y + 1.2;
+  const a = 1 * slack, step = length / 3;
+  return `M${x} ${y}c${-a + sway} ${step * 0.4} ${a * 0.9 + sway} ${step * 0.7} ${sway} ${step}s${a * 0.9 + sway} ${step * 0.65} ${-0.1 + sway} ${step}s${a * 0.8 + sway} ${step * 0.5} ${0.2 + sway} ${step * 0.85}`;
+}
+
+function draw(t) {
+  t = ((t % T_END) + T_END) % T_END;
+  const u = t - T_SWELL; // seconds since the burst
+
+  if (u < 0) {
+    // Filling up: it grows from the knot, squashes and stretches, and trembles more and more.
+    const p = t / T_SWELL;
+    const grow = 1 + 0.26 * inOut(p) + 0.05 * inQuad(clamp((p - 0.8) / 0.2));
+    const wob = Math.sin(t * 17) * 0.035 * p;
+    const tremble = p > 0.55 ? (p - 0.55) / 0.45 : 0;
+    const jx = Math.sin(t * 71) * 0.22 * tremble, jy = Math.cos(t * 83) * 0.16 * tremble;
+    const lean = -2 * Math.sin(p * Math.PI) + 3 * inQuad(p);
+    whole.setAttribute('opacity', 1);
+    whole.setAttribute('transform',
+      `translate(${KNOT_AT.x + jx} ${KNOT_AT.y + jy}) rotate(${lean}) scale(${grow * (1 + wob)} ${grow * (1 - wob)}) translate(${-KNOT_AT.x} ${-KNOT_AT.y})`);
+    // The highlight slides and thins as the rubber stretches.
+    shine.setAttribute('fill-opacity', 0.45 + 0.2 * p);
+    shine.setAttribute('transform', `translate(${0.6 * p} ${-0.3 * p})`);
+    knot.setAttribute('opacity', 1);
+    knot.setAttribute('transform', `translate(${jx * 0.4} ${jy * 0.4})`);
+    stringPath.setAttribute('opacity', 1);
+    stringPath.setAttribute('d', stringD(Math.sin(t * 5) * 0.25 * p, 1));
+    stringPath.setAttribute('transform', '');
+    flash.setAttribute('opacity', 0);
+    ring.setAttribute('opacity', 0);
+    mark.setAttribute('opacity', 0);
+    pieces.forEach((piece) => piece.g.setAttribute('opacity', 0));
+    specks.forEach((s) => s.node.setAttribute('opacity', 0));
+    root.setAttribute('transform', '');
+    return;
+  }
+
+  // The burst. The page takes a short knock.
+  const knock = u < 0.3 ? Math.sin(u * 95) * 0.7 * (1 - u / 0.3) : 0;
+  root.setAttribute('transform', `translate(${knock} ${knock * 0.4})`);
+  whole.setAttribute('opacity', 0);
+
+  // A blink of light, then a ring of air.
+  flash.setAttribute('opacity', u < 0.08 ? 0.6 * (1 - u / 0.08) : 0);
+  flash.setAttribute('r', 13.5 + 60 * u);
+  const ringP = clamp(u / 0.3);
+  ring.setAttribute('opacity', u < 0.3 ? 0.35 * (1 - ringP) : 0);
+  ring.setAttribute('r', 12 + 20 * outCubic(ringP));
+  ring.setAttribute('stroke-width', 0.8 * (1 - ringP) + 0.1);
+
+  // The rubber snaps away from the puncture, shrivels in a blink, then tumbles down.
+  const SWELLED = 1.31;
+  pieces.forEach((piece, i) => {
+    const snap = outExpo(u / 0.22);           // thrown out
+    const shrivel = outCubic(u / 0.3);       // latex pulls itself small
+    const fall = Math.max(0, u - 0.1);
+    // Away from the puncture, and a little away from the middle.
+    const dx = Math.cos(piece.mid) * 0.75 + (piece.at.x - CENTER.x) * 0.045;
+    const dy = Math.sin(piece.mid) * 0.75 + (piece.at.y - CENTER.y) * 0.045;
+    const throwDist = 16 * piece.speed * snap;
+    const drift = Math.sin(fall * 5 + i) * 1.6 * clamp(fall / 0.5); // flutter on the way down
+    const x = piece.at.x + dx * throwDist + drift;
+    const y = piece.at.y + dy * throwDist + 34 * fall * fall * (0.7 + 0.5 * rnd(i, 9)) + 4 * fall;
+    const scale = SWELLED * (1 - 0.5 * shrivel);
+    // A flutter squashes the scrap, like a leaf turning.
+    const turn = Math.cos(fall * 9 + i * 1.7);
+    const rot = piece.spin * (160 * snap + 240 * fall);
+    const fade = u < 0.95 ? 1 : 1 - clamp((u - 0.95) / 0.5);
+    piece.g.setAttribute('opacity', fade);
+    piece.g.setAttribute('transform',
+      `translate(${x} ${y}) rotate(${rot}) scale(${scale} ${scale * (fall > 0.05 ? 0.35 + 0.65 * Math.abs(turn) : 1)}) translate(${-piece.at.x} ${-piece.at.y})`);
+    // The inside of the rubber is paler: some scraps show it as they turn.
+    piece.skin.setAttribute('fill', piece.flips && turn < 0 && fall > 0.05 ? HI : FILL);
+  });
+
+  // Specks fly straight out and are gone.
+  specks.forEach((s) => {
+    const p = clamp(u / 0.42);
+    const d = 9 + s.far * outCubic(p);
+    const x = CENTER.x + Math.cos(s.angle) * d, y = CENTER.y + Math.sin(s.angle) * d;
+    const len = s.len * (1 - p) + 0.2;
+    s.node.setAttribute('x1', x); s.node.setAttribute('y1', y);
+    s.node.setAttribute('x2', x + Math.cos(s.angle) * len); s.node.setAttribute('y2', y + Math.sin(s.angle) * len);
+    s.node.setAttribute('stroke-width', s.w * (1 - 0.6 * p));
+    s.node.setAttribute('opacity', u < 0.42 ? 1 - inQuad(p) : 0);
+  });
+
+  // The knot jumps as the rubber lets go, then hangs: the crown of torn rubber is what's left.
+  const jump = u < 0.5 ? -2.6 * Math.sin(clamp(u / 0.5) * Math.PI) * (1 - u / 0.5) : 0;
+  const swing = Math.sin(u * 11) * 7 * Math.exp(-u * 3.2);
+  knot.setAttribute('opacity', 0);
+  stringPath.setAttribute('opacity', 0);
+  mark.setAttribute('opacity', 1);
+  // The crown starts wide, as the torn neck, and tightens.
+  const crown = 1 + 0.5 * (1 - outCubic(u / 0.35));
+  mark.setAttribute('transform',
+    `translate(${KNOT_AT.x} ${KNOT_AT.y + jump}) rotate(${swing}) scale(${crown}) translate(${-KNOT_AT.x} ${-KNOT_AT.y})`);
+  markString.setAttribute('d', stringD(Math.sin(u * 11 + 1) * 0.9 * Math.exp(-u * 2.6), 1 + 0.8 * Math.exp(-u * 4)));
+}
+
+window.draw = draw;
+window.T_END = T_END;
+if (!params.has('capture')) {
+  const start = performance.now();
+  const speed = Number(params.get('speed') || 1);
+  (function loop(now) { draw(((now - start) / 1000) * speed); requestAnimationFrame(loop); })(start);
+} else {
+  draw(0);
+}
+</script>
+</body>
+</html>

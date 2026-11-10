@@ -24,6 +24,8 @@ const Ink = {
   brand: '#5D2355',
   /** The brand balloon's knot and string. */
   brandDeep: '#2C0B28',
+  /** The pale inside of the brand balloon's rubber, seen as its scraps turn. */
+  brandPale: '#B77FAE',
   brandTint: 'rgba(93, 35, 85, 0.1)',
   /** The text color at 6%: selected fills and icon circles. */
   inkTint: 'rgba(25, 25, 25, 0.06)',
@@ -75,6 +77,8 @@ const light = {
   onBrand: Ink.onAccent,
   /** The brand balloon's knot and string. */
   brandDeep: Ink.brandDeep,
+  /** The pale inside of the brand balloon's rubber. */
+  brandPale: Ink.brandPale,
   /** The brand plum at 10%, behind the paywall's selected plan. */
   brandWash: Ink.brandTint,
   /** Balloon strings, the caret in answers. */
