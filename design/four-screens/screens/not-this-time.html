@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Not this time</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#5D2355}a:hover{color:#3F1739}
+.pd-root > *{animation:pd-rise 760ms cubic-bezier(.22,1,.36,1) both}
+.pd-root > *:nth-child(2){animation-delay:80ms}.pd-root > *:nth-child(3){animation-delay:160ms}.pd-root > *:nth-child(4){animation-delay:240ms}.pd-root > *:nth-child(5){animation-delay:320ms}.pd-root > *:nth-child(6){animation-delay:400ms}.pd-root > *:nth-child(7){animation-delay:480ms}
+@keyframes pd-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.pd-bob{animation:pd-bob 5s ease-in-out infinite;transform-origin:50% 100%}
+.pd-bob2{animation:pd-bob 4.2s ease-in-out -1.6s infinite;transform-origin:50% 100%}
+.pd-bob3{animation:pd-bob 5.6s ease-in-out -3s infinite;transform-origin:50% 100%}
+@keyframes pd-bob{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-7px) rotate(-1.6deg)}}
+.pd-sway{animation:pd-sway 6s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes pd-sway{0%,100%{transform:rotate(-1.2deg)}50%{transform:rotate(1.2deg)}}
+.pd-ghost{animation:pd-ghost 2.6s ease-in-out infinite}
+@keyframes pd-ghost{0%,100%{opacity:.45}50%{opacity:.9}}
+.pd-count{animation:pd-count 5s linear both;transform-origin:left center}
+@keyframes pd-count{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.pd-shred{animation:pd-shred 1.4s cubic-bezier(.22,1,.36,1) 300ms both}
+@keyframes pd-shred{from{opacity:0;transform:translate(0,-18px) scale(.6)}to{opacity:1;transform:none}}
+.pd-root a[href]{transition:transform 180ms cubic-bezier(.22,1,.36,1),opacity 180ms}
+.pd-root a[href]:active{transform:scale(1.02)}
+@media (prefers-reduced-motion: reduce){.pd-root *{animation:none !important;transition:none !important}}
+</style>
+<div class="pd-root" style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #FFFDFE; font-family: 'Figtree', -apple-system, system-ui, sans-serif; color: #191919; box-sizing: border-box">
+  <div style="position: absolute; left: 0; right: 0; top: 96px; height: 250px">
+    <span class="pd-shred" style="position: absolute; left: 96px; top: 150px; width: 14px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 1; rotate: -28deg"></span><span class="pd-shred" style="position: absolute; left: 274px; top: 138px; width: 16px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 1; rotate: 34deg"></span><span class="pd-shred" style="position: absolute; left: 70px; top: 214px; width: 10px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 0.7; rotate: 18deg"></span><span class="pd-shred" style="position: absolute; left: 304px; top: 206px; width: 12px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 0.75; rotate: -16deg"></span><span class="pd-shred" style="position: absolute; left: 128px; top: 104px; width: 10px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 0.6; rotate: 62deg"></span><span class="pd-shred" style="position: absolute; left: 246px; top: 96px; width: 12px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 0.6; rotate: -58deg"></span><span class="pd-shred" style="position: absolute; left: 190px; top: 82px; width: 9px; height: 5px; border-radius: 3px; background: #5D2355; opacity: 0.45; rotate: 8deg"></span>
+    <div style="position: absolute; left: 135px; top: 34px"><svg width="120" height="170" viewBox="0 0 24 34" aria-hidden="true" style="display: block; overflow: visible">
+  <path d="M9.2 20.9c-1.5-1.3-2.2-3-1.9-4.9.9.9 1.7 1.3 2.5 1.2-.2-1.5.2-2.8 1.2-3.9.4 1.4 1 2.4 1.9 3 .2-1 .8-1.8 1.7-2.4.6 1.3.7 2.5.3 3.7.8 0 1.5-.4 2.1-1.2.4 1.8-.2 3.4-1.8 4.6-1.9.6-4 .6-6-.1z" fill="#5D2355"/>
+  <path d="M8.3 17.2c.5.6 1 .9 1.5.9-.1.9.1 1.7.6 2.5-.9-.3-1.6-.8-2-1.5-.2-.6-.3-1.2-.1-1.9z" fill="#FFFFFF" opacity=".28"/>
+  <path d="M12 20.3c-.9-.3-2.4.2-2.5 1 0 .6.9.9 1.9.6-.7.5-.8 1.1-.2 1.3.6.2 1-.4 1.1-1 .1.6.5 1.2 1.1 1 .6-.2.5-.8-.2-1.3 1 .3 1.9 0 1.9-.6-.1-.8-1.6-1.3-2.5-1-.2.1-.4.1-.6 0z" fill="#3F1739"/><path d="M12 23.2c.9.9.9 1.9-.1 2.8-1 .9-1 1.9.1 2.8 1 .9 1 1.9-.1 2.8-.6.5-.8 1-.7 1.6" fill="none" stroke="#3F1739" stroke-width="1.1" stroke-linecap="round"/>
+</svg></div>
+  </div>
+
+  <div style="position: absolute; left: 20px; right: 20px; top: 356px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px">
+    <h1 style="margin: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 46px; line-height: 50px; letter-spacing: -0.02em">Not this time.</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 22px; color: #5F5F5F; width: 330px">Sofia popped your balloon in round 1.<br>Watch how it ends, or try another room.</p>
+  </div>
+
+  <a href="room-ready-balloon.html" aria-label="Watch the rest of the room" style="position: absolute; left: 20px; right: 20px; top: 496px; display: block; border-radius: 24px; background: #F3F0F1; box-shadow: inset 0 0 0 1px rgba(25,25,25,0.10); padding: 14px 16px 0; box-sizing: border-box; text-decoration: none; color: #191919">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px"><span style="font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #818181">Still floating</span><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #5F5F5F"><span class="pd-ghost" style="width: 6px; height: 6px; border-radius: 50%; background: #0D6765"></span>4 of 5</span></div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end"><div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 52px"><svg class="pd-bob3" width="24" height="34" viewBox="0 0 24 34" aria-hidden="true" style="display: block; overflow: visible; "><path d="M12 1.6c4.6-.1 8.3 3.5 8.2 8.3-.1 4.6-3.6 8.6-7.6 10.6-.4.2-.8.2-1.2 0C7.2 18.4 3.7 14.6 3.7 9.8 3.7 5.2 7.4 1.7 12 1.6z" fill="#E2B566"/><path d="M7.3 5.5c-1.2 1.2-1.8 2.9-1.5 4.7" fill="none" stroke="#FFFFFF" stroke-opacity=".38" stroke-width="1.3" stroke-linecap="round"/><path d="M12 20.3c-.9-.3-2.4.2-2.5 1 0 .6.9.9 1.9.6-.7.5-.8 1.1-.2 1.3.6.2 1-.4 1.1-1 .1.6.5 1.2 1.1 1 .6-.2.5-.8-.2-1.3 1 .3 1.9 0 1.9-.6-.1-.8-1.6-1.3-2.5-1-.2.1-.4.1-.6 0z" fill="#7A5418"/><path d="M12 23.2c.9.9.9 1.9-.1 2.8-1 .9-1 1.9.1 2.8 1 .9 1 1.9-.1 2.8-.6.5-.8 1-.7 1.6" fill="none" stroke="#7A5418" stroke-width="1.1" stroke-linecap="round"/></svg><span style="font-size: 12px; color: #5F5F5F">Tim</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 52px"><svg class="pd-bob3" width="24" height="34" viewBox="0 0 24 34" aria-hidden="true" style="display: block; overflow: visible; "><path d="M12 1.6c4.6-.1 8.3 3.5 8.2 8.3-.1 4.6-3.6 8.6-7.6 10.6-.4.2-.8.2-1.2 0C7.2 18.4 3.7 14.6 3.7 9.8 3.7 5.2 7.4 1.7 12 1.6z" fill="#DD6A60"/><path d="M7.3 5.5c-1.2 1.2-1.8 2.9-1.5 4.7" fill="none" stroke="#FFFFFF" stroke-opacity=".38" stroke-width="1.3" stroke-linecap="round"/><path d="M12 20.3c-.9-.3-2.4.2-2.5 1 0 .6.9.9 1.9.6-.7.5-.8 1.1-.2 1.3.6.2 1-.4 1.1-1 .1.6.5 1.2 1.1 1 .6-.2.5-.8-.2-1.3 1 .3 1.9 0 1.9-.6-.1-.8-1.6-1.3-2.5-1-.2.1-.4.1-.6 0z" fill="#7A2A24"/><path d="M12 23.2c.9.9.9 1.9-.1 2.8-1 .9-1 1.9.1 2.8 1 .9 1 1.9-.1 2.8-.6.5-.8 1-.7 1.6" fill="none" stroke="#7A2A24" stroke-width="1.1" stroke-linecap="round"/></svg><span style="font-size: 12px; color: #5F5F5F">David</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 52px"><svg width="24" height="34" viewBox="0 0 24 34" aria-hidden="true" style="display: block; overflow: visible; "><path d="M12 1.6c4.6-.1 8.3 3.5 8.2 8.3-.1 4.6-3.6 8.6-7.6 10.6-.4.2-.8.2-1.2 0C7.2 18.4 3.7 14.6 3.7 9.8 3.7 5.2 7.4 1.7 12 1.6z" fill="none" stroke="#818181" stroke-width=".7" stroke-dasharray="1.6 1.4" stroke-linecap="round"/><path d="M12 23.2c.9.9.9 1.9-.1 2.8-1 .9-1 1.9.1 2.8 1 .9 1 1.9-.1 2.8-.6.5-.8 1-.7 1.6" fill="none" stroke="#818181" stroke-width=".7" stroke-dasharray="1.6 1.4" stroke-linecap="round"/></svg><span style="font-size: 12px; font-weight: 700; color: #818181; text-decoration: line-through">You</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 52px"><svg class="pd-bob3" width="24" height="34" viewBox="0 0 24 34" aria-hidden="true" style="display: block; overflow: visible; "><path d="M12 1.6c4.6-.1 8.3 3.5 8.2 8.3-.1 4.6-3.6 8.6-7.6 10.6-.4.2-.8.2-1.2 0C7.2 18.4 3.7 14.6 3.7 9.8 3.7 5.2 7.4 1.7 12 1.6z" fill="#E8A3A2"/><path d="M7.3 5.5c-1.2 1.2-1.8 2.9-1.5 4.7" fill="none" stroke="#FFFFFF" stroke-opacity=".38" stroke-width="1.3" stroke-linecap="round"/><path d="M12 20.3c-.9-.3-2.4.2-2.5 1 0 .6.9.9 1.9.6-.7.5-.8 1.1-.2 1.3.6.2 1-.4 1.1-1 .1.6.5 1.2 1.1 1 .6-.2.5-.8-.2-1.3 1 .3 1.9 0 1.9-.6-.1-.8-1.6-1.3-2.5-1-.2.1-.4.1-.6 0z" fill="#8A3D45"/><path d="M12 23.2c.9.9.9 1.9-.1 2.8-1 .9-1 1.9.1 2.8 1 .9 1 1.9-.1 2.8-.6.5-.8 1-.7 1.6" fill="none" stroke="#8A3D45" stroke-width="1.1" stroke-linecap="round"/></svg><span style="font-size: 12px; color: #5F5F5F">Elias</span></div><div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 52px"><svg class="pd-bob3" width="24" height="34" viewBox="0 0 24 34" aria-hidden="true" style="display: block; overflow: visible; "><path d="M12 1.6c4.6-.1 8.3 3.5 8.2 8.3-.1 4.6-3.6 8.6-7.6 10.6-.4.2-.8.2-1.2 0C7.2 18.4 3.7 14.6 3.7 9.8 3.7 5.2 7.4 1.7 12 1.6z" fill="#8E1430"/><path d="M7.3 5.5c-1.2 1.2-1.8 2.9-1.5 4.7" fill="none" stroke="#FFFFFF" stroke-opacity=".38" stroke-width="1.3" stroke-linecap="round"/><path d="M12 20.3c-.9-.3-2.4.2-2.5 1 0 .6.9.9 1.9.6-.7.5-.8 1.1-.2 1.3.6.2 1-.4 1.1-1 .1.6.5 1.2 1.1 1 .6-.2.5-.8-.2-1.3 1 .3 1.9 0 1.9-.6-.1-.8-1.6-1.3-2.5-1-.2.1-.4.1-.6 0z" fill="#4A0A18"/><path d="M12 23.2c.9.9.9 1.9-.1 2.8-1 .9-1 1.9.1 2.8 1 .9 1 1.9-.1 2.8-.6.5-.8 1-.7 1.6" fill="none" stroke="#4A0A18" stroke-width="1.1" stroke-linecap="round"/></svg><span style="font-size: 12px; color: #5F5F5F">Noah</span></div></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; height: 48px; margin-top: 12px; border-top: 1px solid rgba(25,25,25,0.10)"><span style="font-size: 15px; font-weight: 600; color: #5D2355">Watch round 2 live</span><svg width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="#5D2355" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></div>
+  </a>
+
+  <div style="position: absolute; left: 20px; right: 20px; bottom: 34px; display: flex; flex-direction: column; gap: 4px">
+    <a href="queue.html" style="display: flex; align-items: center; justify-content: center; height: 56px; border-radius: 999px; background: #191919; color: #FFFDFE; font-size: 17px; font-weight: 600; text-decoration: none">Get back in line</a>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; height: 48px; color: #191919; font-size: 17px; font-weight: 600; text-decoration: none">Leave room</a>
+  </div>
+</div>
+</body>
+</html>

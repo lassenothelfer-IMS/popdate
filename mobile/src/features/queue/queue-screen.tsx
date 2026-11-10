@@ -1,35 +1,19 @@
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  AppState,
-  Platform,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AccessibilityInfo, AppState, Platform, StyleSheet } from 'react-native';
 import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 
 import { api, type Room } from '@/api';
-import { Avatar } from '@/components/avatar';
-import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
-import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MaxContentWidth, MinTouch, Motion, Radius, Space } from '@/constants/theme';
-import { roomSeatIndex } from '@/features/game/room-seats';
-import { PushPrompt } from '@/features/home/push-prompt';
-import { BalloonBunch } from '@/features/queue/balloon-bunch';
+import { Ease, Motion } from '@/constants/theme';
 import { lineClockStart, secondsSince } from '@/features/queue/line-clock';
-import { RollingCount } from '@/features/queue/rolling-count';
+import { QueueStage, RoomReadyStage } from '@/features/queue/queue-stages';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
 import { useQueueStatus, useRoom } from '@/hooks/use-server';
-import { seatAt, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { LOBBY_SIZE, QUEUE_PING_MS } from '@/shared/limits';
-import { useSession } from '@/state/session';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
@@ -45,29 +29,13 @@ const TICK_GAP_MS = 1000;
  * first), so it doesn't tick.
  */
 const CATCH_UP_MS = 5000;
-/** How long the role beat holds before the room appears. A tap skips it. */
-const ROLE_BEAT_MS = 1500;
-/** With a screen reader on, the beat holds long enough for the role line to be read out. */
-const ROLE_BEAT_SCREEN_READER_MS = 4000;
+/** How long the "room is ready" countdown runs before the room opens by itself. */
+const ROLE_BEAT_MS = 5000;
 /**
  * If the room never answers (a slow or failed watch), the room opens anyway after this.
  * The room screen has its own loading and missing states.
  */
-const ROOM_WAIT_MS = ROLE_BEAT_MS * 2;
-/** The role word at the count size, unless it needs less to fit on one line. */
-const WORD_SIZE = 112;
-/** On the web, which can't shrink text to fit: New York Light runs a little over half an em a letter. */
-const WORD_EM_PER_LETTER = 0.6;
-
-/** The role lines replace the queue lines. Opacity only, so it stays under Reduce Motion. */
-const beatIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
-
-/**
- * The count and the bunch are there at once: the push already slides the
- * screen in, so they only fade up, quickly. Opacity only.
- */
-const stageIn = FadeIn.duration(Motion.enter).easing(Ease.out).reduceMotion(ReduceMotion.Never);
-
+const ROOM_WAIT_MS = 3000;
 /**
  * useQueueStatus starts as idle for one frame before the queue answers, so the
  * idle copy waits a beat instead of flashing during the push.
@@ -98,24 +66,6 @@ function waitedLabel(seconds: number) {
 function openRoom(roomId: string) {
   setRoomOpenedByQueue(roomId);
   router.replace({ pathname: '/room/[id]', params: { id: roomId } });
-}
-
-/** Whether VoiceOver or TalkBack is on. Web always reports true, so it is skipped there. */
-function useScreenReader() {
-  const [enabled, setEnabled] = useState(false);
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    let active = true;
-    AccessibilityInfo.isScreenReaderEnabled().then((value) => {
-      if (active) setEnabled(value);
-    });
-    const subscription = AccessibilityInfo.addEventListener('screenReaderChanged', setEnabled);
-    return () => {
-      active = false;
-      subscription.remove();
-    };
-  }, []);
-  return enabled;
 }
 
 type RoleBeat = {
@@ -207,13 +157,11 @@ type FillingRoomProps = {
 };
 
 function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
-  const theme = useTheme();
   const t = useT();
   const [room, setRoom] = useState<Room | null | undefined>(undefined);
   const entered = useRef(false);
   const celebrated = useRef(false);
-  const screenReader = useScreenReader();
-  const holdMs = screenReader ? ROLE_BEAT_SCREEN_READER_MS : ROLE_BEAT_MS;
+  const holdMs = ROLE_BEAT_MS;
   // Counted from the join itself, so time with the app in the background counts too.
   const [startedAt] = useState(() => lineClockStart() ?? Date.now());
   const [waited, setWaited] = useState(() => secondsSince(startedAt));
@@ -388,132 +336,27 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
     }
   }
 
-  function skipBeat() {
-    if (!roomId || entered.current) return;
-    entered.current = true;
-    openRoom(roomId);
-  }
-
   // Android's back button leaves the line like the button, so the queue doesn't fill a room
   // you've left. Once you're matched it does nothing: the room is on its way.
   useHardwareBack(() => void handleCancel());
 
   return (
-    <Screen scroll contentStyle={styles.content}>
+    <>
       {roomId ? <RoomWatcher roomId={roomId} onChange={setRoom} /> : null}
-
-      {/* Once the room is full a tap anywhere opens it right away, even before it answers. */}
-      <Pressable accessible={false} disabled={!roomId} onPress={skipBeat} style={styles.page}>
-        <View style={styles.top}>
-          {beat ? (
-            <Animated.View entering={beatIn} style={styles.topLabel}>
-              <ThemedText type="kicker">{t('queue.roomReady')}</ThemedText>
-            </Animated.View>
-          ) : (
-            <>
-              <Button
-                title={t('queue.leaveLine')}
-                variant="plain"
-                fullWidth={false}
-                disabled={matched}
-                loading={leaving}
-                onPress={() => void handleCancel()}
-              />
-              <View style={[styles.pill, { backgroundColor: theme.surface }]}>
-                <ThemedText type="timer" style={styles.pillText}>
-                  {t('queue.waited', { time: waitedLabel(waited) })}
-                </ThemedText>
-              </View>
-            </>
-          )}
-        </View>
-        {leaveError && !beat ? <ErrorLine message={leaveError} /> : null}
-
-        {beat ? (
-          <Animated.View key="beat" entering={beatIn} style={styles.headline}>
-            <ThemedText type="question" themeColor="textSecondary" style={styles.lead}>
-              {beat.lead}
-            </ThemedText>
-            <RoleWord word={beat.word} />
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.headlineLine}>
-              {beat.line}
-            </ThemedText>
-          </Animated.View>
-        ) : (
-          <Animated.View entering={stageIn} style={styles.headline}>
-            <View
-              accessible
-              accessibilityLabel={`${t('queue.seatsTaken')} ${found}. ${t('queue.countLine', { needed, people: numberWord(t, needed) })}`}
-              accessibilityLiveRegion="polite"
-              style={styles.headline}>
-              <ThemedText type="kicker">{t('queue.seatsTaken')}</ThemedText>
-              <RollingCount value={found} />
-              <ThemedText type="callout" themeColor="textSecondary" style={styles.headlineLine}>
-                {t('queue.countLine', { needed, people: numberWord(t, needed) })}
-              </ThemedText>
-            </View>
-          </Animated.View>
-        )}
-
-        {beat && room ? (
-          <Animated.View key="seats" entering={beatIn} style={styles.cardSlot}>
-            <RoomSeats room={room} />
-          </Animated.View>
-        ) : (
-          <Animated.View entering={stageIn} style={styles.stage}>
-            <BalloonBunch found={found} needed={needed} />
-            {/* The text fades in fresh on each change; the parent stays, so a screen reader's focus does too. */}
-            <View accessible accessibilityLabel={statusLine}>
-              <Animated.View
-                key={statusLine}
-                entering={beatIn}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants">
-                <ThemedText type="footnote" themeColor="textTertiary" style={styles.centered}>
-                  {statusLine}
-                </ThemedText>
-              </Animated.View>
-            </View>
-          </Animated.View>
-        )}
-        {/* Asked here, where it's useful: you can leave the app and still hear when the room opens. */}
-        {beat ? null : <PushPrompt />}
-      </Pressable>
-    </Screen>
-  );
-}
-
-/**
- * "choosing", "a balloon": as big as the line allows and never broken. iOS and
- * Android shrink it to the width; the web gets a size from the screen width instead.
- */
-function RoleWord({ word }: { word: string }) {
-  const { width } = useWindowDimensions();
-  const line = Math.min(width, MaxContentWidth) - Gutter * 2;
-  const fontSize =
-    Platform.OS === 'web'
-      ? Math.min(WORD_SIZE, Math.floor(line / (word.length * WORD_EM_PER_LETTER)))
-      : WORD_SIZE;
-  return (
-    <ThemedText
-      type="count"
-      accessibilityRole="header"
-      maxFontSizeMultiplier={1}
-      allowFontScaling={false}
-      numberOfLines={1}
-      adjustsFontSizeToFit
-      minimumFontScale={0.3}
-      style={[
-        styles.centered,
-        styles.word,
-        fontSize < WORD_SIZE && {
-          fontSize,
-          lineHeight: Math.ceil(fontSize * 1.15),
-          letterSpacing: -0.03 * fontSize,
-        },
-      ]}>
-      {word}
-    </ThemedText>
+      {beat && room ? (
+        <RoomReadyStage room={room} holdMs={holdMs} />
+      ) : (
+        <QueueStage
+          found={found}
+          needed={needed}
+          waited={waitedLabel(waited)}
+          leaving={leaving}
+          locked={matched}
+          error={leaveError}
+          onLeave={() => void handleCancel()}
+        />
+      )}
+    </>
   );
 }
 
@@ -532,54 +375,6 @@ function RoomWatcher({
   return null;
 }
 
-/**
- * The room once it is known: the chooser's avatar, then each balloon with its
- * holder's name, and yours labeled You.
- */
-function RoomSeats({ room }: { room: Room }) {
-  const theme = useTheme();
-  const seats = useSeats();
-  const t = useT();
-  const { profile } = useSession();
-  const choosing = room.me.role === 'popper';
-  // Your own seat shows your own first photo, as the tab bar does, or your initial.
-  const popperPhoto = choosing ? (profile?.photos[0] ?? room.popper.photos[0]) : room.popper.photos[0];
-  return (
-    <View
-      style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants">
-      <View style={styles.cardSeat}>
-        <Avatar
-          name={choosing ? (profile?.name ?? room.popper.name) : room.popper.name}
-          uri={popperPhoto}
-          tone={choosing ? youSeat(seats) : undefined}
-          size={42}
-        />
-        <ThemedText type="captionStrong" numberOfLines={1}>
-          {choosing ? t('common.you') : room.popper.name}
-        </ThemedText>
-      </View>
-      {room.contestants.map((contestant, index) => {
-        const mine = contestant.id === room.me.id;
-        return (
-          <View key={contestant.id} style={styles.cardSeat}>
-            <View style={styles.cardBalloon}>
-              <Balloon color={seatAt(seats, roomSeatIndex(room.contestants, index, room.me.id)).color} size={22} />
-            </View>
-            <ThemedText
-              type={mine ? 'captionStrong' : 'caption'}
-              themeColor={mine ? 'text' : 'textSecondary'}
-              numberOfLines={1}>
-              {mine ? t('common.you') : contestant.name}
-            </ThemedText>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
@@ -589,78 +384,6 @@ const styles = StyleSheet.create({
   },
   idle: {
     flexGrow: 1,
-    justifyContent: 'center',
-  },
-  page: {
-    flexGrow: 1,
-  },
-  top: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: MinTouch,
-  },
-  topLabel: {
-    minHeight: MinTouch,
-    justifyContent: 'center',
-  },
-  pill: {
-    paddingVertical: 7,
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.pill,
-  },
-  pillText: {
-    fontWeight: 600,
-  },
-  headline: {
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 40,
-  },
-  word: {
-    alignSelf: 'stretch',
-  },
-  lead: {
-    fontSize: 22,
-    lineHeight: 28,
-    textAlign: 'center',
-  },
-  headlineLine: {
-    textAlign: 'center',
-    maxWidth: 300,
-    marginTop: Space.xxs,
-  },
-  // The bunch fills the middle of the screen, with the status line under the hand.
-  stage: {
-    flexGrow: 1,
-    gap: Space.md,
-    minHeight: 260,
-    marginTop: Space.lg,
-    paddingBottom: Space.md,
-  },
-  cardSlot: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    marginTop: Space.lg,
-  },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 18,
-    minHeight: 140,
-    paddingHorizontal: Space.md,
-    borderRadius: Radius.card,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  cardSeat: {
-    alignItems: 'center',
-    gap: Space.xs,
-    maxWidth: 52,
-  },
-  cardBalloon: {
-    height: 42,
     justifyContent: 'center',
   },
 });

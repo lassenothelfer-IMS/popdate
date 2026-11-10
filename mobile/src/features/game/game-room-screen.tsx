@@ -47,6 +47,7 @@ import { useTextScale } from '@/hooks/use-text-scale';
 import { seatAt, useSeats } from '@/hooks/use-theme';
 import { track, type RoomOutcome } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
+import { goHome } from '@/utils/navigation';
 import { numberWord } from '@/utils/number-word';
 import { countRoomPlayed, useShowHints } from '@/utils/rooms-played';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
@@ -207,7 +208,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   if (room === undefined) return <LoadingScreen label={t('game.loadingRoom')} />;
   if (room === null || !phase) return <RoomGone />;
 
-  const { isPopper, myIndex, me, iAmActive, finished, answering } = phase;
+  const { isPopper, me, iAmActive, finished, answering } = phase;
   const { pending, selected, selectedQuestion, winner, canSelect, up, revealing } = phase;
   const othersInRoom: Person[] = [room.popper, ...room.contestants]
     .filter((player) => player.id !== room.me.id)
@@ -363,11 +364,19 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
         <PoppedView
           popperName={room.popper.name}
           round={me.poppedInRound}
-          color={seatAt(seats, roomSeatIndex(room.contestants, myIndex, room.me.id)).color}
-          fresh={beat?.id === me.id}
+          seats={room.contestants.map((contestant) => ({
+            id: contestant.id,
+            name: contestant.name,
+            color: seatOf(contestant).color,
+            popped: contestant.popped,
+          }))}
+          meId={room.me.id}
+          liveRound={finished ? null : room.round}
           replaying={replaying}
           error={shownError}
           onPlayAgain={exit.playAgain}
+          // Your balloon has popped, so this isn't leaving mid-game: straight to Play.
+          onLeave={goHome}
           onWatch={() => {
             exit.setConfirmingLeave(false);
             // The room comes back as it is now: photos already out don't develop again.

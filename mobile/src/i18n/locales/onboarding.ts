@@ -93,7 +93,7 @@ export const onboarding = {
     photoTag: 'Photo %{position}',
     photosReady: 'photos\nready',
     readyRoomTitle: 'Rooms open when six are ready',
-    readyRoomBody: 'From Home you can join a room in %{city} any time.',
+    readyRoomBody: 'You can join a room in %{city} any time from the Play tab.',
     everyone: 'Everyone',
   },
   de: {
@@ -190,7 +190,7 @@ export const onboarding = {
     photoTag: 'Foto %{position}',
     photosReady: 'Fotos\nbereit',
     readyRoomTitle: 'Räume öffnen, wenn sechs bereit sind',
-    readyRoomBody: 'Auf Start kannst du jederzeit einem Raum in %{city} beitreten.',
+    readyRoomBody: 'Im Tab «Spielen» kannst du jederzeit einem Raum in %{city} beitreten.',
     everyone: 'Alle',
   },
   fr: {
@@ -287,7 +287,7 @@ export const onboarding = {
     photoTag: 'Photo %{position}',
     photosReady: 'photos\nprêtes',
     readyRoomTitle: 'Les salles s’ouvrent quand six personnes sont prêtes',
-    readyRoomBody: 'Depuis l’accueil, tu peux rejoindre une salle à %{city} quand tu veux.',
+    readyRoomBody: 'Depuis l’onglet Jouer, tu peux rejoindre une salle à %{city} quand tu veux.',
     everyone: 'Tout le monde',
   },
   it: {
@@ -383,7 +383,7 @@ export const onboarding = {
     photoTag: 'Foto %{position}',
     photosReady: 'foto\npronte',
     readyRoomTitle: 'Le stanze si aprono quando sei persone sono pronte',
-    readyRoomBody: 'Dalla home puoi entrare in una stanza a %{city} quando vuoi.',
+    readyRoomBody: 'Dalla scheda Gioca puoi entrare in una stanza a %{city} quando vuoi.',
     everyone: 'Tutti',
   },
 } satisfies Strings;

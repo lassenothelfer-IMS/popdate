@@ -19,7 +19,7 @@ export const BALLOON_BODY =
 export const BALLOON_KNOT =
   'M11.6 22.4L13.6 22.4L12.6 24.1zM12.6 24C12 23.2 10.7 23 10.7 24C10.7 25 11.9 24.7 12.6 24C13.3 24.9 14.9 25.2 14.8 23.9C14.7 22.8 13.2 23.2 12.6 24z';
 /** A filled brush stroke, tapered at both ends. */
-const HIGHLIGHT =
+export const BALLOON_SHINE =
   'M6.5 11.8C5.9 8.6 7.5 5.6 10.5 4.5C10.9 4.4 11.1 4.8 10.8 5.1C8.7 6.5 7.6 8.8 7.6 11.6C7.6 12.3 6.6 12.4 6.5 11.8z';
 const STRING = 'M12.6 24.6c-1 1.2.9 2 0 3.1s.9 2-.1 3.1s.8 1.6.2 2.6';
 export const BALLOON_STRING_SHORT = 'M12.6 24.4c-.9 1.1.8 1.8 0 2.8s.8 1.8-.1 2.8';
@@ -33,6 +33,16 @@ const BODY = BALLOON_BODY;
 const KNOT = BALLOON_KNOT;
 const STRING_SHORT = BALLOON_STRING_SHORT;
 const TORN = BALLOON_TORN;
+const HIGHLIGHT = BALLOON_SHINE;
+/**
+ * A popped balloon's torn crown and its sheen (design/four-screens), drawn for a
+ * knot a little higher and to the left: `CROWN_PLACE` sets it on this knot.
+ */
+const CROWN =
+  'M9.2 20.9c-1.5-1.3-2.2-3-1.9-4.9.9.9 1.7 1.3 2.5 1.2-.2-1.5.2-2.8 1.2-3.9.4 1.4 1 2.4 1.9 3 .2-1 .8-1.8 1.7-2.4.6 1.3.7 2.5.3 3.7.8 0 1.5-.4 2.1-1.2.4 1.8-.2 3.4-1.8 4.6-1.9.6-4 .6-6-.1z';
+const CROWN_SHINE =
+  'M8.3 17.2c.5.6 1 .9 1.5.9-.1.9.1 1.7.6 2.5-.9-.3-1.6-.8-2-1.5-.2-.6-.3-1.2-.1-1.9z';
+const CROWN_PLACE = 'translate(0.6 2.1)';
 /** The middle of the body, where a pop bursts from. */
 const BODY_CENTER = { x: 12.2, y: 12 };
 /** Below this width the highlight is a smudge, so it is left off. */
@@ -71,24 +81,61 @@ type BalloonProps = {
   color: string;
   /** Width of the box in points. */
   size?: number;
-  /** An outline for a seat that isn't filled yet. */
+  /** A seat that isn't filled, or is no longer: body and string as a dashed outline. */
   ghost?: boolean;
+  /** Popped: the torn crown on the knot, with the bow and the string. */
+  popped?: boolean;
   /** The highlight on the body. Off for the smallest marks. */
   shine?: boolean;
   /** The wiggly string. Off where the screen draws its own string. */
   string?: boolean;
 };
 
-export function Balloon({ color, size = 24, ghost = false, shine = true, string = true }: BalloonProps) {
+export function Balloon({
+  color,
+  size = 24,
+  ghost = false,
+  popped = false,
+  shine = true,
+  string = true,
+}: BalloonProps) {
   const theme = useTheme();
   const height = balloonHeight(size);
   const { fill, knot } = balloonInks(color, theme);
 
   if (ghost) {
+    const dashed = {
+      fill: 'none',
+      stroke: theme.textTertiary,
+      strokeWidth: 0.7,
+      strokeDasharray: [1.6, 1.4],
+      strokeLinecap: 'round',
+    } as const;
     return (
       <Svg width={size} height={height} viewBox={VIEW_BOX}>
-        <Path d={BODY} fill="none" stroke={theme.borderStrong} strokeWidth={toUnits(1.5, size)} />
-        <Path d={KNOT} fill={theme.borderStrong} />
+        <Path d={BODY} {...dashed} />
+        {string ? <Path d={STRING} {...dashed} /> : null}
+      </Svg>
+    );
+  }
+  if (popped) {
+    return (
+      <Svg width={size} height={height} viewBox={VIEW_BOX}>
+        {string ? (
+          <Path
+            d={STRING}
+            fill="none"
+            stroke={knot}
+            strokeWidth={stringWidth(size)}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ) : null}
+        <G transform={CROWN_PLACE}>
+          <Path d={CROWN} fill={fill} />
+          <Path d={CROWN_SHINE} fill="#FFFFFF" fillOpacity={0.28} />
+        </G>
+        <Path d={KNOT} fill={knot} />
       </Svg>
     );
   }
