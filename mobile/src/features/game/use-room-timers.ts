@@ -23,6 +23,9 @@ export function useRoomSlow(room: Room | null | undefined) {
  * last pop lands before the match fades in. A match that came with the last pop
  * waits for the whole pop to play.
  */
+/** How much longer the room stays on the game's last pop. */
+const FINAL_HOLD_MS = 1400;
+
 export function useMatchHandoff(room: Room | null | undefined, matchInBeat: boolean, holdMs: number) {
   const matchId = room?.matchId ?? null;
   const matchAs = room?.me.role === 'popper' ? 'popper' : 'winner';
@@ -35,7 +38,8 @@ export function useMatchHandoff(room: Room | null | undefined, matchInBeat: bool
           params: { id: matchId, as: matchAs },
         });
       },
-      matchInBeat ? holdMs : Motion.hold,
+      // The last pop of the game holds longer than any other before the match opens.
+      matchInBeat ? holdMs + FINAL_HOLD_MS : Motion.hold,
     );
     return () => clearTimeout(timer);
   }, [matchId, matchAs, matchInBeat, holdMs]);

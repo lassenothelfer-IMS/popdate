@@ -224,6 +224,8 @@ export const Motion = {
   state: 180,
   enter: 250,
   exit: 200,
+  /** Changes in a room that you watch happen, not ones you cause: a phase arriving, a row settling. */
+  watch: 500,
   burst: 300,
   /** Each top-level block of a screen rises in over this long. */
   entrance: 760,

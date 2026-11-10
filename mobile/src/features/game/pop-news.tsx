@@ -43,7 +43,7 @@ const TIMELINE_MS = TEXT_AT + TEXT_MS;
 /** How long the room holds on a pop before the next phase: the whole sequence and a breath. */
 export function popHoldMs(own: boolean, reduced: boolean) {
   if (reduced) return Motion.hold;
-  return (own ? TIMELINE_MS - BURST_AT : TIMELINE_MS) + 900;
+  return (own ? TIMELINE_MS - BURST_AT : TIMELINE_MS) + 2000;
 }
 
 /** The latex shards, from the mockup: where each flies, its turn, size and tone. */
@@ -60,7 +60,7 @@ const SHARDS = [
 ] as const;
 const SHARD_PATH = 'M2 20C10 4 30 0 44 8c-6 10-20 20-42 12z';
 
-const lineIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+const lineIn = FadeIn.duration(Motion.watch).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 /** Native only: on web the exit replays the line's and the mark's fade-in, so they blink. */
 const newsOut = nativeOnly(
   FadeOut.duration(Motion.exit).easing(Ease.out).reduceMotion(ReduceMotion.Never),
@@ -70,7 +70,7 @@ const newsOut = nativeOnly(
  * because an exiting view keeps its place while the page reflows beneath it.
  * The web has no exit fade (newsOut), so there it comes in at once.
  */
-export const afterBeatIn = FadeIn.duration(Motion.state)
+export const afterBeatIn = FadeIn.duration(Motion.watch)
   .delay(Platform.OS === 'web' ? 0 : Motion.exit)
   .easing(Ease.out)
   .reduceMotion(ReduceMotion.Never);

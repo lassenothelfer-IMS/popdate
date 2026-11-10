@@ -29,6 +29,13 @@ export const ANSWER_GRACE_MS = 3_000;
 export const POP_REMINDER_MS = 30_000;
 /** After the reminder, how long until a random balloon pops so the room never stalls. */
 export const POP_LIMIT_MS = 30_000;
+/**
+ * The app plays a pop and then the "Round N" beat before the chooser can pick again.
+ * From round 2 on the pick time starts this much later, so the beats cost nobody time.
+ */
+export const POP_BEAT_MS = 8_000;
+/** The same for the "Answers are in" beat before the photos and the pop time. */
+export const REVEAL_BEAT_MS = 2_500;
 
 /** A runner-up can get a second chance this long after the room ends. */
 export const SECOND_CHANCE_MS = 7 * 24 * 60 * 60_000;

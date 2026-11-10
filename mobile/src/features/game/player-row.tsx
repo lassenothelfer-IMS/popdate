@@ -41,7 +41,7 @@ const DOT_STARTS = [0.1, 0.3, 0.5];
 const DOT_FADE = 0.12;
 
 /** Small changes inside a row: the Answered check, a row arriving in the Popped group. */
-const quietIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+const quietIn = FadeIn.duration(Motion.watch).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /** "Lena, 27", with ", you" on your own row. */
 function whoLabel(t: Translate, contestant: Contestant, isMe: boolean) {

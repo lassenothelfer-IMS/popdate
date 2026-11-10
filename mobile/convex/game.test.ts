@@ -8,6 +8,7 @@ import {
   ANSWER_GRACE_MS,
   ANSWER_MS,
   PICK_MS,
+  REVEAL_BEAT_MS,
   POP_LIMIT_MS,
   POP_REMINDER_MS,
   QUEUE_AWAY_MS,
@@ -224,7 +225,7 @@ test('timers move answering on to popping and remind the popper, but never pop',
   expect(room.status).toBe('popping');
   expect(room.popReminder).toBe(false);
 
-  vi.advanceTimersByTime(30_001);
+  vi.advanceTimersByTime(POP_REMINDER_MS + REVEAL_BEAT_MS + 1);
   await t.finishInProgressScheduledFunctions();
   room = await view(lena, roomId);
   expect(room.status).toBe('popping');
@@ -759,7 +760,7 @@ test('a chooser who never picks or pops ends the room with no match and no ballo
   await t.finishInProgressScheduledFunctions();
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
-  vi.advanceTimersByTime(POP_REMINDER_MS + 1);
+  vi.advanceTimersByTime(POP_REMINDER_MS + REVEAL_BEAT_MS + 1);
   await t.finishInProgressScheduledFunctions();
   vi.advanceTimersByTime(POP_LIMIT_MS + 1);
   await t.finishInProgressScheduledFunctions();

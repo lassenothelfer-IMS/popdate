@@ -48,9 +48,11 @@ import {
   MAX_PHOTOS,
   MIN_PHOTOS,
   PICK_MS,
+  POP_BEAT_MS,
   POP_LIMIT_MS,
   POP_REMINDER_MS,
   QUESTION_OPTIONS_PER_ROUND,
+  REVEAL_BEAT_MS,
   SECOND_CHANCE_MS,
 } from '@/shared/limits';
 import { ageFromBirthDate } from '@/utils/birth-date';
@@ -350,12 +352,13 @@ function randomInt(min: number, max: number) {
 }
 
 /**
- * AI faces for the bots when EXPO_PUBLIC_DEMO_PHOTOS=1 (see demo-photos.ts), so a room
- * looks like it would with real people. Loaded lazily, so tests and normal runs never
- * touch the image files.
+ * AI faces for the bots (see demo-photos.ts), so a room looks like it would with real
+ * people: always in a development build, and elsewhere when EXPO_PUBLIC_DEMO_PHOTOS=1.
+ * Loaded lazily, so tests never touch the image files.
  */
-function demoPhotos(): Record<Gender, string[]> | null {
-  if (process.env.EXPO_PUBLIC_DEMO_PHOTOS !== '1') return null;
+export function demoPhotos(): Record<Gender, string[]> | null {
+  const dev = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.NODE_ENV !== 'test';
+  if (!dev && process.env.EXPO_PUBLIC_DEMO_PHOTOS !== '1') return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy, so tests never load images
   return (require('./demo-photos') as typeof import('./demo-photos')).DEMO_PHOTOS;
 }
@@ -1160,7 +1163,9 @@ class MockServer implements PopdateApi {
     this.clearTimers(room);
     room.status = 'picking';
     room.question = null;
-    room.deadline = Date.now() + PICK_MS;
+    // From round 2 on the app first plays the pop and the round beat, which don't count.
+    const beat = room.round > 1 ? POP_BEAT_MS : 0;
+    room.deadline = Date.now() + PICK_MS + beat;
     room.answerDeadline = null;
     room.popReminder = false;
     const unused = QUESTIONS.filter((q) => !room.usedQuestionIds.has(q.id));
@@ -1168,7 +1173,7 @@ class MockServer implements PopdateApi {
     this.emit(room);
 
     // A bot picks in a few seconds; an idle person gets one picked for them.
-    this.after(room, room.popper.isBot ? randomInt(2000, 3500) : PICK_MS, () => {
+    this.after(room, beat + (room.popper.isBot ? randomInt(2000, 3500) : PICK_MS), () => {
       this.startAnswering(room, pickRandom(room.questionOptions));
     });
   }
@@ -1206,11 +1211,12 @@ class MockServer implements PopdateApi {
   private startPopping(room: ServerRoom) {
     this.clearTimers(room);
     room.status = 'popping';
-    room.deadline = Date.now() + POP_REMINDER_MS;
+    // The app first plays the "Answers are in" beat, which doesn't count.
+    room.deadline = Date.now() + POP_REMINDER_MS + REVEAL_BEAT_MS;
     room.popReminder = false;
     this.emit(room);
 
-    this.after(room, POP_REMINDER_MS, () => {
+    this.after(room, POP_REMINDER_MS + REVEAL_BEAT_MS, () => {
       room.popReminder = true;
       room.deadline = Date.now() + POP_LIMIT_MS;
       this.emit(room);
@@ -1226,7 +1232,7 @@ class MockServer implements PopdateApi {
       });
     });
     if (room.popper.isBot) {
-      this.after(room, randomInt(3500, 6000), () => {
+      this.after(room, REVEAL_BEAT_MS + randomInt(3500, 6000), () => {
         this.pop(room, pickRandom(room.seats.filter(isActive)));
       });
     }

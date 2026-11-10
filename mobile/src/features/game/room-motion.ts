@@ -10,9 +10,9 @@ import { nativeOnly, webSafeKeyframe } from '@/utils/web-motion';
  * A row sliding into the Popped group, or into its new place. Skipped under
  * Reduce Motion, and on web, where it would stretch a row that changes size.
  */
-export const cardTransition = nativeOnly(LinearTransition.duration(Motion.enter).easing(Ease.inOut));
+export const cardTransition = nativeOnly(LinearTransition.duration(Motion.watch).easing(Ease.inOut));
 /** The next phase arriving on the page: the picker, the question, the waiting line. */
-export const phaseIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+export const phaseIn = FadeIn.duration(Motion.watch).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 const phaseOut = FadeOut.duration(Motion.exit).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 /**
  * The list fades as the picker or the cards take over. Native only: it holds rows
@@ -28,7 +28,7 @@ export const pickingOut = nativeOnly(phaseOut);
  * The question waits until the picking phase has gone and the rows below have
  * moved into place, so it never lands on top of either.
  */
-export const questionIn = FadeIn.duration(Motion.state)
+export const questionIn = FadeIn.duration(Motion.watch)
   .delay(Motion.enter)
   .easing(Ease.out)
   .reduceMotion(ReduceMotion.Never);

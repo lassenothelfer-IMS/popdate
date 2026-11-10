@@ -129,7 +129,7 @@ describe('mock server', () => {
       await mockServer.pickQuestion(roomId, room().questionOptions[0].id);
       await vi.advanceTimersByTimeAsync(15_000);
       expect(room().status).toBe('popping');
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(32_500);
       expect(room().popReminder).toBe(true);
       await vi.advanceTimersByTimeAsync(30_000);
       expect(room().contestants.filter((c) => c.popped)).toHaveLength(1);

@@ -5,8 +5,10 @@ import {
   ANSWER_GRACE_MS,
   ANSWER_MS,
   PICK_MS,
+  POP_BEAT_MS,
   POP_REMINDER_MS,
   QUESTION_OPTIONS_PER_ROUND,
+  REVEAL_BEAT_MS,
   shuffle,
 } from './game';
 import { spendBalloon } from './balloons';
@@ -82,7 +84,8 @@ async function startRound(ctx: MutationCtx, roomId: Id<'rooms'>) {
     return;
   }
   // The popper gets PICK_MS to choose; then one of the options is picked for them.
-  const deadline = Date.now() + PICK_MS;
+  // From round 2 on the app first plays the pop and the round beat, which don't count.
+  const deadline = Date.now() + PICK_MS + (room.round > 1 ? POP_BEAT_MS : 0);
   await ctx.db.patch(roomId, {
     status: 'picking',
     questionId: undefined,
@@ -116,7 +119,8 @@ export async function startAnswering(
 }
 
 export async function startPopping(ctx: MutationCtx, room: Doc<'rooms'>) {
-  const deadline = Date.now() + POP_REMINDER_MS;
+  // The app first plays the "Answers are in" beat, which doesn't count.
+  const deadline = Date.now() + POP_REMINDER_MS + REVEAL_BEAT_MS;
   await ctx.db.patch(room._id, { status: 'popping', deadline, popReminder: false });
   await ctx.scheduler.runAt(deadline, internal.rooms.popTimeUp, {
     roomId: room._id,

@@ -19,6 +19,7 @@ import { Gutter, MaxContentWidth, Space } from '@/constants/theme';
 import { announce, Announcer } from '@/features/game/announce';
 import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { LeaveSheet } from '@/features/game/leave-sheet';
+import { PhaseCurtain, usePhaseCurtain } from '@/features/game/phase-curtain';
 import { PickingView } from '@/features/game/picking-view';
 import { PlayerList } from '@/features/game/player-list';
 import { afterBeatIn } from '@/features/game/pop-news';
@@ -50,6 +51,9 @@ import { numberWord } from '@/utils/number-word';
 import { countRoomPlayed, useShowHints } from '@/utils/rooms-played';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
+
+/** While a beat covers the room, no photo has developed yet. */
+const NOTHING_DEVELOPED: ReadonlySet<string> = new Set();
 
 /** Milliseconds since `at`. Only for handlers and effects, never during render. */
 function msSince(at: number) {
@@ -138,6 +142,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     : null;
 
   useMatchHandoff(room, matchInBeat, holdMs);
+  // A beat before each new round and before the reveal. A pop holds the room itself.
+  const curtain = usePhaseCurtain(room, !!phase?.holding);
 
   // Every new phase starts at the top: the balloons, the pop and the next question.
   // Nobody asked for this scroll, so under Reduce Motion it jumps. An effect event
@@ -447,6 +453,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               }}
             />
 
+            <View style={styles.flex}>
             <ScrollView
               ref={scrollRef}
               style={styles.flex}
@@ -534,7 +541,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                 revealing={revealing}
                 up={up}
                 seatOf={seatOf}
-                developed={photos.developed}
+                // The photos wait behind the beat, and develop as it lifts.
+                developed={curtain ? NOTHING_DEVELOPED : photos.developed}
                 cardWidth={cardWidth}
                 tight={tight}
                 markedId={selected?.id ?? null}
@@ -557,6 +565,24 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                 />
               ) : null}
             </ScrollView>
+            {curtain ? (
+              <PhaseCurtain
+                key={`${curtain.kind}:${curtain.round}`}
+                title={
+                  curtain.kind === 'reveal'
+                    ? t('game.answersIn')
+                    : phase.finalTwo
+                      ? t('game.finalTwo')
+                      : t('game.roundOf', { round: curtain.round, total: room.totalRounds })
+                }
+                detail={
+                  curtain.kind === 'round' && !phase.finalTwo
+                    ? t('game.balloonsLeft', { count: up.length })
+                    : undefined
+                }
+              />
+            ) : null}
+            </View>
           </Screen>
           {/* The web's leave confirmation, over the whole room. iOS and Android use Alert. */}
           {Platform.OS === 'web' && exit.confirmingLeave && !finished ? (
