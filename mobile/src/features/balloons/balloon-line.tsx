@@ -18,7 +18,7 @@ export function BalloonLine({ balloons }: { balloons: BalloonState }) {
       ? t('balloons.unlimited')
       : count === 0
         ? t('balloons.empty', { time: refillsAt ? refillTime(refillsAt, locale) : '0:00' })
-        : `${t('balloons.count', { count })} · ${t('balloons.howItWorks')}`;
+        : t('balloons.count', { count });
 
   return (
     <View style={styles.row} accessible accessibilityLabel={text}>

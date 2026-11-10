@@ -1,7 +1,18 @@
 import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Redirect, router, type Href } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Platform, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type NativeScrollEvent,
+  type ScrollViewInstance,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -24,7 +35,7 @@ import { Rise } from '@/components/rise';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
 import { VerifiedCheck } from '@/components/verified-check';
-import { Gutter, MinTouch, PhotoAspect, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
+import { Gutter, MinTouch, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
@@ -51,7 +62,7 @@ const SCRIM_FADE = 120;
 /**
  * Your profile as others meet it: photo 1 big at the top with your name and
  * city over it, your bio, everything else you filled in, the answers you
- * pinned, your other photos, and your verification. Edit opens the editor. As
+ * pinned, and your verification. The photo pages sideways through all your photos. Edit opens the editor. As
  * the You tab it also shows your numbers, and a gear for Settings takes the
  * place of Back.
  */
@@ -61,7 +72,6 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const { show, toast } = useToast();
   const [unpinning, setUnpinning] = useState(false);
   const theme = useTheme();
-  const you = youSeat(useSeats());
   const t = useT();
   const insets = useSafeAreaInsets();
   const [verification, setVerification] = useState<VerificationStatus | null>(null);
@@ -73,8 +83,8 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   // text), they go two by two.
   const { width, fontScale } = useWindowDimensions();
   const statGrid = (width - 2 * Gutter - 3 * Space.xs) / 4 / fontScale < STAT_MIN_WIDTH;
-  /** Photos 2 and on go two by two. */
-  const photoTile = (width - 2 * Gutter - Space.xs) / 2;
+  /** The photo showing in the hero, which the dashes over the name follow. */
+  const [photoIndex, setPhotoIndex] = useState(0);
 
   const loadVerification = useCallback(
     (isCurrent: () => boolean = () => true) =>
@@ -168,7 +178,14 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
         {/* The name and its lines sit in the flow under the buttons, so a long city or
             a large text size grows the hero instead of climbing over the photo dots. */}
         <View style={[styles.hero, { paddingTop: insets.top + Space.xs + MinTouch + Space.lg }]}>
-          <HeroPhoto uri={profile.photos[0] ?? 'mock://'} name={profile.name} />
+          <HeroPhotos
+            photos={profile.photos.length ? profile.photos : ['mock://']}
+            name={profile.name}
+            width={width}
+            index={photoIndex}
+            onIndex={setPhotoIndex}
+            label={(position) => t('profile.photoMenuTitle', { position })}
+          />
           <View style={[styles.heroTop, { top: insets.top + Space.xs }]}>
             {asTab ? (
               <GlassButton
@@ -182,11 +199,12 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             )}
             <GlassButton label={t('home.profileEdit')} onPress={() => router.push('/profile')} />
           </View>
-          <View style={styles.heroText}>
+          {/* Touches fall through to the photos, so a swipe over the name still pages them. */}
+          <View style={styles.heroText} pointerEvents="none">
             <HeroScrim />
             <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               {profile.photos.map((uri, index) => (
-                <View key={`${uri}-${index}`} style={[styles.dot, index === 0 ? styles.dotActive : styles.dotRest]} />
+                <View key={`${uri}-${index}`} style={[styles.dot, index === photoIndex ? styles.dotActive : styles.dotRest]} />
               ))}
             </View>
             <View
@@ -290,26 +308,6 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             </Rise>
           ) : null}
 
-          {profile.photos.length > 1 ? (
-            <Rise index={1} style={styles.pins}>
-              <ThemedText type="kicker" accessibilityRole="header">
-                {t('profile.photos')}
-              </ThemedText>
-              <View style={styles.photoGrid}>
-                {profile.photos.slice(1).map((uri, index) => (
-                  <Photo
-                    key={`${uri}-${index}`}
-                    uri={uri}
-                    name={profile.name}
-                    tone={you}
-                    accessibilityLabel={t('profile.photoMenuTitle', { position: index + 2 })}
-                    style={[styles.photoTile, { width: photoTile }]}
-                  />
-                ))}
-              </View>
-            </Rise>
-          ) : null}
-
           {verification ? (
             <Rise index={1}>
               <PressableHighlight
@@ -364,17 +362,76 @@ function Stat({ value, label, half }: { value: number; label: string; half: bool
 /** One drift in or out. */
 const DRIFT_MS = 14000;
 
+type HeroPhotosProps = {
+  photos: string[];
+  name: string;
+  /** The window's width: each photo is one page of it. */
+  width: number;
+  index: number;
+  onIndex: (index: number) => void;
+  /** What VoiceOver calls a photo, by its position from 1. */
+  label: (position: number) => string;
+};
+
 /**
- * Photo 1, slowly drifting in (Ken Burns, 1 to 1.08 over 14 s). A placeholder is
- * your tint tile with two soft circles of your balloon color. Holds still under
- * Reduce Motion, and while the You page is off screen.
+ * Your photos behind the name, one page each: swipe sideways, or tap the right
+ * or left half, to move through them.
  */
-function HeroPhoto({ uri, name }: { uri: string; name: string }) {
+function HeroPhotos({ photos, name, width, index, onIndex, label }: HeroPhotosProps) {
+  const ref = useRef<ScrollViewInstance>(null);
+  const reduced = useReduceMotion();
+  const [height, setHeight] = useState(0);
+
+  function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const page = Math.round(event.nativeEvent.contentOffset.x / width);
+    const next = Math.min(photos.length - 1, Math.max(0, page));
+    if (next !== index) onIndex(next);
+  }
+  function step(by: number) {
+    const next = index + by;
+    if (next < 0 || next >= photos.length) return;
+    haptics.selection();
+    ref.current?.scrollTo({ x: next * width, animated: !reduced });
+  }
+
+  return (
+    <ScrollView
+      ref={ref}
+      horizontal
+      pagingEnabled
+      bounces={false}
+      overScrollMode="never"
+      showsHorizontalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onScroll={onScroll}
+      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      style={StyleSheet.absoluteFill}>
+      {photos.map((uri, i) => (
+        <Pressable
+          key={`${uri}-${i}`}
+          accessibilityRole="image"
+          accessibilityLabel={label(i + 1)}
+          // pageX, not locationX: the web reports no locationX, and each page spans the window.
+          onPress={(event) => step(event.nativeEvent.pageX > width / 2 ? 1 : -1)}
+          style={[styles.heroPage, { width, height }]}>
+          <HeroPhoto uri={uri} name={name} active={i === index} />
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+/**
+ * One photo, slowly drifting in while it is the one showing (Ken Burns, 1 to
+ * 1.08 over 14 s). A placeholder is your tint tile with two soft circles of your
+ * balloon color. Holds still under Reduce Motion, and while the You page is off screen.
+ */
+function HeroPhoto({ uri, name, active }: { uri: string; name: string; active: boolean }) {
   const seats = useSeats();
   const you = youSeat(seats);
   const { width } = useWindowDimensions();
   const reduced = useReduceMotion();
-  const showing = useTabActive();
+  const showing = useTabActive() && active;
   const drift = useSharedValue(0);
   useEffect(() => {
     if (reduced) {
@@ -545,6 +602,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   // Above the scrim, which can reach up to the buttons at large text sizes.
+  heroPage: {
+    overflow: 'hidden',
+  },
   heroTop: {
     position: 'absolute',
     left: Gutter,
@@ -614,15 +674,6 @@ const styles = StyleSheet.create({
   },
   aboutRule: {
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Space.xs,
-  },
-  photoTile: {
-    aspectRatio: PhotoAspect,
-    borderRadius: Radius.lg,
   },
   verify: {
     flexDirection: 'row',

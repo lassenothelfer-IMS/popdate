@@ -1,11 +1,10 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import type { Question } from '@/api';
-import { Icon } from '@/components/icon';
-import { PressableHighlight } from '@/components/pressable-highlight';
 import { ThemedText } from '@/components/themed-text';
-import { CssEase, Motion, Space } from '@/constants/theme';
+import { CssEase, Motion, Radius, Space } from '@/constants/theme';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
@@ -14,13 +13,19 @@ type QuestionPickerProps = {
   /** The marked option. A tap only marks it; "Ask this question" commits. */
   selectedId: string | null;
   onSelect: (questionId: string) => void;
-  /** True while the pick is on its way: the options lock and the others dim. */
+  /** True while the pick is on its way: the options lock and the others fade out. */
   locked: boolean;
   /** Balloons still up, who will all answer. */
   answering: number;
 };
 
-/** The chooser's question options: New York rows over hairlines, the picked one checked. */
+/** Once one is picked, the others step back; while it is sent, they leave. */
+const OTHERS_PICKED = 0.55;
+
+/**
+ * The chooser's question options: one card each. A press pushes the card in; the
+ * picked one turns black with light text, and the others step back.
+ */
 export function QuestionPicker({
   options,
   selectedId,
@@ -28,7 +33,6 @@ export function QuestionPicker({
   locked,
   answering,
 }: QuestionPickerProps) {
-  const theme = useTheme();
   const t = useT();
 
   return (
@@ -43,50 +47,65 @@ export function QuestionPicker({
       </ThemedText>
 
       <View accessibilityRole="radiogroup" style={styles.list}>
-        {options.map((question) => {
-          const selected = question.id === selectedId;
-          return (
-            <Animated.View
-              key={question.id}
-              style={{
-                opacity: locked && !selected ? 0.5 : 1,
-                transitionProperty: 'opacity',
-                transitionDuration: Motion.state,
-                transitionTimingFunction: CssEase.out,
-              }}>
-              <PressableHighlight
-                accessibilityRole="radio"
-                accessibilityLabel={question.text}
-                accessibilityState={{ checked: selected, disabled: locked }}
-                disabled={locked}
-                onPress={() => onSelect(question.id)}
-                background="transparent"
-                style={[styles.option, { borderBottomColor: theme.border }]}>
-                <ThemedText type="questionRow" style={styles.text}>
-                  {question.text}
-                </ThemedText>
-                {/* The picked one gets a filled check; it always has its place, so text never moves. */}
-                <Animated.View
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                  style={[
-                    styles.check,
-                    {
-                      backgroundColor: theme.inverse,
-                      opacity: selected ? 1 : 0,
-                      transitionProperty: 'opacity',
-                      transitionDuration: Motion.state,
-                      transitionTimingFunction: CssEase.out,
-                    },
-                  ]}>
-                  <Icon name="check" size={11} color={theme.onInverse} />
-                </Animated.View>
-              </PressableHighlight>
-            </Animated.View>
-          );
-        })}
+        {options.map((question) => (
+          <Option
+            key={question.id}
+            question={question}
+            selected={question.id === selectedId}
+            anySelected={selectedId !== null}
+            locked={locked}
+            onSelect={onSelect}
+          />
+        ))}
       </View>
     </View>
+  );
+}
+
+type OptionProps = {
+  question: Question;
+  selected: boolean;
+  anySelected: boolean;
+  locked: boolean;
+  onSelect: (questionId: string) => void;
+};
+
+function Option({ question, selected, anySelected, locked, onSelect }: OptionProps) {
+  const theme = useTheme();
+  const reduced = useReduceMotion();
+  const rest = selected || !anySelected ? 1 : locked ? 0 : OTHERS_PICKED;
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityLabel={question.text}
+      accessibilityState={{ checked: selected, disabled: locked }}
+      disabled={locked}
+      onPress={() => onSelect(question.id)}>
+      {({ pressed }) => {
+        // Only the card under the finger moves, and it lets go the moment the finger does.
+        const down = pressed && !locked;
+        return (
+          <Animated.View
+            style={[
+              styles.card,
+              {
+                backgroundColor: selected ? theme.inverse : down ? theme.surfacePressed : theme.field,
+                opacity: rest,
+                transform: [{ scale: reduced ? 1 : down ? 0.97 : selected || !anySelected ? 1 : 0.985 }],
+                transitionProperty: ['backgroundColor', 'opacity', 'transform'],
+                transitionDuration: down ? Motion.press : Motion.state,
+                transitionTimingFunction: CssEase.out,
+              },
+            ]}>
+            <ThemedText
+              type="questionRow"
+              style={[styles.text, { color: selected ? theme.onInverse : theme.text }]}>
+              {question.text}
+            </ThemedText>
+          </Animated.View>
+        );
+      }}
+    </Pressable>
   );
 }
 
@@ -96,23 +115,18 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: Space.sm,
+    gap: Space.xs,
   },
-  /** A question row: New York 19/24, a hairline under it, the check on the right. */
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.sm,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  /** A question card: New York 19/24 on the card surface, black once picked. */
+  card: {
+    minHeight: 60,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.xl,
+    borderCurve: 'continuous',
   },
   text: {
-    flex: 1,
-  },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexShrink: 1,
   },
 });

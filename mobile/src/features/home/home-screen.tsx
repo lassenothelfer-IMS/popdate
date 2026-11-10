@@ -227,9 +227,6 @@ export function HomeScreen() {
               <ThemedText type="display" style={styles.cardTitle} maxFontSizeMultiplier={1.3}>
                 {t('home.cardTitle')}
               </ThemedText>
-              <ThemedText type="callout" themeColor="textSecondary" style={styles.cardNote}>
-                {t('home.roleNote')}
-              </ThemedText>
             </View>
             <Button
               title={t('home.play')}
@@ -242,11 +239,6 @@ export function HomeScreen() {
           <View style={styles.balloonLine}>
             <BalloonLine balloons={balloons} />
           </View>
-          {live ? (
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.liveNote}>
-              {t('home.roomsLastHour', { count: live.roomsLastHour })}
-            </ThemedText>
-          ) : null}
         </Rise>
 
         <Rise index={3} style={styles.rows}>
@@ -283,7 +275,6 @@ export function HomeScreen() {
           {showHowToPlay ? (
             <LinkRow
               title={t('home.howToPlay')}
-              subtitle={t('home.howToPlayNote')}
               onPress={() => router.push('/how-to-play')}
               icon={
                 <View style={[styles.rowIcon, { backgroundColor: theme.surface }]}>
@@ -348,7 +339,8 @@ export function HomeScreen() {
 
 type LinkRowProps = {
   title: string;
-  subtitle: string;
+  /** The quiet line under the title. Left out where the title says it all. */
+  subtitle?: string;
   icon: React.ReactNode;
   onPress: () => void;
   accessibilityHint?: string;
@@ -368,9 +360,11 @@ function LinkRow({ title, subtitle, icon, onPress, accessibilityHint }: LinkRowP
       {icon}
       <View style={styles.rowText}>
         <ThemedText type="headline">{title}</ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={2}>
-          {subtitle}
-        </ThemedText>
+        {subtitle ? (
+          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={2}>
+            {subtitle}
+          </ThemedText>
+        ) : null}
       </View>
       <Icon name="chevronRight" size={13} color={theme.textTertiary} />
     </PressableHighlight>
@@ -397,10 +391,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs,
-  },
-  liveNote: {
-    marginTop: Space.xs,
-    textAlign: 'center',
   },
   balloonLine: {
     marginTop: Space.sm,
@@ -438,11 +428,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 28,
     lineHeight: 32,
-  },
-  cardNote: {
-    marginTop: Space.xxs,
-    fontSize: 14,
-    lineHeight: 19,
   },
   rows: {
     gap: 10,

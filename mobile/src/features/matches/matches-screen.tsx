@@ -256,9 +256,6 @@ function EarnedCard({ onJoin, joining }: { onJoin: () => void; joining: boolean 
   return (
     <View style={[styles.earned, { backgroundColor: theme.field, borderColor: theme.border }]}>
       <ThemedText type="questionRow">{t('home.earnedTitle')}</ThemedText>
-      <ThemedText type="callout" themeColor="textSecondary" style={styles.earnedBody}>
-        {t('home.earnedBody')}
-      </ThemedText>
       <View style={styles.earnedButton}>
         <Button title={t('home.play')} variant="tinted" loading={joining} onPress={onJoin} />
       </View>
@@ -386,10 +383,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     borderCurve: 'continuous',
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  earnedBody: {
-    fontSize: 14,
-    lineHeight: 19,
   },
   earnedButton: {
     marginTop: Space.xs,

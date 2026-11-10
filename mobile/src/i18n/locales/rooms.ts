@@ -168,7 +168,6 @@ export const almost = {
     decline: 'No thanks',
     declineTitle: 'Say no to %{name}?',
     declineBody: "Their second chance goes away, and you won't match from this room.",
-    explain: 'The last balloon you popped can get one second chance, for a week after the room.',
     failed: "That didn't go through. Try again.",
   },
   de: {
@@ -181,7 +180,6 @@ export const almost = {
     decline: 'Nein danke',
     declineTitle: 'Nein zu %{name} sagen?',
     declineBody: 'Die zweite Chance verfällt, und aus diesem Raum gibt es kein Match.',
-    explain: 'Der letzte Ballon, den du platzen liessest, bekommt eine Woche lang eine zweite Chance.',
     failed: 'Das hat nicht geklappt. Versuch es nochmals.',
   },
   fr: {
@@ -194,7 +192,6 @@ export const almost = {
     decline: 'Non merci',
     declineTitle: 'Dire non à %{name} ?',
     declineBody: 'Sa seconde chance disparaît, et vous ne matcherez pas depuis cette salle.',
-    explain: 'Le dernier ballon que tu as éclaté peut avoir une seconde chance, pendant une semaine.',
     failed: 'Ça n’a pas marché. Réessaie.',
   },
   it: {
@@ -207,7 +204,6 @@ export const almost = {
     decline: 'No grazie',
     declineTitle: 'Dire di no a %{name}?',
     declineBody: 'La sua seconda chance sparisce e non ci sarà un match da questa stanza.',
-    explain: 'L’ultimo palloncino che hai fatto scoppiare può avere una seconda chance, per una settimana.',
     failed: 'Non è andata. Riprova.',
   },
 } satisfies Strings;

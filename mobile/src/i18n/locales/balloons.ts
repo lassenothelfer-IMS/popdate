@@ -5,7 +5,6 @@ export const balloons = {
   en: {
     count: { one: '%{count} balloon left', other: '%{count} balloons left' },
     unlimited: 'Unlimited balloons with Popdate+',
-    howItWorks: 'You only lose one when yours gets popped.',
     empty: 'No balloons left. Free ones come back at %{time}.',
     outTitle: 'No balloons left',
     outBody: 'Your free balloons come back at %{time}.',
@@ -17,7 +16,6 @@ export const balloons = {
   de: {
     count: { one: 'Noch %{count} Ballon', other: 'Noch %{count} Ballons' },
     unlimited: 'Unbegrenzte Ballons mit Popdate+',
-    howItWorks: 'Du verlierst nur einen, wenn deiner platzt.',
     empty: 'Keine Ballons mehr. Die Gratis-Ballons kommen um %{time} zurück.',
     outTitle: 'Keine Ballons mehr',
     outBody: 'Deine Gratis-Ballons kommen um %{time} zurück.',
@@ -29,7 +27,6 @@ export const balloons = {
   fr: {
     count: { one: 'Encore %{count} ballon', other: 'Encore %{count} ballons' },
     unlimited: 'Ballons illimités avec Popdate+',
-    howItWorks: 'Tu n’en perds un que quand le tien éclate.',
     empty: 'Tu n’as plus de ballons. Les gratuits reviennent à %{time}.',
     outTitle: 'Tu n’as plus de ballons',
     outBody: 'Tes ballons gratuits reviennent à %{time}.',
@@ -41,7 +38,6 @@ export const balloons = {
   it: {
     count: { one: 'Ancora %{count} palloncino', other: 'Ancora %{count} palloncini' },
     unlimited: 'Palloncini illimitati con Popdate+',
-    howItWorks: 'Ne perdi uno solo quando il tuo scoppia.',
     empty: 'Niente più palloncini. Quelli gratis tornano alle %{time}.',
     outTitle: 'Niente più palloncini',
     outBody: 'I tuoi palloncini gratis tornano alle %{time}.',

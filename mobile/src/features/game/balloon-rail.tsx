@@ -48,6 +48,8 @@ export function BalloonRail({
 }: BalloonRailProps) {
   const seats = useSeats();
   const showNames = useTextScale() <= NAMES_UP_TO_SCALE;
+  // Once anyone's photo is out, every seat stands photo tall, so the row doesn't step.
+  const tall = contestants.some((contestant) => contestant.photos.length > 0);
   return (
     <View style={styles.rail}>
       {contestants.map((contestant, index) => {
@@ -63,6 +65,7 @@ export function BalloonRail({
             isMe={contestant.id === meId}
             risen={contestant.id === risenId}
             showName={showNames}
+            tall={tall}
             onSelect={onSelect && !popped ? () => onSelect(contestant.id) : undefined}
           />
         );
@@ -97,10 +100,11 @@ type SeatProps = {
   isMe: boolean;
   risen: boolean;
   showName: boolean;
+  tall: boolean;
   onSelect?: () => void;
 };
 
-function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelect }: SeatProps) {
+function Seat({ contestant, color, state, dimmed, isMe, risen, showName, tall, onSelect }: SeatProps) {
   const theme = useTheme();
   const t = useT();
   const selectable = !!onSelect;
@@ -129,7 +133,15 @@ function Seat({ contestant, color, state, dimmed, isMe, risen, showName, onSelec
             transitionTimingFunction: CssEase.out,
           },
         ]}>
-        <SeatMark color={color} state={state} active={isMe} risen={risen} />
+        <SeatMark
+          color={color}
+          state={state}
+          active={isMe}
+          risen={risen}
+          photo={contestant.photos.at(-1)}
+          name={contestant.name}
+          tall={tall}
+        />
         {isMe ? (
           showName ? (
             <YouTag />

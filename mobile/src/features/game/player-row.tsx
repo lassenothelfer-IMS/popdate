@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -15,10 +15,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { Contestant } from '@/api';
+import { Avatar } from '@/components/avatar';
 import { PoppedMark } from '@/components/balloon';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Motion, Space } from '@/constants/theme';
+import { Ease, lacquerFor, Motion, Space } from '@/constants/theme';
 import { YouTag } from '@/features/game/you-tag';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -29,6 +30,10 @@ const ROW_HEIGHT = 56;
 const MARK_BOX = 20;
 const DOT = 10;
 const POPPED_MARK = 14;
+/** Once their photo is out, it takes the dot's place, in a ring of their balloon color. */
+const PHOTO = 40;
+const PHOTO_BOX = 48;
+const BADGE = 18;
 /** One pass of the Writing dots. */
 const DOTS_MS = 1200;
 /** Where in a pass each dot starts to show, and how long a dot takes to fade. */
@@ -58,6 +63,7 @@ export function LiveRow({ contestant, color, isMe, status }: LiveRowProps) {
   const t = useT();
   const answered = status === 'answered';
   const writing = status === 'writing';
+  const photo = contestant.photos.at(-1);
   return (
     <View
       accessible
@@ -68,7 +74,17 @@ export function LiveRow({ contestant, color, isMe, status }: LiveRowProps) {
         .filter(Boolean)
         .join('. ')}
       style={[styles.row, { borderBottomColor: theme.border }]}>
-      {answered ? (
+      {photo ? (
+        <RowPhoto contestant={contestant} color={color} photo={photo}>
+          {answered ? (
+            <Animated.View
+              entering={quietIn}
+              style={[styles.badge, { backgroundColor: theme.successFill, borderColor: theme.page }]}>
+              <Icon name="check" size={9} color={theme.onInverse} />
+            </Animated.View>
+          ) : null}
+        </RowPhoto>
+      ) : answered ? (
         <Animated.View
           entering={quietIn}
           style={[styles.check, { backgroundColor: theme.successFill }]}>
@@ -178,6 +194,7 @@ type PoppedRowProps = {
 export function PoppedRow({ contestant, color, isMe, round, last }: PoppedRowProps) {
   const theme = useTheme();
   const t = useT();
+  const photo = contestant.photos.at(-1);
   const what = contestant.left
     ? round
       ? t('game.leftInRound', { round })
@@ -191,9 +208,17 @@ export function PoppedRow({ contestant, color, isMe, round, last }: PoppedRowPro
       accessible
       accessibilityLabel={`${whoLabel(t, contestant, isMe)}. ${what}`}
       style={[styles.row, { borderBottomColor: theme.border }, last && styles.lastRow]}>
-      <View style={styles.markBox}>
-        <PoppedMark color={color} size={POPPED_MARK} />
-      </View>
+      {photo ? (
+        <RowPhoto contestant={contestant} color={color} photo={photo} popped>
+          <View style={[styles.badge, { backgroundColor: theme.page, borderColor: theme.page }]}>
+            <PoppedMark color={color} size={POPPED_MARK} />
+          </View>
+        </RowPhoto>
+      ) : (
+        <View style={styles.markBox}>
+          <PoppedMark color={color} size={POPPED_MARK} />
+        </View>
+      )}
       <View style={styles.name}>
         <ThemedText type="row" themeColor="textSecondary" style={styles.shrink}>
           {contestant.name}, {contestant.age}
@@ -207,7 +232,69 @@ export function PoppedRow({ contestant, color, isMe, round, last }: PoppedRowPro
   );
 }
 
+type RowPhotoProps = {
+  contestant: Contestant;
+  color: string;
+  photo: string;
+  /** Popped: the photo steps back and loses its ring. */
+  popped?: boolean;
+  /** A small badge on the photo's lower right: the answered check, or the popped mark. */
+  children?: ReactNode;
+};
+
+/** Their newest revealed photo in a ring of their balloon color: 2 pt of canvas, then the color. */
+function RowPhoto({ contestant, color, photo, popped = false, children }: RowPhotoProps) {
+  const theme = useTheme();
+  const seat = lacquerFor(color);
+  return (
+    <View style={styles.photoBox}>
+      <View
+        style={[
+          styles.photo,
+          {
+            boxShadow: popped
+              ? `0 0 0 1px ${theme.borderStrong}`
+              : `0 0 0 2px ${theme.page}, 0 0 0 3.5px ${color}`,
+          },
+        ]}>
+        <View style={popped ? styles.poppedPhoto : null}>
+          <Avatar
+            name={contestant.name}
+            uri={photo}
+            tone={seat ? { color: seat.color, tint: seat.tint } : undefined}
+            size={PHOTO}
+          />
+        </View>
+      </View>
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  photoBox: {
+    width: PHOTO_BOX,
+    height: PHOTO_BOX,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photo: {
+    borderRadius: PHOTO / 2,
+  },
+  poppedPhoto: {
+    opacity: 0.4,
+  },
+  badge: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: BADGE,
+    height: BADGE,
+    borderRadius: BADGE / 2,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   row: {
     minHeight: ROW_HEIGHT,
     flexDirection: 'row',

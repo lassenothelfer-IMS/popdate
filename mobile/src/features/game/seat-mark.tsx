@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Balloon } from '@/components/balloon';
-import { CssEase, Motion } from '@/constants/theme';
+import { Avatar } from '@/components/avatar';
+import { Balloon, PoppedMark } from '@/components/balloon';
+import { CssEase, lacquerFor, Motion } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -13,6 +14,9 @@ const BALLOON_SIZE = 12;
 const ACTIVE_SIZE = 15;
 /** A popped seat: a 14 pt hollow ring at 30%. */
 const POPPED_SIZE = 14;
+/** Once photos are out, a seat is the person's newest photo in a ring of their balloon color. */
+const PHOTO_BOX = 44;
+const PHOTO_SIZE = 34;
 /** How far the last balloon rises when the game is over. */
 const RISE = 6;
 
@@ -25,6 +29,12 @@ type SeatMarkProps = {
   active?: boolean;
   /** The last balloon, once the game is over. */
   risen?: boolean;
+  /** Their newest revealed photo. Once there is one, it takes the balloon's place. */
+  photo?: string;
+  /** For the photo's placeholder initial. */
+  name?: string;
+  /** The box is photo sized: someone in the row has a photo, so every seat stands as tall. */
+  tall?: boolean;
 };
 
 /**
@@ -33,12 +43,55 @@ type SeatMarkProps = {
  * seat as a hollow ring at 30%. All three stay mounted in a fixed box, so a
  * change is a crossfade in place, and a failed pop fades back.
  */
-export function SeatMark({ color, state, active = false, risen = false }: SeatMarkProps) {
+export function SeatMark({
+  color,
+  state,
+  active = false,
+  risen = false,
+  photo,
+  name = '',
+  tall = false,
+}: SeatMarkProps) {
   const theme = useTheme();
   const reduced = useReduceMotion();
   const ringed = state === 'mark' || (active && state === 'up');
+  if (photo) {
+    const popped = state === 'pop';
+    const seat = lacquerFor(color);
+    // The ring: 2 pt of canvas, then their color, thicker on the marked one. A popped seat loses it.
+    const ring = popped
+      ? `0 0 0 1px ${theme.borderStrong}`
+      : `0 0 0 2px ${theme.page}, 0 0 0 ${state === 'mark' ? 5 : 3.5}px ${color}`;
+    return (
+      <View style={[styles.box, styles.photoBox]}>
+        <Animated.View
+          style={[
+            styles.photo,
+            {
+              boxShadow: ring,
+              transform: [{ translateY: risen && !reduced ? -RISE : 0 }],
+              transitionProperty: 'transform',
+              transitionDuration: Motion.enter,
+              transitionTimingFunction: CssEase.out,
+            },
+          ]}>
+          <Animated.View style={crossfade(true, popped ? 0.35 : 1)}>
+            <Avatar
+              name={name}
+              uri={photo}
+              tone={seat ? { color: seat.color, tint: seat.tint } : undefined}
+              size={PHOTO_SIZE}
+            />
+          </Animated.View>
+        </Animated.View>
+        <Animated.View style={[styles.layer, styles.center, crossfade(popped)]}>
+          <PoppedMark color={color} size={16} />
+        </Animated.View>
+      </View>
+    );
+  }
   return (
-    <View style={styles.box}>
+    <View style={[styles.box, tall && styles.photoBox]}>
       <Animated.View
         style={[
           styles.layer,
@@ -94,6 +147,15 @@ const styles = StyleSheet.create({
   },
   center: {
     justifyContent: 'center',
+  },
+  photoBox: {
+    width: PHOTO_BOX,
+    height: PHOTO_BOX,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photo: {
+    borderRadius: PHOTO_SIZE / 2,
   },
   ring: {
     borderRadius: 6,

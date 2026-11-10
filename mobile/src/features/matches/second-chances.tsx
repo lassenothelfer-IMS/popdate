@@ -185,9 +185,6 @@ export function SecondChances({ onMatched, refreshes = 0 }: { onMatched?: () => 
           </View>
         );
       })}
-      <ThemedText type="footnote" themeColor="textTertiary">
-        {t('almost.explain')}
-      </ThemedText>
     </View>
   );
 }
