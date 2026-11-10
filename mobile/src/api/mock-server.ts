@@ -349,6 +349,17 @@ function randomInt(min: number, max: number) {
   return min + Math.floor(Math.random() * (max - min + 1));
 }
 
+/**
+ * AI faces for the bots when EXPO_PUBLIC_DEMO_PHOTOS=1 (see demo-photos.ts), so a room
+ * looks like it would with real people. Loaded lazily, so tests and normal runs never
+ * touch the image files.
+ */
+function demoPhotos(): Record<Gender, string[]> | null {
+  if (process.env.EXPO_PUBLIC_DEMO_PHOTOS !== '1') return null;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy, so tests never load images
+  return (require('./demo-photos') as typeof import('./demo-photos')).DEMO_PHOTOS;
+}
+
 function pickRandom<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
@@ -380,6 +391,7 @@ class MockServer implements PopdateApi {
   private rooms = new Map<string, ServerRoom>();
   private matches: Match[] = [];
   private usedBotNames = new Set<string>();
+  private usedDemoPhotos = new Set<string>();
   private settings: Settings = { ...DEFAULT_SETTINGS, notifications: { ...DEFAULT_SETTINGS.notifications } };
   private verification: VerificationStatus = 'none';
   private blocked: BlockedPerson[] = [];
@@ -1123,11 +1135,23 @@ class MockServer implements PopdateApi {
     const name = pickRandom(names.length > 0 ? names : BOT_NAMES[gender]);
     this.usedBotNames.add(name);
     const id = `bot-${randomId()}`;
+    // One face per bot, used for all 6 photos; each room gets different faces.
+    const faces = demoPhotos()?.[gender];
+    let face: string | null = null;
+    if (faces?.length) {
+      let free = faces.filter((uri) => !this.usedDemoPhotos.has(uri));
+      if (free.length === 0) {
+        faces.forEach((uri) => this.usedDemoPhotos.delete(uri));
+        free = faces;
+      }
+      face = pickRandom(free);
+      this.usedDemoPhotos.add(face);
+    }
     return {
       id,
       name,
       age: randomInt(19, 32),
-      photos: Array.from({ length: 6 }, (_, i) => `mock://${id}/${i + 1}`),
+      photos: Array.from({ length: 6 }, (_, i) => face ?? `mock://${id}/${i + 1}`),
       isBot: true,
     };
   }
