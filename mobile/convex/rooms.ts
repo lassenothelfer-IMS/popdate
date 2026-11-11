@@ -7,6 +7,7 @@ import { requireUserId } from './lib/auth';
 import { fail } from './lib/errors';
 import { ANSWER_GRACE_MS, MAX_ANSWER_LENGTH, POP_LIMIT_MS } from './lib/game';
 import { maskProfanity } from './lib/profanity';
+import { REVEAL_POP_TOLERANCE_MS, revealEndsAt } from '../src/shared/reveal';
 import { rateLimit } from './lib/rateLimit';
 import {
   endAnsweringIfEveryoneAnswered,
@@ -119,6 +120,10 @@ export const popBalloon = mutation({
     const room = await requireRoom(ctx, roomId);
     if (room.popperId !== userId) fail('Only the popper can pop.');
     if (room.status !== 'popping') fail("It's not time to pop yet.");
+    // Everyone sees the whole reveal before anything pops.
+    if (room.reveal && Date.now() < revealEndsAt(room.reveal) - REVEAL_POP_TOLERANCE_MS) {
+      fail("It's not time to pop yet.");
+    }
     const seat = (await seatsOf(ctx, room._id)).find((s) => s.userId === contestantId);
     if (!seat || seat.popped) fail('That balloon is already popped.');
     if (!room.popperActed) await ctx.db.patch(room._id, { popperActed: true });
@@ -167,13 +172,20 @@ export const pickTimeUp = internalMutation({
   },
 });
 
-/** The 30-second pop timer: it reminds the popper, and starts the last 30 seconds. */
+/** The pop reminder, 8 seconds before the random pop: the countdown itself runs on. */
 export const popTimeUp = internalMutation({
   args: { roomId: v.id('rooms'), round: v.number() },
   handler: async (ctx, { roomId, round }) => {
     const room = await ctx.db.get(roomId);
     if (room?.status !== 'popping' || room.round !== round) return;
-    const deadline = Date.now() + POP_LIMIT_MS;
+    // Once only: a reveal that got shorter (someone left) schedules an earlier reminder.
+    if (room.popReminder) return;
+    // The reveal's countdown runs on to its deadline. A room that started popping
+    // before the reveal existed gets the limit from now.
+    const deadline =
+      room.reveal && room.deadline && room.deadline > Date.now()
+        ? room.deadline
+        : Date.now() + POP_LIMIT_MS;
     await ctx.db.patch(roomId, { popReminder: true, deadline });
     await ctx.scheduler.runAt(deadline, internal.rooms.popLimitUp, { roomId, round });
   },

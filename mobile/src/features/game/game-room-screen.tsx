@@ -37,6 +37,8 @@ import { spokenPhase } from '@/features/game/room-speech';
 import { RoomGone, RoomSlow } from '@/features/game/room-states';
 import { BAR_ESTIMATE, revealLayout } from '@/features/game/reveal-layout';
 import { RevealSection } from '@/features/game/reveal-section';
+import { RevealSpotlight, revealLine } from '@/features/game/reveal-spotlight';
+import { useRevealTurn } from '@/features/game/use-reveal-turn';
 import { usePhotoDevelop } from '@/features/game/use-photo-develop';
 import { usePopBeat } from '@/features/game/use-pop-beat';
 import { phaseOf, useRoomCall } from '@/features/game/use-room-call';
@@ -126,6 +128,9 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   );
   const { leaving, replaying } = exit;
 
+  // The live reveal's turn: one contestant at a time once the answers are in.
+  const revealTurn = useRevealTurn(room?.status === 'popping' ? (room.reveal ?? null) : null);
+
   // Everything the room shows, from the room and what you have pressed.
   const phase = room
     ? roomPhase({
@@ -139,8 +144,24 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
         watching,
         replaying,
         leftForReplay: exit.leftForReplay,
+        inReveal: !!revealTurn,
       })
     : null;
+
+  // The spotlight showed each photo in full: the cards after it don't develop them again.
+  const spotlightNow = !!phase?.spotlight;
+  const [wasSpotlight, setWasSpotlight] = useState(spotlightNow);
+  if (spotlightNow !== wasSpotlight) {
+    setWasSpotlight(spotlightNow);
+    if (!spotlightNow && room) photos.keepShown(room);
+  }
+  /** The round whose reveal was already brought into view. */
+  const spotlightScrolled = useRef<number | null>(null);
+  // Who the spotlight is on, and what VoiceOver says for their turn.
+  const spotlightOn =
+    phase?.spotlight && revealTurn
+      ? room?.contestants.find((c) => c.id === revealTurn.turn.id)
+      : undefined;
 
   useMatchHandoff(room, matchInBeat, holdMs);
   // A beat before each new round and before the reveal. A pop holds the room itself.
@@ -168,11 +189,13 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     // The ref is the same object every render: listed only for the linter.
   }, [holdingId, scrollYRef]);
 
-  // For analytics: when this round's photos came out, so the chooser's pop can say how long it took.
+  // For analytics: when this round's pop time started, after the reveal, so the
+  // chooser's pop can say how long it took.
   const poppingSince = useRef<{ round: number; at: number } | null>(null);
   useEffect(() => {
-    poppingSince.current = status === 'popping' && round !== undefined ? { round, at: Date.now() } : null;
-  }, [round, status]);
+    poppingSince.current =
+      status === 'popping' && !spotlightNow && round !== undefined ? { round, at: Date.now() } : null;
+  }, [round, status, spotlightNow]);
 
   // For analytics: whether you answered, sent once a round's answer time is over.
   const answerRound = useRef<{ round: number; answered: boolean } | null>(null);
@@ -349,7 +372,12 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
       text={
         phase.showPopped
           ? null
-          : spokenPhase(t, room, phase, { title, leaving, myPhotoLine: yourPhotoShowing })
+          : spokenPhase(t, room, phase, {
+              title,
+              leaving,
+              myPhotoLine: yourPhotoShowing,
+              revealLine: spotlightOn ? revealLine(t, spotlightOn, revealTurn?.index ?? 0, room.reveal?.turns.length ?? 0) : null,
+            })
       }
     />
   );
@@ -547,6 +575,31 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                   }
                 }}
               />
+
+              {spotlightOn && revealTurn ? (
+                // One live region for the whole reveal, so Android reads each new turn.
+                // As the reveal starts it comes up under the room bar, so each photo
+                // lands in view without anyone scrolling.
+                <View
+                  accessibilityLiveRegion="polite"
+                  onLayout={(event) => {
+                    if (spotlightScrolled.current === room.round) return;
+                    spotlightScrolled.current = room.round;
+                    const y = Math.max(0, event.nativeEvent.layout.y - Space.md);
+                    scrollYRef.current = y;
+                    scrollRef.current?.scrollTo({ y, animated: !reduced });
+                  }}>
+                  <RevealSpotlight
+                    key={`${room.round}:${spotlightOn.id}`}
+                    contestant={spotlightOn}
+                    seat={seatOf(spotlightOn)}
+                    index={revealTurn.index}
+                    total={room.reveal?.turns.length ?? 0}
+                    startsAt={revealTurn.startsAt}
+                    isMe={spotlightOn.id === room.me.id}
+                  />
+                </View>
+              ) : null}
 
               <RevealSection
                 myPhoto={phase.myPhotoShowing && me ? me : null}

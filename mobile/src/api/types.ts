@@ -6,6 +6,7 @@
 
 import type { BalloonsView } from '../shared/balloons';
 import type { LinkPreview, VoiceNote } from '../shared/chat';
+import type { Reveal } from '../shared/reveal';
 
 /**
  * The two groups rooms are matched from. How you describe your own gender is
@@ -145,6 +146,11 @@ export type Room = {
    * to a random pop, so a room never stalls.
    */
   popReminder: boolean;
+  /**
+   * While popping: the live reveal, one contestant at a time, before the pop time
+   * starts. Null in every other phase. See `src/shared/reveal.ts`.
+   */
+  reveal: Reveal | null;
   winnerId: string | null;
   matchId: string | null;
   me: { id: string; role: 'popper' | 'contestant' };

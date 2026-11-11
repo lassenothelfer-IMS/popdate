@@ -70,10 +70,10 @@ export function RoomHeader({
       subtitle={subtitle}
       watching={watching && !finished}
       timer={
-        answering || isPopping || room.status === 'picking' ? (
+        // During the live reveal the pop time hasn't started: the ring waits for it.
+        (answering || isPopping || room.status === 'picking') && !phase.spotlight ? (
           <RoundTimer
             deadline={room.deadline}
-            popReminder={room.popReminder}
             warn={answering && phase.iAmActive && !me?.answered}
           />
         ) : null

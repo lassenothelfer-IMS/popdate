@@ -26,9 +26,14 @@ export const ANSWER_MS = 60_000;
  * slow connection doesn't lose one sent right at the end.
  */
 export const ANSWER_GRACE_MS = 3_000;
-export const POP_REMINDER_MS = 30_000;
-/** After the reminder, how long until a random balloon pops so the room never stalls. */
-export const POP_LIMIT_MS = 30_000;
+/**
+ * The chooser's pop time is one 20-second countdown that starts after the live
+ * reveal: a reminder with 8 seconds left, then a random balloon pops so the room
+ * never stalls.
+ */
+export const POP_REMINDER_MS = 12_000;
+/** After the reminder, how long until a random balloon pops. */
+export const POP_LIMIT_MS = 8_000;
 /**
  * The app plays a pop and then the "Round N" beat before the chooser can pick again.
  * From round 2 on the pick time starts this much later, so the beats cost nobody time.

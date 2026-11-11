@@ -37,6 +37,7 @@ function room(meId: string, extra: Partial<Room> = {}, changes: Record<string, P
     ],
     deadline: null,
     popReminder: false,
+    reveal: null,
     winnerId: null,
     matchId: null,
     me: { id: meId, role: meId === CHOOSER ? 'popper' : 'contestant' },
@@ -192,6 +193,30 @@ describe('roomPhase: popping', () => {
     expect(p.myPhotoShowing).toBe(true);
     expect(p.footer).toBeNull();
     expect(p.showList).toBe(true);
+  });
+
+  it('gives everyone the live reveal first, with no pop bar and no list', () => {
+    for (const viewer of [CHOOSER, 'a']) {
+      const p = phase(room(viewer, popping, { a: { photos: ['one.jpg'] } }), { inReveal: true });
+      expect(p.view).toBe('spotlight');
+      expect(p.spotlight).toBe(true);
+      expect(p.revealing).toBe(false);
+      expect(p.footer).toBeNull();
+      expect(p.statusLine).toBeNull();
+      expect(p.showList).toBe(false);
+      expect(p.myPhotoShowing).toBe(false);
+      expect(p.canSelect).toBe(false);
+    }
+  });
+
+  it('lets a pop holding the room take over from the reveal', () => {
+    const p = phase(room(CHOOSER, popping), {
+      inReveal: true,
+      pendingPopId: 'b',
+      beat: { id: 'b', holding: true, own: true },
+    });
+    expect(p.view).toBe('popNews');
+    expect(p.spotlight).toBe(false);
   });
 
   it('has no photo to show before one is revealed', () => {

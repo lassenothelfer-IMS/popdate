@@ -65,6 +65,13 @@ import {
   REVEAL_BEAT_MS,
   SECOND_CHANCE_MS,
 } from '@/shared/limits';
+import {
+  type Reveal,
+  REVEAL_POP_TOLERANCE_MS,
+  revealEndsAt,
+  revealTurnMs,
+  revealWithout,
+} from '@/shared/reveal';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { readJson, removeJson, writeJson } from '@/utils/device-store';
 import { maskProfanity } from '@/utils/profanity';
@@ -339,6 +346,8 @@ type ServerRoom = {
   /** When this round's answers were due, so one sent right at the end still counts. */
   answerDeadline: number | null;
   popReminder: boolean;
+  /** While popping: the live reveal, as the server sends it. */
+  reveal: Reveal | null;
   /** The chooser picked or popped at least once. A bot chooser always counts as there. */
   popperActed?: boolean;
   winnerId: string | null;
@@ -683,6 +692,9 @@ class MockServer implements PopdateApi {
     const room = this.requireRoom(roomId);
     if (room.popper.id !== this.userId) throw new Error('Only the popper can pop.');
     if (room.status !== 'popping') throw new Error("It's not time to pop yet.");
+    if (room.reveal && Date.now() < revealEndsAt(room.reveal) - REVEAL_POP_TOLERANCE_MS) {
+      throw new Error("It's not time to pop yet.");
+    }
     const seat = room.seats.find((s) => s.player.id === contestantId);
     if (!seat || !isActive(seat)) throw new Error('That balloon is already popped.');
     room.popperActed = true;
@@ -716,6 +728,11 @@ class MockServer implements PopdateApi {
       if (room.seats.filter(isActive).length <= 1) {
         this.finish(room);
         return;
+      }
+      // Mid-reveal, your turn goes if it hasn't come up yet, and the pop time moves up.
+      if (room.status === 'popping' && room.reveal && !room.popReminder) {
+        const reveal = revealWithout(room.reveal, seat.player.id, Date.now());
+        if (reveal !== room.reveal) this.setReveal(room, reveal);
       }
       this.emit(room);
       this.endAnsweringIfEveryoneAnswered(room);
@@ -1294,6 +1311,7 @@ class MockServer implements PopdateApi {
       deadline: null,
       answerDeadline: null,
       popReminder: false,
+      reveal: null,
       winnerId: null,
       matchId: null,
       timers: [],
@@ -1340,6 +1358,7 @@ class MockServer implements PopdateApi {
     room.deadline = Date.now() + PICK_MS + beat;
     room.answerDeadline = null;
     room.popReminder = false;
+    room.reveal = null;
     const unused = QUESTIONS.filter((q) => !room.usedQuestionIds.has(q.id));
     room.questionOptions = shuffle(unused).slice(0, QUESTION_OPTIONS_PER_ROUND);
     this.emit(room);
@@ -1381,16 +1400,29 @@ class MockServer implements PopdateApi {
   }
 
   private startPopping(room: ServerRoom) {
-    this.clearTimers(room);
     room.status = 'popping';
-    // The app first plays the "Answers are in" beat, which doesn't count.
-    room.deadline = Date.now() + POP_REMINDER_MS + REVEAL_BEAT_MS;
     room.popReminder = false;
+    // The app first plays the "Answers are in" beat, then the live reveal, one balloon at
+    // a time. Neither counts: the pop time is one countdown after them, as on the server.
+    this.setReveal(room, {
+      startsAt: Date.now() + REVEAL_BEAT_MS,
+      turns: shuffle(room.seats.filter(isActive)).map((seat) => ({
+        id: seat.player.id,
+        ms: revealTurnMs(seat.answers.get(room.round) ?? null),
+      })),
+    });
+  }
+
+  /** Sets the reveal and arms the pop time after it: the reminder, then a random pop. */
+  private setReveal(room: ServerRoom, reveal: Reveal) {
+    this.clearTimers(room);
+    room.reveal = reveal;
+    const popIn = revealEndsAt(reveal) - Date.now();
+    room.deadline = Date.now() + popIn + POP_REMINDER_MS + POP_LIMIT_MS;
     this.emit(room);
 
-    this.after(room, POP_REMINDER_MS + REVEAL_BEAT_MS, () => {
+    this.after(room, popIn + POP_REMINDER_MS, () => {
       room.popReminder = true;
-      room.deadline = Date.now() + POP_LIMIT_MS;
       this.emit(room);
       // Past the limit a random balloon pops, so five people never wait forever. A chooser
       // who never picked or popped isn't there: the room ends with no match instead.
@@ -1404,7 +1436,7 @@ class MockServer implements PopdateApi {
       });
     });
     if (room.popper.isBot) {
-      this.after(room, REVEAL_BEAT_MS + randomInt(3500, 6000), () => {
+      this.after(room, popIn + randomInt(3500, 6000), () => {
         this.pop(room, pickRandom(room.seats.filter(isActive)));
       });
     }
@@ -1428,6 +1460,7 @@ class MockServer implements PopdateApi {
     room.status = 'finished';
     room.deadline = null;
     room.popReminder = false;
+    room.reveal = null;
     const winner = withWinner ? (room.seats.find(isActive)?.player ?? null) : null;
     room.winnerId = winner?.id ?? null;
 
@@ -1514,6 +1547,7 @@ class MockServer implements PopdateApi {
       questionOptions: room.questionOptions,
       deadline: room.deadline,
       popReminder: room.popReminder,
+      reveal: room.status === 'popping' ? room.reveal : null,
       winnerId: room.winnerId,
       matchId: room.matchId && !this.isHiddenMatch(room.matchId) ? room.matchId : null,
       me: { id: this.userId ?? '', role: myRole },

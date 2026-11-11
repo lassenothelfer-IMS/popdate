@@ -2,13 +2,13 @@ import { convexTest } from 'convex-test';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { FREE_BALLOONS, STARTER_BALLOONS } from '../src/shared/balloons';
+import { revealEndsAt } from '../src/shared/reveal';
 import { api, internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import {
   ANSWER_GRACE_MS,
   ANSWER_MS,
   PICK_MS,
-  REVEAL_BEAT_MS,
   POP_LIMIT_MS,
   POP_REMINDER_MS,
   QUEUE_AWAY_MS,
@@ -83,6 +83,12 @@ async function view(p: { as: ReturnType<Tester['withIdentity']> }, roomId: strin
   const room = await p.as.query(api.rooms.get, { roomId });
   if (!room) throw new Error('Room not visible');
   return room;
+}
+
+/** Lets the live reveal play out, so the popper may pop. */
+async function afterReveal(p: { as: ReturnType<Tester['withIdentity']> }, roomId: string) {
+  const room = await view(p, roomId);
+  if (room.reveal) vi.advanceTimersByTime(Math.max(0, revealEndsAt(room.reveal) - Date.now()));
 }
 
 async function pickFirstQuestion(lena: { as: ReturnType<Tester['withIdentity']> }, roomId: string) {
@@ -163,6 +169,8 @@ test('the last balloon matches with the popper, and a second pop changes nothing
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
 
+  await afterReveal(lena, roomId);
+
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
   await expect(
     lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: luca.id }),
@@ -186,6 +194,7 @@ test('only the two people in a match can chat, and bad words are masked', async 
   await pickFirstQuestion(lena, roomId);
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await afterReveal(lena, roomId);
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
   const matchId = (await view(lena, roomId)).matchId!;
 
@@ -224,8 +233,12 @@ test('timers move answering on to popping and remind the popper, but never pop',
   let room = await view(lena, roomId);
   expect(room.status).toBe('popping');
   expect(room.popReminder).toBe(false);
+  // The live reveal comes first: one turn per balloon, then the pop time's one countdown.
+  expect(room.reveal?.turns).toHaveLength(2);
+  const popFrom = revealEndsAt(room.reveal!);
+  expect(room.deadline).toBe(popFrom + POP_REMINDER_MS + POP_LIMIT_MS);
 
-  vi.advanceTimersByTime(POP_REMINDER_MS + REVEAL_BEAT_MS + 1);
+  vi.advanceTimersByTime(popFrom - Date.now() + POP_REMINDER_MS + 1);
   await t.finishInProgressScheduledFunctions();
   room = await view(lena, roomId);
   expect(room.status).toBe('popping');
@@ -292,6 +305,7 @@ test('deleting an account removes the profile, matches, chat and sign-in records
   await pickFirstQuestion(lena, roomId);
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await afterReveal(lena, roomId);
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
   const matchId = (await view(lena, roomId)).matchId!;
   await luca.as.mutation(api.chat.send, { matchId, text: 'Hi Lena' });
@@ -335,6 +349,7 @@ type Player = Awaited<ReturnType<typeof player>>;
 async function playRound(lena: Player, roomId: string, answering: Player[], loser: Player) {
   await pickFirstQuestion(lena, roomId);
   for (const p of answering) await p.as.mutation(api.rooms.postAnswer, { roomId, text: p.id });
+  await afterReveal(lena, roomId);
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: loser.id });
 }
 
@@ -548,6 +563,7 @@ async function playToTheEnd(lena: Player, luca: Player, noah: Player, roomId: st
   await pickFirstQuestion(lena, roomId);
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await afterReveal(lena, roomId);
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
 }
 
@@ -630,6 +646,7 @@ test('a pop costs nothing to someone who never answered in the room', async () =
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   vi.advanceTimersByTime(ANSWER_MS + ANSWER_GRACE_MS + 1000);
   await vi.runOnlyPendingTimersAsync();
+  await afterReveal(lena, roomId);
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
   const b = await balloons(noah);
   expect(b.free + b.extra).toBe(START);
@@ -760,7 +777,8 @@ test('a chooser who never picks or pops ends the room with no match and no ballo
   await t.finishInProgressScheduledFunctions();
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
-  vi.advanceTimersByTime(POP_REMINDER_MS + REVEAL_BEAT_MS + 1);
+  const popping = await view(luca, roomId);
+  vi.advanceTimersByTime(revealEndsAt(popping.reveal!) - Date.now() + POP_REMINDER_MS + 1);
   await t.finishInProgressScheduledFunctions();
   vi.advanceTimersByTime(POP_LIMIT_MS + 1);
   await t.finishInProgressScheduledFunctions();
@@ -977,6 +995,7 @@ async function matchedChat() {
   await pickFirstQuestion(lena, roomId);
   await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
   await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await afterReveal(lena, roomId);
   await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
   return { ...started, matchId: (await view(lena, roomId)).matchId! };
 }
@@ -1084,4 +1103,47 @@ test("a match shows the other person's full profile and the room's rounds, and o
 
   await lena.as.mutation(api.matches.unmatch, { matchId });
   expect(await luca.as.query(api.matches.profile, { matchId })).toBeNull();
+});
+
+test('nobody pops during the live reveal, and it walks every balloon still up', async () => {
+  const { lena, luca, noah, roomId } = await startRoom();
+  await pickFirstQuestion(lena, roomId);
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A short one' });
+  await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  const room = await view(lena, roomId);
+  expect(room.reveal!.turns.map((turn) => turn.id).sort()).toEqual([luca.id, noah.id].sort());
+  await expect(
+    lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id }),
+  ).rejects.toThrow("It's not time to pop yet.");
+  // Contestants see the same reveal.
+  expect((await view(luca, roomId)).reveal).toEqual(room.reveal);
+  await afterReveal(lena, roomId);
+  await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
+  expect((await view(lena, roomId)).status).toBe('finished');
+});
+
+test('someone who leaves before their reveal turn is skipped, and the pop time moves up', async () => {
+  process.env.LOBBY_SIZE = '4';
+  const t = convexTest(schema, modules);
+  const lena = await player(t, 'Lena', 'woman', 'man');
+  const men = [
+    await player(t, 'Luca', 'man', 'woman'),
+    await player(t, 'Noah', 'man', 'woman'),
+    await player(t, 'Elia', 'man', 'woman'),
+  ];
+  for (const p of [lena, ...men]) await join(p);
+  const status = await lena.as.query(api.queue.status, {});
+  if (status.state !== 'matched') throw new Error('No room formed');
+  const roomId = status.roomId;
+  await pickFirstQuestion(lena, roomId);
+  for (const p of men) await p.as.mutation(api.rooms.postAnswer, { roomId, text: 'Hi' });
+
+  const before = await view(lena, roomId);
+  const [, , last] = before.reveal!.turns;
+  await men.find((p) => p.id === last.id)!.as.mutation(api.rooms.leaveRoom, { roomId });
+  const after = await view(lena, roomId);
+  expect(after.reveal!.turns.map((turn) => turn.id)).toEqual(
+    before.reveal!.turns.slice(0, 2).map((turn) => turn.id),
+  );
+  expect(after.deadline).toBe(before.deadline! - last.ms);
 });

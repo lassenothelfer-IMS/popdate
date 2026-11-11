@@ -21,6 +21,8 @@ export type RoomPhaseInput = {
   replaying: boolean;
   /** You left this room on the way to another one. */
   leftForReplay: boolean;
+  /** The live reveal is still going: one contestant at a time, before the pop time. */
+  inReveal?: boolean;
 };
 
 /**
@@ -34,6 +36,9 @@ export type RoomView =
   | 'popNews'
   | 'picking'
   | 'answering'
+  /** Everyone: the live reveal, one contestant at a time. */
+  | 'spotlight'
+  /** The popper: the answer cards side by side, to pick one to pop. */
   | 'reveal'
   | 'deciding';
 
@@ -92,6 +97,8 @@ export type RoomPhase = {
   climax: boolean;
   holdingPop: boolean;
   pickingNow: boolean;
+  /** The live reveal holds the room: nobody pops yet. */
+  spotlight: boolean;
   revealing: boolean;
   ownFinalPop: boolean;
   viewer: 'popper' | 'winner' | 'other';
@@ -132,7 +139,6 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
       ? room.questionOptions.find((question) => question.id === questionId)
       : undefined;
   const winner = room.contestants.find((c) => c.id === room.winnerId);
-  const canSelect = isPopper && isPopping && !sendingPop;
 
   const up = room.contestants.filter((c) => !c.popped);
   const down = room.contestants
@@ -157,9 +163,13 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
   // A pop holding the room: on the popper's press, or as the next round starts.
   const holdingPop = holding && !!beatPop && (room.status === 'picking' || !!pending);
   const pickingNow = room.status === 'picking' && !holding;
-  // The popper's reveal: the answer cards, side by side.
-  const revealing = isPopper && isPopping && !holdingPop;
-  const myPhotoShowing = !isPopper && isPopping && iAmActive && me.photos.length > 0;
+  // The live reveal comes first, for everyone; then the popper's cards, side by side.
+  const spotlight = isPopping && !holdingPop && !!input.inReveal;
+  const revealing = isPopper && isPopping && !holdingPop && !spotlight;
+  // Marking a balloon waits for the reveal to end, with the pop bar.
+  const canSelect = isPopper && isPopping && !sendingPop && !spotlight;
+  const myPhotoShowing =
+    !isPopper && isPopping && !spotlight && iAmActive && me.photos.length > 0;
 
   // Your own pop in the final, seen live: the room goes straight to the result.
   const ownFinalPop =
@@ -181,7 +191,7 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
   // The question, and what the room is waiting on under it.
   const showQuestionBlock = !!room.question && (answering || (isPopping && !holdingPop));
   const myAnswer = answering && iAmActive && me.answered ? me.answer : null;
-  const statusLine: RoomStatusLine | null = !showQuestionBlock
+  const statusLine: RoomStatusLine | null = !showQuestionBlock || spotlight
     ? null
     : answering
       ? 'answering'
@@ -190,7 +200,7 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
         : 'deciding';
 
   // Who is still in, then who has popped. A pop on its way already counts as popped.
-  const showList = !showResult && !(isPopper && pickingNow) && !revealing;
+  const showList = !showResult && !(isPopper && pickingNow) && !revealing && !spotlight;
   const stillIn = up.filter((c) => c.id !== pending?.id);
   const pendingRow = pending ? up.find((c) => c.id === pending.id) : undefined;
   const poppedRows = pendingRow ? [pendingRow, ...down] : down;
@@ -203,7 +213,7 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
     footer = me.answered ? 'sent' : 'composer';
   } else if (isPopper && pickingNow) {
     footer = 'ask';
-  } else if (isPopper && isPopping && !pending) {
+  } else if (isPopper && isPopping && !pending && !spotlight) {
     footer = 'hold';
   }
 
@@ -214,6 +224,7 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
   else if (holdingPop) view = 'popNews';
   else if (pickingNow) view = 'picking';
   else if (answering) view = 'answering';
+  else if (spotlight) view = 'spotlight';
   else if (revealing) view = 'reveal';
   else view = 'deciding';
 
@@ -244,6 +255,7 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
     climax,
     holdingPop,
     pickingNow,
+    spotlight,
     revealing,
     ownFinalPop,
     viewer,

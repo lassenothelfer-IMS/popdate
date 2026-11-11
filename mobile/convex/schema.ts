@@ -131,6 +131,13 @@ export default defineSchema({
     /** When the current answer or pop timer ends, in epoch milliseconds. */
     deadline: v.optional(v.number()),
     popReminder: v.boolean(),
+    /** The live reveal of this round's answers: see `src/shared/reveal.ts`. */
+    reveal: v.optional(
+      v.object({
+        startsAt: v.number(),
+        turns: v.array(v.object({ id: v.string(), ms: v.number() })),
+      }),
+    ),
     /** The popper picked or popped at least once: they're really there. */
     popperActed: v.optional(v.boolean()),
     winnerId: v.optional(v.id('users')),

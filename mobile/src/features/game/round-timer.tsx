@@ -4,8 +4,7 @@ import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Motion, Radius, Space } from '@/constants/theme';
-import { BAR_TEXT_MAX_SCALE } from '@/features/game/room-bar';
+import { Ease, Motion } from '@/constants/theme';
 import { formatSeconds, useSecondsLeft } from '@/hooks/use-server';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -23,8 +22,6 @@ const WARN_AT = 10;
 
 type RoundTimerProps = {
   deadline: number | null;
-  /** The popper is over the pop time; the deadline now counts down to a random pop. */
-  popReminder: boolean;
   /** Buzz once at 10 s left: only while you still have an answer to send. */
   warn?: boolean;
 };
@@ -32,10 +29,10 @@ type RoundTimerProps = {
 /**
  * The ring timer in the room header: a 40 pt ring that empties as the clock
  * runs, the time in 11 pt tabular figures inside. It owns the per-second tick,
- * so only this ring re-renders while the clock runs. Past the pop time it
- * becomes a quiet "Everyone's waiting" pill.
+ * so only this ring re-renders while the clock runs. The pop time is one
+ * countdown to the random pop: the reminder on the way is the status line's.
  */
-export function RoundTimer({ deadline, popReminder, warn = false }: RoundTimerProps) {
+export function RoundTimer({ deadline, warn = false }: RoundTimerProps) {
   const theme = useTheme();
   const t = useT();
   const secondsLeft = useSecondsLeft(deadline);
@@ -53,22 +50,6 @@ export function RoundTimer({ deadline, popReminder, warn = false }: RoundTimerPr
     }
   }, [warn, secondsLeft, deadline]);
 
-  // Over the pop time: the quiet pill. Its deadline is the random pop, which isn't shown.
-  if (popReminder) {
-    const waiting = t('game.everyoneWaiting');
-    return (
-      <Animated.View
-        entering={timerIn}
-        accessible
-        accessibilityRole="timer"
-        accessibilityLabel={waiting}
-        style={[styles.pill, { backgroundColor: theme.surface }]}>
-        <ThemedText type="timer" maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE} style={styles.pillText}>
-          {waiting}
-        </ThemedText>
-      </Animated.View>
-    );
-  }
   if (secondsLeft === null) return null;
 
   const fraction = Math.min(1, secondsLeft / (total?.seconds ?? Math.max(1, secondsLeft)));
@@ -113,15 +94,6 @@ const styles = StyleSheet.create({
   digits: {
     fontSize: 11,
     lineHeight: 13,
-    fontWeight: 600,
-  },
-  pill: {
-    minHeight: 32,
-    justifyContent: 'center',
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.pill,
-  },
-  pillText: {
     fontWeight: 600,
   },
 });

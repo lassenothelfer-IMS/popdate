@@ -14,7 +14,12 @@ export function spokenPhase(
   t: Translate,
   room: Room,
   phase: RoomPhase,
-  { title, leaving, myPhotoLine }: { title: string; leaving: boolean; myPhotoLine: string },
+  {
+    title,
+    leaving,
+    myPhotoLine,
+    revealLine,
+  }: { title: string; leaving: boolean; myPhotoLine: string; revealLine?: string | null },
 ): string | null {
   const { isPopper, winner, me } = phase;
   if (phase.holdingPop || phase.climax || leaving || me?.left) return null;
@@ -40,6 +45,8 @@ export function spokenPhase(
         ? `${t('game.youAskedSpoken', { question })} ${t('game.photosUnlock')}`
         : t('game.asksSpoken', { name: popperName, question });
     case 'popping':
+      // The live reveal: each turn as it comes up.
+      if (phase.spotlight) return revealLine ?? t('game.answersIn');
       if (isPopper) {
         return room.popReminder
           ? t('game.waitingOnYou')

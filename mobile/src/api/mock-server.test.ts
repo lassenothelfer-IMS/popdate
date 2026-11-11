@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Balloons, ProfileDraft, Room } from '@/api/types';
 import { FREE_BALLOONS, STARTER_BALLOONS } from '@/shared/balloons';
+import { POP_LIMIT_MS, POP_REMINDER_MS } from '@/shared/limits';
+import { revealEndsAt } from '@/shared/reveal';
 
 // The device store reaches for the keychain through React Native; the mock
 // server only needs somewhere to keep JSON, so a map stands in for it.
@@ -108,6 +110,10 @@ describe('mock server', () => {
         const active = room().contestants.filter((c) => !c.popped);
         expect(active).toHaveLength(6 - round);
         expect(active.every((c) => c.answer)).toBe(true);
+        // Nothing pops until the live reveal has played.
+        expect(room().reveal!.turns).toHaveLength(6 - round);
+        await expect(mockServer.popBalloon(roomId, active[0].id)).rejects.toThrow();
+        await vi.advanceTimersByTimeAsync(revealEndsAt(room().reveal!) - Date.now());
 
         await mockServer.popBalloon(roomId, active[0].id);
         await expect(mockServer.popBalloon(roomId, active[0].id)).rejects.toThrow();
@@ -129,9 +135,11 @@ describe('mock server', () => {
       await mockServer.pickQuestion(roomId, room().questionOptions[0].id);
       await vi.advanceTimersByTimeAsync(15_000);
       expect(room().status).toBe('popping');
-      await vi.advanceTimersByTimeAsync(32_500);
+      // The live reveal first, then one countdown: the reminder, then the random pop.
+      const popFrom = revealEndsAt(room().reveal!);
+      await vi.advanceTimersByTimeAsync(popFrom - Date.now() + POP_REMINDER_MS + 1);
       expect(room().popReminder).toBe(true);
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(POP_LIMIT_MS);
       expect(room().contestants.filter((c) => c.popped)).toHaveLength(1);
       expect(room().round).toBe(2);
       stop();
@@ -258,6 +266,7 @@ describe('mock server', () => {
       for (let round = 1; round <= 4; round++) {
         await mockServer.pickQuestion(roomId, room().questionOptions[0].id);
         await vi.advanceTimersByTimeAsync(15_000);
+        await vi.advanceTimersByTimeAsync(revealEndsAt(room().reveal!) - Date.now());
         await mockServer.popBalloon(roomId, room().contestants.find((c) => !c.popped)!.id);
       }
       const [match] = await mockServer.listMatches();

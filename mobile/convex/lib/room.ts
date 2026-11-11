@@ -6,6 +6,7 @@ import {
   ANSWER_MS,
   PICK_MS,
   POP_BEAT_MS,
+  POP_LIMIT_MS,
   POP_REMINDER_MS,
   QUESTION_OPTIONS_PER_ROUND,
   REVEAL_BEAT_MS,
@@ -15,6 +16,7 @@ import { spendBalloon } from './balloons';
 import { ageFromBirthDate, getProfile, isBlockedEitherWay, personCard, photoUrls } from './people';
 import { schedulePush } from '../push';
 import { questionPool } from './questions';
+import { type Reveal, revealEndsAt, revealTurnMs, revealWithout } from '../../src/shared/reveal';
 
 /*
  * The game rules, following the mock in `src/api/mock-server.ts` so the screens
@@ -94,6 +96,7 @@ async function startRound(ctx: MutationCtx, roomId: Id<'rooms'>) {
       .map((question) => question._id),
     deadline,
     popReminder: false,
+    reveal: undefined,
   });
   await ctx.scheduler.runAt(deadline, internal.rooms.pickTimeUp, { roomId, round: room.round });
 }
@@ -119,13 +122,30 @@ export async function startAnswering(
 }
 
 export async function startPopping(ctx: MutationCtx, room: Doc<'rooms'>) {
-  // The app first plays the "Answers are in" beat, which doesn't count.
-  const deadline = Date.now() + POP_REMINDER_MS + REVEAL_BEAT_MS;
-  await ctx.db.patch(room._id, { status: 'popping', deadline, popReminder: false });
-  await ctx.scheduler.runAt(deadline, internal.rooms.popTimeUp, {
-    roomId: room._id,
-    round: room.round,
-  });
+  // The app first plays the "Answers are in" beat, then the live reveal: every balloon
+  // still up, one at a time in a random order. Neither counts toward the pop time.
+  const answers = await ctx.db
+    .query('answers')
+    .withIndex('by_room_round', (q) => q.eq('roomId', room._id).eq('round', room.round))
+    .collect();
+  const answerOf = new Map(answers.map((answer) => [answer.userId, answer.text]));
+  const turns = shuffle((await seatsOf(ctx, room._id)).filter(stillIn)).map((seat) => ({
+    id: seat.userId as string,
+    ms: revealTurnMs(answerOf.get(seat.userId) ?? null),
+  }));
+  const reveal = { startsAt: Date.now() + REVEAL_BEAT_MS, turns };
+  await ctx.db.patch(room._id, { status: 'popping', popReminder: false });
+  await setReveal(ctx, room._id, room.round, reveal);
+}
+
+/**
+ * Sets the reveal and the pop time that follows it. One countdown: players see the
+ * random pop's time, and the reminder comes on the way.
+ */
+async function setReveal(ctx: MutationCtx, roomId: Id<'rooms'>, round: number, reveal: Reveal) {
+  const popFrom = revealEndsAt(reveal);
+  await ctx.db.patch(roomId, { reveal, deadline: popFrom + POP_REMINDER_MS + POP_LIMIT_MS });
+  await ctx.scheduler.runAt(popFrom + POP_REMINDER_MS, internal.rooms.popTimeUp, { roomId, round });
 }
 
 /** Moves on to popping as soon as every contestant still in has answered. */
@@ -192,6 +212,7 @@ export async function finish(ctx: MutationCtx, roomId: Id<'rooms'>, { withWinner
     status: 'finished',
     deadline: undefined,
     popReminder: false,
+    reveal: undefined,
     winnerId: winner?.userId,
     matchId,
     endedAt: Date.now(),
@@ -228,6 +249,11 @@ export async function leave(ctx: MutationCtx, room: Doc<'rooms'>, userId: Id<'us
   if (seats.filter(stillIn).length <= 1) {
     await finish(ctx, room._id);
     return;
+  }
+  // Mid-reveal, their turn goes if it hasn't come up yet, and the pop time moves up.
+  if (room.status === 'popping' && room.reveal && !room.popReminder) {
+    const reveal = revealWithout(room.reveal, userId, Date.now());
+    if (reveal !== room.reveal) await setReveal(ctx, room._id, room.round, reveal);
   }
   await endAnsweringIfEveryoneAnswered(ctx, room._id);
 }
@@ -300,6 +326,7 @@ export async function roomView(ctx: QueryCtx, room: Doc<'rooms'>, viewerId: Id<'
     ),
     deadline: room.deadline ?? null,
     popReminder: room.popReminder,
+    reveal: room.status === 'popping' ? (room.reveal ?? null) : null,
     winnerId: (room.winnerId as string | undefined) ?? null,
     matchId: ownsMatch ? ((room.matchId as string | undefined) ?? null) : null,
     me: { id: viewerId as string, role },
