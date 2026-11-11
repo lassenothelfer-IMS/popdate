@@ -1,6 +1,6 @@
 # Popdate waitlist
 
-A one-page signup for the launch. It saves email, phone (iPhone or Android), country, city, who people are and who they want to meet, their language and where they came from (`?ref=tiktok`) in the `waitlist` table of the Convex backend (`mobile/convex/waitlist.ts`). The table can only be read from the Convex dashboard or the CLI.
+A one-page signup for the launch. It asks for two things, email and phone (iPhone or Android), and also saves the visitor's language and where they came from (`?ref=tiktok`) in the `waitlist` table of the Convex backend (`mobile/convex/waitlist.ts`). The table can only be read from the Convex dashboard or the CLI.
 
 ## See the list
 
@@ -11,7 +11,7 @@ npm run waitlist:stats
 npm run waitlist:export
 ```
 
-`waitlist:stats` prints totals by status, gender pair, phone, country and source. `waitlist:export` writes `waitlist.csv`, which is git-ignored because it holds emails. Add `-- --prod` to either one for production.
+`waitlist:stats` prints totals by status, phone and source. `waitlist:export` writes `waitlist.csv`, which is git-ignored because it holds emails. Add `-- --prod` to either one for production.
 
 ## Try it locally
 

@@ -5,23 +5,6 @@
   const button = form.querySelector('button');
   const openedAt = Date.now();
 
-  // Countries in the visitor's language: the launch markets first, then everyone else A to Z.
-  const FIRST = ['CH', 'DE', 'AT', 'IT', 'FR', 'GB', 'US'];
-  const names = new Intl.DisplayNames([navigator.language, 'en'], { type: 'region' });
-  const select = document.getElementById('country');
-  const option = (code) => new Option(names.of(code) ?? code, code);
-  select.append(new Option('Choose', ''));
-  FIRST.forEach((code) => select.append(option(code)));
-  const divider = new Option('──────────', '');
-  divider.disabled = true;
-  select.append(divider);
-  window.POPDATE_COUNTRIES.filter((c) => !FIRST.includes(c))
-    .map((code) => ({ code, name: names.of(code) ?? code }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach(({ code }) => select.append(option(code)));
-  const guess = (navigator.language.split('-')[1] ?? '').toUpperCase();
-  if (window.POPDATE_COUNTRIES.includes(guess)) select.value = guess;
-
   const language = navigator.language.slice(0, 2).toLowerCase();
   const params = new URLSearchParams(location.search);
   const source = (params.get('ref') ?? params.get('utm_source') ?? '').toLowerCase().slice(0, 32);
@@ -29,18 +12,11 @@
   const MESSAGES = {
     email: 'Enter a valid email address.',
     phone: 'Choose your phone.',
-    gender: 'Choose who you are.',
-    wantsToMeet: 'Choose who you want to meet.',
-    country: 'Choose your country.',
-    city: 'Enter your city.',
-    adult: 'Popdate is 18+ only.',
-    consent: 'Tick the box so we can email you at launch.',
   };
 
   function missing(data) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.email)) return 'email';
-    return ['phone', 'gender', 'wantsToMeet', 'country', 'city'].find((k) => !data[k])
-      ?? (!data.adult ? 'adult' : !data.consent ? 'consent' : null);
+    return data.phone ? null : 'phone';
   }
 
   form.addEventListener('submit', async (event) => {
@@ -49,12 +25,6 @@
     const data = {
       email: String(fields.get('email') ?? '').trim(),
       phone: fields.get('phone'),
-      gender: fields.get('gender'),
-      wantsToMeet: fields.get('wantsToMeet'),
-      country: fields.get('country'),
-      city: String(fields.get('city') ?? '').trim(),
-      adult: fields.get('adult') === 'on',
-      consent: fields.get('consent') === 'on',
       website: fields.get('website') ?? '',
       language: ['en', 'de', 'fr', 'it'].includes(language) ? language : undefined,
       source: source || undefined,

@@ -52,8 +52,6 @@ h2 { font-size: 30px; line-height: 1.15; }
 .card { background: var(--field); border: 1px solid var(--outline); border-radius: 18px; padding: 22px 20px; }
 .field { display: grid; gap: 8px; margin-bottom: 18px; }
 .label { font-weight: 600; font-size: 14px; color: var(--text); }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.row .field { margin: 0; }
 
 input[type=email], input[type=text], select {
   width: 100%; min-height: 50px; padding: 0 14px;
@@ -74,8 +72,8 @@ input:focus, select:focus { border-color: var(--strong); box-shadow: 0 0 0 3px r
 .choice input:checked + span { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; }
 .choice input:focus-visible + span { box-shadow: 0 0 0 3px rgba(240, 105, 92, 0.4); }
 
-.check { display: flex; gap: 12px; align-items: flex-start; margin: 4px 0 14px; font-size: 15px; color: var(--text-2); cursor: pointer; }
-.check input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
+.note { margin: 14px 0 0; font-size: 14px; line-height: 1.5; color: var(--text-3); }
+.note a { color: var(--text-2); }
 
 .honey { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 

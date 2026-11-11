@@ -19,14 +19,8 @@ afterEach(() => {
 const signup = {
   email: '  Mia@Example.com ',
   phone: 'iphone',
-  country: 'ch',
-  city: ' Zurich ',
-  gender: 'woman',
-  wantsToMeet: 'man',
   language: 'de',
   source: 'TikTok',
-  adult: true,
-  consent: true,
   elapsedMs: 9_000,
   website: '',
 };
@@ -52,8 +46,8 @@ test('a signup is cleaned and saved as pending', async () => {
   const [row] = await rows(t);
   expect(row).toMatchObject({
     email: 'mia@example.com',
-    country: 'CH',
-    city: 'Zurich',
+    phone: 'iphone',
+    language: 'de',
     status: 'pending',
     source: 'tiktok',
   });
@@ -72,15 +66,14 @@ test('bots and bad data are not saved', async () => {
   expect((await post(t, '/waitlist/join', { ...signup, website: 'spam.biz' })).status).toBe(200);
   expect((await post(t, '/waitlist/join', { ...signup, elapsedMs: 300 })).status).toBe(200);
   expect((await post(t, '/waitlist/join', { ...signup, email: 'not-an-email' })).status).toBe(400);
-  expect((await post(t, '/waitlist/join', { ...signup, country: 'XX' })).status).toBe(400);
-  expect((await post(t, '/waitlist/join', { ...signup, consent: false })).status).toBe(400);
+  expect((await post(t, '/waitlist/join', { ...signup, phone: 'windows' })).status).toBe(400);
   expect(await rows(t)).toHaveLength(0);
 });
 
 test('signing up twice keeps one row and answers the same', async () => {
   const t = convexTest(schema, modules);
   await post(t, '/waitlist/join', signup);
-  const again = await post(t, '/waitlist/join', { ...signup, city: 'Bern' });
+  const again = await post(t, '/waitlist/join', { ...signup, phone: 'android' });
   expect(again.status).toBe(200);
   expect(await rows(t)).toHaveLength(1);
 });
@@ -92,7 +85,7 @@ test('the confirm and leave links work with the emailed token', async () => {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
   await t.mutation(internal.waitlist.join, {
-    email: 'leo@example.com', phone: 'android', country: 'DE', city: 'Berlin', gender: 'man', wantsToMeet: 'woman', tokenHash,
+    email: 'leo@example.com', phone: 'android', tokenHash,
   });
 
   expect((await post(t, '/waitlist/confirm', { token: 'b'.repeat(43) })).status).toBe(404);
@@ -106,8 +99,8 @@ test('the confirm and leave links work with the emailed token', async () => {
 test('the export defuses spreadsheet formulas', async () => {
   const t = convexTest(schema, modules);
   await t.mutation(internal.waitlist.join, {
-    email: 'x@example.com', phone: 'iphone', country: 'CH', city: '=HYPERLINK("evil")', gender: 'woman', wantsToMeet: 'man', tokenHash: 'h',
+    email: '=HYPERLINK("evil")@example.com', phone: 'iphone', tokenHash: 'h',
   });
   const csv = await t.query(internal.waitlist.exportCsv, {});
-  expect(csv).toContain(`"'=HYPERLINK(""evil"")"`);
+  expect(csv).toContain(`"'=HYPERLINK(""evil"")@example.com"`);
 });

@@ -3,9 +3,8 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
 import { httpAction, internalMutation, internalQuery } from './_generated/server';
-import { COUNTRY_CODES } from './lib/countries';
 import { rateLimit } from './lib/rateLimit';
-import { gender, waitlistLanguage, waitlistPhone } from './schema';
+import { waitlistLanguage, waitlistPhone } from './schema';
 
 /**
  * The launch waitlist. The page in `waitlist/` posts to the HTTP routes at the
@@ -21,7 +20,7 @@ import { gender, waitlistLanguage, waitlistPhone } from './schema';
  */
 
 /** Bump when the consent sentence on the page changes. */
-export const CONSENT_VERSION = '2026-11-03';
+export const CONSENT_VERSION = '2026-11-11';
 
 /** A pending signup gets at most one confirmation email per this long. */
 const RESEND_AFTER_MS = 10 * 60_000;
@@ -32,10 +31,6 @@ const SOURCE = /^[a-z0-9_-]{1,32}$/;
 const signupFields = {
   email: v.string(),
   phone: waitlistPhone,
-  country: v.string(),
-  city: v.string(),
-  gender,
-  wantsToMeet: gender,
   language: v.optional(waitlistLanguage),
   source: v.optional(v.string()),
 };
@@ -43,10 +38,6 @@ const signupFields = {
 type Signup = {
   email: string;
   phone: Doc<'waitlist'>['phone'];
-  country: string;
-  city: string;
-  gender: Doc<'waitlist'>['gender'];
-  wantsToMeet: Doc<'waitlist'>['wantsToMeet'];
   language?: Doc<'waitlist'>['language'];
   source?: string;
 };
@@ -58,26 +49,15 @@ export function cleanSignup(raw: unknown): Signup | null {
   const text = (value: unknown) => (typeof value === 'string' ? value : '');
 
   const email = text(r.email).trim().toLowerCase();
-  // Control characters out, runs of spaces to one.
-  const city = text(r.city).replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
-  const country = text(r.country).trim().toUpperCase();
   const source = text(r.source).trim().toLowerCase();
-  const isGender = (value: unknown) => value === 'woman' || value === 'man';
 
   if (email.length > 254 || !EMAIL.test(email)) return null;
   if (r.phone !== 'iphone' && r.phone !== 'android') return null;
-  if (!COUNTRY_CODES.has(country)) return null;
-  if (city.length < 1 || city.length > 60) return null;
-  if (!isGender(r.gender) || !isGender(r.wantsToMeet)) return null;
   const language = ['en', 'de', 'fr', 'it'].includes(text(r.language)) ? (r.language as Signup['language']) : undefined;
 
   return {
     email,
     phone: r.phone,
-    country,
-    city,
-    gender: r.gender as Signup['gender'],
-    wantsToMeet: r.wantsToMeet as Signup['wantsToMeet'],
     language,
     source: SOURCE.test(source) ? source : undefined,
   };
@@ -162,7 +142,7 @@ export const pruneUnconfirmed = internalMutation({
   },
 });
 
-/** Counts for the marketing plan: totals, the gender split, phones and top countries. */
+/** Counts for the marketing plan: totals, phones and where people came from. */
 export const stats = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -179,9 +159,7 @@ export const stats = internalQuery({
     return {
       total: rows.length,
       byStatus: count((row) => row.status),
-      byPerson: count((row) => `${row.gender} wants ${row.wantsToMeet}`),
       byPhone: count((row) => row.phone),
-      byCountry: count((row) => row.country),
       bySource: count((row) => row.source ?? 'direct'),
     };
   },
@@ -192,16 +170,12 @@ export const exportCsv = internalQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query('waitlist').order('desc').collect();
-    const header = ['email', 'status', 'phone', 'country', 'city', 'gender', 'wants_to_meet', 'language', 'source', 'signed_up', 'confirmed'];
+    const header = ['email', 'status', 'phone', 'language', 'source', 'signed_up', 'confirmed'];
     const lines = rows.map((row) =>
       [
         row.email,
         row.status,
         row.phone,
-        row.country,
-        row.city,
-        row.gender,
-        row.wantsToMeet,
         row.language ?? '',
         row.source ?? '',
         new Date(row.createdAt).toISOString(),
@@ -286,9 +260,6 @@ export const joinRoute = httpAction(async (ctx, request) => {
   // Bots fill the hidden field or submit faster than a person can type: tell them it worked, save nothing.
   if (body.website || typeof body.elapsedMs !== 'number' || body.elapsedMs < 2_500) {
     return reply(origin, 200, { ok: true });
-  }
-  if (body.adult !== true || body.consent !== true) {
-    return reply(origin, 400, { error: 'Tick both boxes to join.' });
   }
   const signup = cleanSignup(body);
   if (!signup) return reply(origin, 400, { error: 'Check your details and try again.' });

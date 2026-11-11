@@ -283,11 +283,11 @@ export default defineSchema({
     /** Trimmed and lowercased. */
     email: v.string(),
     phone: waitlistPhone,
-    /** ISO 3166-1 alpha-2, for example "CH". */
-    country: v.string(),
-    city: v.string(),
-    gender,
-    wantsToMeet: gender,
+    /** Country, city, gender and who they want to meet were asked until 2026-11-10. The page only asks for email and phone now, so older rows keep them. */
+    country: v.optional(v.string()),
+    city: v.optional(v.string()),
+    gender: v.optional(gender),
+    wantsToMeet: v.optional(gender),
     language: v.optional(waitlistLanguage),
     /** Where they came from, from `?ref=` or `?utm_source=` on the page link, like "tiktok". */
     source: v.optional(v.string()),

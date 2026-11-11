@@ -12,7 +12,6 @@
 <link rel="icon" href="/icon.png">
 <link rel="stylesheet" href="/styles.css">
 <script src="/config.js" defer></script>
-<script src="/countries.js" defer></script>
 <script src="/app.js" defer></script>
 </head>
 <body>
@@ -56,38 +55,13 @@
       <label class="choice"><input type="radio" name="phone" value="android"><span>Android</span></label>
     </fieldset>
 
-    <fieldset class="choices field">
-      <legend class="label">I am a</legend>
-      <label class="choice"><input type="radio" name="gender" value="woman" required><span>Woman</span></label>
-      <label class="choice"><input type="radio" name="gender" value="man"><span>Man</span></label>
-    </fieldset>
-
-    <fieldset class="choices field">
-      <legend class="label">I want to meet</legend>
-      <label class="choice"><input type="radio" name="wantsToMeet" value="man" required><span>Men</span></label>
-      <label class="choice"><input type="radio" name="wantsToMeet" value="woman"><span>Women</span></label>
-    </fieldset>
-
-    <div class="row field">
-      <div class="field">
-        <label class="label" for="country">Country</label>
-        <select id="country" name="country" autocomplete="country" required></select>
-      </div>
-      <div class="field">
-        <label class="label" for="city">City</label>
-        <input id="city" name="city" type="text" autocomplete="address-level2" maxlength="60" placeholder="Zurich" required>
-      </div>
-    </div>
-
     <div class="honey" aria-hidden="true">
       <label for="website">Leave this empty</label>
       <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
     </div>
 
-    <label class="check"><input type="checkbox" name="adult" required> I'm 18 or older.</label>
-    <label class="check"><input type="checkbox" name="consent" required> <span>Email me when Popdate launches. I can unsubscribe anytime. See the <a href="/privacy">privacy policy</a>.</span></label>
-
     <button class="primary" type="submit">Join the waitlist</button>
+    <p class="note">By joining you ask us to email you when Popdate launches (18+). You can unsubscribe anytime. See the <a href="/privacy">privacy policy</a>.</p>
     <p class="error" id="error" role="alert" aria-live="polite"></p>
   </form>
 
