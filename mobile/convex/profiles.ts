@@ -10,6 +10,7 @@ import { ageFromBirthDate, getProfile, photoUrls } from './lib/people';
 import { rateLimit } from './lib/rateLimit';
 import { claimImage, deleteImage } from './lib/uploads';
 import { gender, interest } from './schema';
+import { cleanInterests, cleanLanguages } from '../src/shared/profile-tags';
 
 /**
  * Your profile in the `Profile` shape, plus `photoIds`: the app keeps those to
@@ -30,6 +31,8 @@ async function profileView(ctx: QueryCtx, profile: Doc<'profiles'>) {
     heightCm: profile.heightCm ?? null,
     job: profile.job,
     bio: profile.bio,
+    interests: cleanInterests(profile.interests),
+    languages: cleanLanguages(profile.languages),
     photos: await photoUrls(ctx, profile.photos),
     photoIds: profile.photos as string[],
     termsAcceptedAt: profile.termsAcceptedAt,
@@ -95,6 +98,8 @@ export const saveProfile = mutation({
     heightCm: v.optional(v.number()),
     job: v.string(),
     bio: v.string(),
+    interests: v.optional(v.array(v.string())),
+    languages: v.optional(v.array(v.string())),
     photos: v.array(v.id('_storage')),
   },
   handler: async (ctx, args) => {
@@ -114,6 +119,9 @@ export const saveProfile = mutation({
     }
     for (const photo of args.photos) await claimImage(ctx, userId, photo);
 
+    // Only tags from the lists are kept, five at most; nothing picked is stored as nothing.
+    const interests = cleanInterests(args.interests);
+    const languages = cleanLanguages(args.languages);
     const existing = await getProfile(ctx, userId);
     const fields = {
       userId,
@@ -132,6 +140,8 @@ export const saveProfile = mutation({
       heightCm,
       job: optionalText(args.job, 'job or school', 80),
       bio: optionalText(args.bio, 'bio', 500),
+      interests: interests.length ? interests : undefined,
+      languages: languages.length ? languages : undefined,
       photos: args.photos,
       // Recorded by the server the first time, so it can't be backdated.
       termsAcceptedAt: existing?.termsAcceptedAt ?? new Date().toISOString(),

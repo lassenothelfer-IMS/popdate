@@ -18,6 +18,7 @@ import {
   type IdentityChoice,
 } from '@/features/profile/gender-section';
 import { identityOf } from '@/features/profile/identity';
+import { TagsSection } from '@/features/profile/tags-section';
 import {
   DetailsSection,
   PhotoSection,
@@ -55,6 +56,8 @@ export function EditProfileScreen() {
           bio: profile.bio,
           genderDetails: profile.genderDetails,
           sexuality: profile.sexuality,
+          interests: profile.interests,
+          languages: profile.languages,
           photos: profile.photos,
         }
       : null,
@@ -171,6 +174,7 @@ export function EditProfileScreen() {
         </Rise>
         <Rise index={2}>
           <DetailsSection form={form} style={styles.aboutSection} />
+          <TagsSection form={form} style={styles.aboutSection} />
           <GenderSection
             form={form}
             identity={{ value: identity, onChange: setIdentity }}

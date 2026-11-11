@@ -140,18 +140,20 @@ type GenderSectionProps = {
   /** Editing a profile: your gender can change here too. Setup asked it in onboarding. */
   identity?: { value: IdentityChoice; onChange: (next: IdentityChoice) => void };
   style?: StyleProp<ViewStyle>;
+  /** Just the fields, for a screen whose title already introduces them (profile setup). */
+  bare?: boolean;
 };
 
 /**
  * "Gender and sexuality" on your profile: your gender in your own words, like
  * pronouns, and your sexuality. Both are optional; tap a picked chip to clear it.
  */
-export function GenderSection({ form, identity, style }: GenderSectionProps) {
+export function GenderSection({ form, identity, style, bare = false }: GenderSectionProps) {
   const revealView = useRevealView();
   const reduced = useReduceMotion();
   const t = useT();
-  return (
-    <Section title={t('profile.genderAndSexuality')} style={[styles.section, style]}>
+  const fields = (
+    <>
       {identity ? (
         <IdentityPicker
           value={identity.value}
@@ -181,6 +183,12 @@ export function GenderSection({ form, identity, style }: GenderSectionProps) {
           ))}
         </View>
       </View>
+    </>
+  );
+  if (bare) return <View style={[styles.section, style]}>{fields}</View>;
+  return (
+    <Section title={t('profile.genderAndSexuality')} style={[styles.section, style]}>
+      {fields}
     </Section>
   );
 }

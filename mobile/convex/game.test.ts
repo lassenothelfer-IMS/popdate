@@ -1105,6 +1105,32 @@ test("a match shows the other person's full profile and the room's rounds, and o
   expect(await luca.as.query(api.matches.profile, { matchId })).toBeNull();
 });
 
+test('interests and languages are kept from the lists only, five at most, and show to a match', async () => {
+  const { lena, luca, matchId } = await matchedChat();
+  const mine = await luca.as.query(api.profiles.getMine, {});
+  const saved = await luca.as.mutation(api.profiles.saveProfile, {
+    name: mine!.name,
+    birthDate: mine!.birthDate,
+    gender: mine!.gender,
+    wantsToMeet: mine!.wantsToMeet,
+    city: mine!.city,
+    job: mine!.job,
+    bio: mine!.bio,
+    photos: mine!.photoIds as Id<'_storage'>[],
+    // One that doesn't exist, one twice, and more than five.
+    interests: ['hiking', 'hacking', 'coffee', 'coffee', 'film', 'dogs', 'wine', 'yoga'],
+    languages: ['de', 'klingon', 'en'],
+  });
+  expect(saved.interests).toEqual(['hiking', 'coffee', 'film', 'dogs', 'wine']);
+  expect(saved.languages).toEqual(['de', 'en']);
+
+  const seen = await lena.as.query(api.matches.profile, { matchId });
+  expect(seen?.interests).toEqual(['hiking', 'coffee', 'film', 'dogs', 'wine']);
+  expect(seen?.languages).toEqual(['de', 'en']);
+  // Lena picked none: empty lists, not missing ones.
+  expect((await luca.as.query(api.matches.profile, { matchId }))?.interests).toEqual([]);
+});
+
 test('nobody pops during the live reveal, and it walks every balloon still up', async () => {
   const { lena, luca, noah, roomId } = await startRoom();
   await pickFirstQuestion(lena, roomId);

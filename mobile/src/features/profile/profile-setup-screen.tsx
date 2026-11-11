@@ -17,6 +17,7 @@ import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
 import { GenderSection } from '@/features/profile/gender-section';
+import { TagsSection } from '@/features/profile/tags-section';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import {
   DetailsSection,
@@ -34,13 +35,14 @@ import { haptics } from '@/utils/haptics';
 
 /**
  * The profile, after onboarding's questions: photos (S12, S13), a few lines
- * about you (S14), saved there, then "You're in" (S18). Notifications are asked
- * for later, in the queue, where they make sense.
+ * about you (S14), then two short pages that are yours to skip: interests and
+ * languages, and gender and sexuality. The last one saves, then "You're in"
+ * (S18). Small pages, because a long one gets abandoned.
  */
-type Phase = 'photos' | 'about' | 'ready';
+type Phase = 'photos' | 'about' | 'interests' | 'identity' | 'ready';
 
 /** Where each phase sits on the setup's progress bar (onboarding has steps 1 to 4). */
-const STEP: Record<'photos' | 'about', number> = { photos: 5, about: 6 };
+const STEP: Record<Exclude<Phase, 'ready'>, number> = { photos: 5, about: 6, interests: 7, identity: 8 };
 
 export function ProfileSetupScreen() {
   const t = useT();
@@ -76,13 +78,23 @@ export function ProfileSetupScreen() {
   if (phase === 'photos') return <PhotosStep form={form} onContinue={() => setPhase('about')} />;
   if (phase === 'about') {
     return (
-      <AboutStep
+      <AboutStep form={form} onBack={() => setPhase('photos')} onContinue={() => setPhase('interests')} />
+    );
+  }
+  if (phase === 'interests') {
+    return (
+      <InterestsStep form={form} onBack={() => setPhase('about')} onContinue={() => setPhase('identity')} />
+    );
+  }
+  if (phase === 'identity') {
+    return (
+      <IdentityStep
         form={form}
         saving={saving}
         error={error}
         // Going back mid-save would leave the save's outcome on a step you can't see.
         onBack={() => {
-          if (!saving) setPhase('photos');
+          if (!saving) setPhase('interests');
         }}
         onSave={handleSave}
       />
@@ -185,16 +197,10 @@ function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }
   );
 }
 
-type AboutStepProps = {
-  form: Form;
-  saving: boolean;
-  error: string | null;
-  onBack: () => void;
-  onSave: () => void;
-};
+type StepProps = { form: Form; onBack: () => void; onContinue: () => void };
 
-/** S14: a few lines about you. Saving here makes the profile. */
-function AboutStep({ form, saving, error, onBack, onSave }: AboutStepProps) {
+/** S14: a few lines about you. Your name and city are the only things setup insists on here. */
+function AboutStep({ form, onBack, onContinue }: StepProps) {
   const t = useT();
   const missing = form.missing('start');
   return (
@@ -203,18 +209,18 @@ function AboutStep({ form, saving, error, onBack, onSave }: AboutStepProps) {
       footerStyle="plain"
       footer={
         <>
-          {error ? (
-            <ErrorLine message={error} />
-          ) : missing ? (
+          {missing ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.footerNote}>
               {missing}
             </ThemedText>
           ) : null}
           <Button
-            title={t('profile.startPlaying')}
+            title={t('common.continue')}
             disabled={!form.complete}
-            loading={saving}
-            onPress={onSave}
+            onPress={() => {
+              haptics.light();
+              onContinue();
+            }}
             accessibilityHint={form.complete ? undefined : (missing ?? undefined)}
           />
         </>
@@ -223,7 +229,68 @@ function AboutStep({ form, saving, error, onBack, onSave }: AboutStepProps) {
       <StepHeading title={t('profile.aboutTitle')} intro={t('profile.aboutIntro')} />
       <Rise index={2} style={styles.body}>
         <DetailsSection form={form} bare />
-        <GenderSection form={form} style={styles.genderSection} />
+      </Rise>
+    </Screen>
+  );
+}
+
+/** What you like and the languages you speak. All optional: with nothing picked, the button skips. */
+function InterestsStep({ form, onBack, onContinue }: StepProps) {
+  const t = useT();
+  const picked = form.interests.length + form.languages.length > 0;
+  return (
+    <Screen
+      scroll
+      footerStyle="plain"
+      footer={
+        <Button
+          title={picked ? t('common.continue') : t('profile.skipStep')}
+          variant={picked ? 'prominent' : 'tinted'}
+          onPress={() => {
+            haptics.light();
+            onContinue();
+          }}
+        />
+      }>
+      <StepTop step={STEP.interests} onBack={onBack} />
+      <StepHeading title={t('profile.interestsTitle')} intro={t('profile.interestsIntro')} />
+      <Rise index={2} style={styles.body}>
+        <TagsSection form={form} />
+      </Rise>
+    </Screen>
+  );
+}
+
+type IdentityStepProps = {
+  form: Form;
+  saving: boolean;
+  error: string | null;
+  onBack: () => void;
+  onSave: () => void;
+};
+
+/** Your gender in your own words and your sexuality, both optional. Saving here makes the profile. */
+function IdentityStep({ form, saving, error, onBack, onSave }: IdentityStepProps) {
+  const t = useT();
+  return (
+    <Screen
+      scroll
+      footerStyle="plain"
+      footer={
+        <>
+          {error ? <ErrorLine message={error} /> : null}
+          <Button
+            title={t('profile.startPlaying')}
+            disabled={!form.complete}
+            loading={saving}
+            onPress={onSave}
+          />
+        </>
+      }>
+      <StepTop step={STEP.identity} onBack={onBack} />
+      <StepHeading title={t('profile.genderAndSexuality')} intro={t('profile.identityIntro')} />
+      <Rise index={2} style={styles.body}>
+        <GenderSection form={form} bare />
       </Rise>
     </Screen>
   );
@@ -350,9 +417,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 6,
-  },
-  genderSection: {
-    marginTop: Space.xs,
   },
   footerNote: {
     textAlign: 'center',

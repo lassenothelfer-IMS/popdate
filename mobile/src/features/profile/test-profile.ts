@@ -9,6 +9,8 @@ export function testProfileDetails(): ProfileDetails {
     heightCm: 172,
     job: 'Student',
     bio: 'Here to pop some balloons.',
+    interests: ['hiking', 'coffee', 'film'],
+    languages: ['de', 'en'],
     photos: testPhotos(),
   };
 }

@@ -253,6 +253,8 @@ export class ConvexServer implements PopdateApi {
       genderIdentity: draft.genderIdentity,
       genderDetails: draft.genderDetails,
       sexuality: draft.sexuality,
+      interests: draft.interests,
+      languages: draft.languages,
       pinnedAnswers: draft.pinnedAnswers,
       photos,
     }).catch((error: unknown) => {

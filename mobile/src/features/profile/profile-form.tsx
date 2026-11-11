@@ -30,6 +30,14 @@ import { asSexuality, type Sexuality } from '@/features/profile/identity';
 import { keepPickedPhoto, livePhoto } from '@/features/profile/photo-files';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { useT, type Translate, type TranslationKey } from '@/i18n';
+import {
+  cleanInterests,
+  cleanLanguages,
+  MAX_INTERESTS,
+  MAX_LANGUAGES,
+  type InterestTag,
+  type LanguageTag,
+} from '@/shared/profile-tags';
 import type { ProfileDetails } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { readJson, writeJson } from '@/utils/device-store';
@@ -135,6 +143,8 @@ type SetupDraft = {
   bio: string;
   genderDetails: string;
   sexuality: Sexuality | null;
+  interests: InterestTag[];
+  languages: LanguageTag[];
 };
 
 function text(value: unknown) {
@@ -170,6 +180,8 @@ function checkedDraft(value: unknown, units: Units): SetupDraft | null {
     bio: text(draft.bio).slice(0, BIO_MAX),
     genderDetails: text(draft.genderDetails),
     sexuality: asSexuality(typeof draft.sexuality === 'string' ? draft.sexuality : undefined),
+    interests: cleanInterests(draft.interests),
+    languages: cleanLanguages(draft.languages),
   };
 }
 
@@ -209,6 +221,8 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
   const [bio, setBio] = useState(initial?.bio ?? '');
   const [genderDetails, setGenderDetails] = useState(initial?.genderDetails ?? '');
   const [sexuality, setSexuality] = useState<Sexuality | null>(asSexuality(initial?.sexuality));
+  const [interests, setInterests] = useState(() => cleanInterests(initial?.interests));
+  const [languages, setLanguages] = useState(() => cleanLanguages(initial?.languages));
   // Bring back a draft from an earlier launch, then keep it up to date.
   const draftRestored = useRef(!draftKey);
   // Set by every change you make. A draft that arrives after you started typing doesn't overwrite it.
@@ -228,6 +242,8 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
         setBio(draft.bio);
         setGenderDetails(draft.genderDetails);
         setSexuality(draft.sexuality);
+        setInterests(draft.interests);
+        setLanguages(draft.languages);
       }
       draftRestored.current = true;
     });
@@ -256,11 +272,13 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
         bio,
         genderDetails,
         sexuality,
+        interests,
+        languages,
       };
       void writeJson(draftKey, draft);
     }, 400);
     return () => clearTimeout(timer);
-  }, [draftKey, photos, name, city, typedHeight, job, bio, genderDetails, sexuality]);
+  }, [draftKey, photos, name, city, typedHeight, job, bio, genderDetails, sexuality, interests, languages]);
 
   // The picker is open, or iCloud is still handing over the photos you chose.
   const [picking, setPicking] = useState(false);
@@ -304,6 +322,8 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
           bio: bio.trim(),
           genderDetails: genderDetails.trim() || undefined,
           sexuality: sexuality ?? undefined,
+          interests,
+          languages,
           photos,
         }
       : null;
@@ -318,7 +338,9 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     job.trim() !== before.job.trim() ||
     bio.trim() !== before.bio.trim() ||
     genderDetails.trim() !== (before.genderDetails ?? '').trim() ||
-    sexuality !== asSexuality(before.sexuality);
+    sexuality !== asSexuality(before.sexuality) ||
+    interests.join() !== cleanInterests(before.interests).join() ||
+    languages.join() !== cleanLanguages(before.languages).join();
 
   /** What still stands between you and the footer's action, or null when nothing does. */
   function missing(purpose: 'start' | 'save'): string | null {
@@ -409,6 +431,20 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     });
   }
 
+  /** Picks a tag, or takes a picked one off again. A sixth isn't added. */
+  function toggled<T>(picked: T[], tag: T, max: number) {
+    if (picked.includes(tag)) return picked.filter((other) => other !== tag);
+    return picked.length < max ? [...picked, tag] : picked;
+  }
+  function toggleInterest(tag: InterestTag) {
+    touched.current = true;
+    setInterests((picked) => toggled(picked, tag, MAX_INTERESTS));
+  }
+  function toggleLanguage(tag: LanguageTag) {
+    touched.current = true;
+    setLanguages((picked) => toggled(picked, tag, MAX_LANGUAGES));
+  }
+
   function changeHeight(part: 'cm' | 'feet' | 'inches', value: string) {
     touched.current = true;
     setTypedHeight({ ...height, [part]: digitsOnly(value) });
@@ -439,6 +475,10 @@ export function useProfileForm(initial: ProfileDetails | null, { draftKey }: { d
     setGenderDetails: touching(setGenderDetails),
     sexuality,
     setSexuality: touching(setSexuality),
+    interests,
+    toggleInterest,
+    languages,
+    toggleLanguage,
     complete,
     details,
     changed,

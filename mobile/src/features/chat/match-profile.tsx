@@ -23,9 +23,11 @@ import { Skeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { Gutter, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { asSexuality, identityLabel, identityOf, sexualityLabel } from '@/features/profile/identity';
+import { interestLabel, languageLabel } from '@/features/profile/tags-section';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
+import { cleanInterests, cleanLanguages } from '@/shared/profile-tags';
 import { useFilterText, useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
 import { formatHeight } from '@/utils/units';
@@ -157,6 +159,11 @@ function Loaded({ profile, bottom, onPlanDate }: { profile: MatchProfile; bottom
   // Only what they filled in. Their gender shows when they described it themselves.
   const about = [
     profile.heightCm ? formatHeight(profile.heightCm, settings.units) : '',
+    ...cleanInterests(profile.interests).map((interest) => interestLabel(t, interest)),
+    // The languages they speak share one chip.
+    cleanLanguages(profile.languages)
+      .map((language) => languageLabel(t, language))
+      .join(', '),
     profile.genderIdentity ? identityLabel(t, identityOf(profile)) : '',
     sexuality ? sexualityLabel(t, sexuality) : '',
   ].filter(Boolean);

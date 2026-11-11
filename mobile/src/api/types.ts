@@ -48,6 +48,10 @@ export type Profile = {
   job: string;
   /** Optional: empty when you haven't added it. */
   bio: string;
+  /** Optional: up to five from `INTERESTS` in `src/shared/profile-tags.ts`. */
+  interests?: string[];
+  /** Optional: up to five from `LANGUAGES`, the languages you speak. */
+  languages?: string[];
   /** 4 to 6 photo URIs, in order (position 1 to 6). */
   photos: string[];
   termsAcceptedAt: string;
@@ -184,6 +188,9 @@ export type MatchProfile = {
   job: string;
   bio: string;
   heightCm: number | null;
+  /** What they picked, from the lists in `src/shared/profile-tags.ts`. Empty when they picked none. */
+  interests: string[];
+  languages: string[];
   /** All their photos, in their order. */
   photos: string[];
   verified: boolean;

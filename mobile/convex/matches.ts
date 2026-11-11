@@ -7,6 +7,7 @@ import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } fr
 import { requireUserId } from './lib/auth';
 import { ageFromBirthDate, getProfile, isBlockedEitherWay, personCard, photoUrls } from './lib/people';
 import { deleteImage } from './lib/uploads';
+import { cleanInterests, cleanLanguages } from '../src/shared/profile-tags';
 
 function otherOf(match: Doc<'matches'>, viewerId: Id<'users'>) {
   return match.popperId === viewerId ? match.winnerId : match.popperId;
@@ -184,6 +185,8 @@ export const profile = query({
       job: theirs.job,
       bio: theirs.bio,
       heightCm: theirs.heightCm ?? null,
+      interests: cleanInterests(theirs.interests),
+      languages: cleanLanguages(theirs.languages),
       photos: (await photoUrls(ctx, theirs.photos)).filter(Boolean),
       verified: verification?.status === 'verified',
       role: match.popperId === otherId ? ('popper' as const) : ('contestant' as const),

@@ -39,7 +39,9 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { asSexuality, identityLabel, identityOf, sexualityLabel } from '@/features/profile/identity';
+import { interestLabel, languageLabel } from '@/features/profile/tags-section';
 import { useT } from '@/i18n';
+import { cleanInterests, cleanLanguages } from '@/shared/profile-tags';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { ageFromBirthDate } from '@/utils/birth-date';
@@ -151,6 +153,18 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
         .join(' · '),
     },
     { label: t('profile.sexuality'), value: sexuality ? sexualityLabel(t, sexuality) : '' },
+    {
+      label: t('profile.interests'),
+      value: cleanInterests(profile.interests)
+        .map((interest) => interestLabel(t, interest))
+        .join(', '),
+    },
+    {
+      label: t('profile.languages'),
+      value: cleanLanguages(profile.languages)
+        .map((language) => languageLabel(t, language))
+        .join(', '),
+    },
   ].filter((row) => row.value);
 
   function back() {

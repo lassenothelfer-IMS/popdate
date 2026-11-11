@@ -50,6 +50,9 @@ export default defineSchema({
     heightCm: v.optional(v.number()),
     job: v.string(),
     bio: v.string(),
+    /** Optional: up to five each, from the lists in `src/shared/profile-tags.ts`. */
+    interests: v.optional(v.array(v.string())),
+    languages: v.optional(v.array(v.string())),
     /** 4 to 6 files, in order (position 1 to 6). */
     photos: v.array(v.id('_storage')),
     termsAcceptedAt: v.string(),

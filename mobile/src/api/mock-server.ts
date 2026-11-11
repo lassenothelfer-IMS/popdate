@@ -48,6 +48,7 @@ import {
   MIN_VOICE_MS,
   type VoiceNote,
 } from '@/shared/chat';
+import { cleanInterests, cleanLanguages, INTERESTS } from '@/shared/profile-tags';
 import { DEFAULT_SETTINGS } from '@/shared/settings';
 import {
   ANSWER_GRACE_MS,
@@ -526,7 +527,12 @@ class MockServer implements PopdateApi {
       throw new Error('A profile needs 4 to 6 photos.');
     }
     if (ageFromBirthDate(draft.birthDate) < 18) throw new Error('You need to be 18 or older.');
-    this.profile = { ...draft, id: userId };
+    this.profile = {
+      ...draft,
+      interests: cleanInterests(draft.interests),
+      languages: cleanLanguages(draft.languages),
+      id: userId,
+    };
     await writeJson(PROFILE_KEY, this.profile);
     return this.profile;
   }
@@ -808,6 +814,8 @@ class MockServer implements PopdateApi {
       job: BOT_JOBS[(seed >>> 3) % BOT_JOBS.length],
       bio: BOT_BIOS[(seed >>> 6) % BOT_BIOS.length],
       heightCm: (seed >>> 9) % 4 === 0 ? null : 158 + ((seed >>> 11) % 34),
+      interests: [0, 1, 2].map((i) => INTERESTS[(seed + i * 7) % INTERESTS.length]),
+      languages: seed % 2 === 0 ? ['de', 'en'] : ['gsw', 'en', 'fr'],
       photos: player?.photos.length ? [...player.photos] : [match.other.photo],
       verified: (seed >>> 2) % 3 !== 0,
       role: theyChose ? 'popper' : 'contestant',
