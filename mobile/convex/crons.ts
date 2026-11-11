@@ -17,4 +17,7 @@ crons.interval('sweep unclaimed uploads', { hours: 1 }, internal.uploads.sweepUn
 // Ended chats kept for reports go after 30 days.
 crons.interval('purge ended chats', { hours: 24 }, internal.matches.purgeEndedChats, {});
 
+// A message that has waited a day for its answer gets one "your turn" push.
+crons.interval('nudge your turn', { hours: 1 }, internal.chat.nudgeYourTurn, {});
+
 export default crons;

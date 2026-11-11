@@ -28,15 +28,31 @@ type ChatComposerProps = {
   sending: boolean;
   /** Their name, for the placeholder. */
   name: string;
+  /** The message you are answering, shown over the field until you send or cancel. */
+  replyingTo?: { label: string; text: string } | null;
+  onCancelReply?: () => void;
+  /** Starts a voice message. The button for it shows while the field is empty. */
+  onRecord?: () => void;
 };
 
 /** The message field: a pill on surface 1 with a strong hairline, and the send button inside it. */
-export function ChatComposer({ value: text, onChangeText, onSend, sending, name }: ChatComposerProps) {
+export function ChatComposer({
+  value: text,
+  onChangeText,
+  onSend,
+  sending,
+  name,
+  replyingTo = null,
+  onCancelReply,
+  onRecord,
+}: ChatComposerProps) {
   const t = useT();
   const theme = useTheme();
   /** The last count VoiceOver heard, so each step down is said once. */
   const spokenCount = useRef<number | null>(null);
   const canSend = text.trim().length > 0 && !sending;
+  /** Nothing typed: the button records a voice message instead. */
+  const records = !!onRecord && text.trim().length === 0 && !sending;
   const left = MAX_MESSAGE_LENGTH - text.length;
   const countLabel =
     left === 0 ? t('chat.noCharactersLeft') : t('chat.charactersLeft', { count: left });
@@ -61,6 +77,26 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
 
   return (
     <View style={styles.composer}>
+      {replyingTo ? (
+        <View style={[styles.replying, { borderLeftColor: theme.text }]}>
+          <View style={styles.replyingText}>
+            <ThemedText type="captionStrong" numberOfLines={1}>
+              {replyingTo.label}
+            </ThemedText>
+            <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+              {replyingTo.text}
+            </ThemedText>
+          </View>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.cancelReply')}
+            onPress={onCancelReply}
+            hitSlop={Space.xs}
+            style={[styles.cancelReply, { backgroundColor: theme.surface }]}>
+            <Icon name="close" size={11} color={theme.text} />
+          </PressableScale>
+        </View>
+      ) : null}
       <View
         style={[
           styles.pill,
@@ -87,17 +123,17 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
         {/* Always in the text color; it only answers once there is something to send. */}
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={t('chat.send')}
-          accessibilityState={{ disabled: !canSend, busy: sending }}
-          disabled={!canSend}
-          onPress={onSend}
+          accessibilityLabel={records ? t('chat.recordVoice') : t('chat.send')}
+          accessibilityState={{ disabled: !canSend && !records, busy: sending }}
+          disabled={!canSend && !records}
+          onPress={records ? onRecord : onSend}
           hitSlop={Space.xxs}
           containerStyle={styles.sendSlot}
           style={[styles.send, { backgroundColor: theme.inverse }]}>
           {sending ? (
             <ActivityIndicator color={theme.onInverse} />
           ) : (
-            <Icon name="send" size={16} color={theme.onInverse} />
+            <Icon name={records ? 'mic' : 'send'} size={16} color={theme.onInverse} />
           )}
         </PressableScale>
       </View>
@@ -113,6 +149,26 @@ export function ChatComposer({ value: text, onChangeText, onSend, sending, name 
 const styles = StyleSheet.create({
   composer: {
     gap: Space.xxs,
+  },
+  // What you are answering: a bar on the left, their line, and a way out.
+  replying: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    marginBottom: Space.xxs,
+    paddingLeft: 10,
+    borderLeftWidth: 2.5,
+  },
+  replyingText: {
+    flex: 1,
+    gap: 1,
+  },
+  cancelReply: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pill: {
     flexDirection: 'row',

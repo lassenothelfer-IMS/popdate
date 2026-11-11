@@ -969,3 +969,98 @@ test("a deleted account's Popdate+ follows its renewals and goes when it ends", 
   });
   expect(await kept()).toBeNull();
 });
+
+/** Lena and Luca matched: the id of their chat. */
+async function matchedChat() {
+  const started = await startRoom();
+  const { lena, luca, noah, roomId } = started;
+  await pickFirstQuestion(lena, roomId);
+  await luca.as.mutation(api.rooms.postAnswer, { roomId, text: 'A' });
+  await noah.as.mutation(api.rooms.postAnswer, { roomId, text: 'B' });
+  await lena.as.mutation(api.rooms.popBalloon, { roomId, contestantId: noah.id });
+  return { ...started, matchId: (await view(lena, roomId)).matchId! };
+}
+
+test('a reply answers a message of the same chat, and each person has one reaction per message', async () => {
+  const { lena, luca, matchId } = await matchedChat();
+  const first = await lena.as.mutation(api.chat.send, { matchId, text: 'Fondue is soup.' });
+  const reply = await luca.as.mutation(api.chat.send, { matchId, text: 'haha', replyTo: first.id });
+  expect(reply.replyTo).toBe(first.id);
+  // An id that isn't a message of this chat is sent as a plain message.
+  const plain = await luca.as.mutation(api.chat.send, { matchId, text: 'Hi', replyTo: 'nonsense' });
+  expect(plain.replyTo).toBeNull();
+
+  await luca.as.mutation(api.chat.react, { matchId, messageId: first.id, emoji: '😂' });
+  await luca.as.mutation(api.chat.react, { matchId, messageId: first.id, emoji: '❤️' });
+  await lena.as.mutation(api.chat.react, { matchId, messageId: first.id, emoji: '🔥' });
+  let [message] = await lena.as.query(api.chat.list, { matchId });
+  expect(message.reactions).toEqual([
+    { userId: luca.id, emoji: '❤️' },
+    { userId: lena.id, emoji: '🔥' },
+  ]);
+  await luca.as.mutation(api.chat.react, { matchId, messageId: first.id, emoji: null });
+  [message] = await lena.as.query(api.chat.list, { matchId });
+  expect(message.reactions).toEqual([{ userId: lena.id, emoji: '🔥' }]);
+  await expect(
+    luca.as.mutation(api.chat.react, { matchId, messageId: first.id, emoji: 'nope' }),
+  ).rejects.toThrow("That reaction doesn't exist.");
+});
+
+test('typing shows to the other person and ends when the message is sent', async () => {
+  const { lena, luca, noah, matchId } = await matchedChat();
+  expect(await luca.as.query(api.chat.typingOf, { matchId })).toBeNull();
+  await lena.as.mutation(api.chat.typing, { matchId });
+  expect(await luca.as.query(api.chat.typingOf, { matchId })).toEqual(expect.any(Number));
+  // You never see your own typing, and nobody outside the match sees any.
+  expect(await lena.as.query(api.chat.typingOf, { matchId })).toBeNull();
+  await expect(noah.as.query(api.chat.typingOf, { matchId })).rejects.toThrow("This match doesn't exist.");
+  await lena.as.mutation(api.chat.send, { matchId, text: 'Hi Luca' });
+  expect(await luca.as.query(api.chat.typingOf, { matchId })).toBeNull();
+});
+
+test('a message that waits a day gets one "your turn" nudge', async () => {
+  const { t, lena, matchId } = await matchedChat();
+  await lena.as.mutation(api.chat.send, { matchId, text: 'Hi Luca' });
+  const nudgedAt = () => t.run(async (ctx) => (await ctx.db.query('matches').first())?.nudgedAt ?? null);
+
+  await t.mutation(internal.chat.nudgeYourTurn, {});
+  expect(await nudgedAt()).toBeNull();
+
+  vi.advanceTimersByTime(25 * 60 * 60_000);
+  await t.mutation(internal.chat.nudgeYourTurn, {});
+  const first = await nudgedAt();
+  expect(first).toEqual(expect.any(Number));
+
+  // The same waiting message is never nudged twice.
+  vi.advanceTimersByTime(60 * 60_000);
+  await t.mutation(internal.chat.nudgeYourTurn, {});
+  expect(await nudgedAt()).toBe(first);
+});
+
+test('a voice message carries its audio, and only audio of a fair length is one', async () => {
+  const { t, lena, luca, matchId } = await matchedChat();
+  const store = (type: string) => t.run((ctx) => ctx.storage.store(new Blob(['sound'], { type })));
+  const waveform = [0.2, 3, -1];
+
+  const sent = await lena.as.mutation(api.chat.sendVoice, {
+    matchId,
+    storageId: await store('audio/mp4'),
+    durationMs: 4200,
+    waveform,
+  });
+  // Levels are kept between 0 and 1, whatever the app sent.
+  expect(sent.voice).toEqual({ url: expect.any(String), durationMs: 4200, waveform: [0.2, 1, 0] });
+  expect(sent.text).toBe('');
+  const [message] = await luca.as.query(api.chat.list, { matchId });
+  expect(message.voice?.durationMs).toBe(4200);
+
+  await expect(
+    lena.as.mutation(api.chat.sendVoice, { matchId, storageId: await store('audio/mp4'), durationMs: 200, waveform }),
+  ).rejects.toThrow('That voice message is too short.');
+  await expect(
+    lena.as.mutation(api.chat.sendVoice, { matchId, storageId: await store('audio/mp4'), durationMs: 90_000, waveform }),
+  ).rejects.toThrow('That voice message is too long.');
+  await expect(
+    lena.as.mutation(api.chat.sendVoice, { matchId, storageId: await store('image/png'), durationMs: 4200, waveform }),
+  ).rejects.toThrow('That is not a voice message.');
+});

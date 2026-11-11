@@ -5,6 +5,7 @@
  */
 
 import type { BalloonsView } from '../shared/balloons';
+import type { LinkPreview, VoiceNote } from '../shared/chat';
 
 /**
  * The two groups rooms are matched from. How you describe your own gender is
@@ -215,6 +216,14 @@ export type Message = {
   /** Already filtered by the server's own profanity filter. */
   text: string;
   sentAt: string;
+  /** The message this one answers, if any. */
+  replyTo?: string | null;
+  /** One reaction per person. */
+  reactions?: { userId: string; emoji: string }[];
+  /** The preview of the first link in the text, once its page has been read. */
+  link?: LinkPreview | null;
+  /** A voice message. The text is then empty. */
+  voice?: VoiceNote | null;
 };
 
 /** One method per server function in the root README. */
@@ -296,5 +305,18 @@ export interface PopdateApi {
   listMessages(matchId: string): Promise<Message[]>;
   /** `onError` runs when the chat can't be read, so it isn't mistaken for an empty one. */
   watchMessages(matchId: string, onChange: (messages: Message[]) => void, onError?: () => void): Unsubscribe;
-  sendMessage(matchId: string, text: string): Promise<Message>;
+  /** `replyTo` is the message this one answers. */
+  sendMessage(matchId: string, text: string, replyTo?: string): Promise<Message>;
+  /** Sends a recording on the phone as a voice message. */
+  sendVoice(
+    matchId: string,
+    recording: { uri: string; durationMs: number; waveform: number[] },
+    replyTo?: string,
+  ): Promise<Message>;
+  /** One of the chat's reactions on a message, or `null` to take yours back. */
+  reactToMessage(matchId: string, messageId: string, emoji: string | null): Promise<void>;
+  /** Says you are typing right now. The composer repeats it while you type. */
+  setTyping(matchId: string): Promise<void>;
+  /** When the other person last typed, as a timestamp, or null. */
+  watchTyping(matchId: string, onChange: (typedAt: number | null) => void): Unsubscribe;
 }

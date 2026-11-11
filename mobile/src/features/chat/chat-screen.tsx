@@ -1,4 +1,5 @@
 import { Redirect, router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -25,13 +26,21 @@ import { Skeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { ChatComposer } from '@/features/chat/chat-composer';
-import { MessageList, type Seed } from '@/features/chat/message-list';
+import { MessageActions } from '@/features/chat/message-actions';
+import {
+  MessageList,
+  type BubbleAnchor,
+  type PendingMessage,
+  type Seed,
+} from '@/features/chat/message-list';
 import { CheckInSheet } from '@/features/chat/check-in-sheet';
 import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
+import { VoiceRecorder, type Recording } from '@/features/chat/voice-recorder';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { TYPING_MS, TYPING_PING_MS } from '@/shared/chat';
 import { useSession } from '@/state/session';
 import { useFilterText, useSettings } from '@/state/settings';
 import { track } from '@/utils/analytics';
@@ -140,22 +149,39 @@ function makeTimeFormat(locale: string, region: string | null) {
   const tag = region ? `${locale}-${region}` : locale;
   const time: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
   const dated: Intl.DateTimeFormatOptions = { ...time, day: 'numeric', month: 'short' };
-  let formats: { time: Intl.DateTimeFormat; dated: Intl.DateTimeFormat };
-  try {
-    formats = { time: new Intl.DateTimeFormat(tag, time), dated: new Intl.DateTimeFormat(tag, dated) };
-  } catch {
-    // A region the phone's Intl doesn't know: the language alone still reads right.
-    formats = {
-      time: new Intl.DateTimeFormat(locale, time),
-      dated: new Intl.DateTimeFormat(locale, dated),
-    };
-  }
-  return (iso: string) => {
-    const date = new Date(iso);
-    const today = new Date().toDateString() === date.toDateString();
-    return (today ? formats.time : formats.dated).format(date);
+  const day: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+  const make = (options: Intl.DateTimeFormatOptions) => {
+    try {
+      return new Intl.DateTimeFormat(tag, options);
+    } catch {
+      // A region the phone's Intl doesn't know: the language alone still reads right.
+      return new Intl.DateTimeFormat(locale, options);
+    }
+  };
+  const formats = { time: make(time), dated: make(dated), day: make(day) };
+  return {
+    /** When you matched: today just the time, earlier days the date too. */
+    stamp(iso: string) {
+      const date = new Date(iso);
+      const today = new Date().toDateString() === date.toDateString();
+      return (today ? formats.time : formats.dated).format(date);
+    },
+    /** A message's time. Its day stands on the divider above it. */
+    clock: (iso: string) => formats.time.format(new Date(iso)),
+    /** The divider over a day's messages: null for today and yesterday, which have their own words. */
+    day(iso: string): 'today' | 'yesterday' | string {
+      const date = new Date(iso);
+      const now = new Date();
+      if (now.toDateString() === date.toDateString()) return 'today';
+      const before = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      if (before.toDateString() === date.toDateString()) return 'yesterday';
+      return formats.day.format(date);
+    },
   };
 }
+
+/** A local id for a message that hasn't been sent yet. */
+let pendingCount = 0;
 
 function Conversation({ match, myId }: { match: Match; myId: string }) {
   const t = useT();
@@ -186,14 +212,31 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
 
   const { name, age } = match.other;
   const tone = seatFor(seats, match.other.id);
-  const formatTime = useMemo(() => makeTimeFormat(locale, region), [locale, region]);
+  const times = useMemo(() => makeTimeFormat(locale, region), [locale, region]);
+  const formatTime = times.stamp;
+  const formatDay = (iso: string) => {
+    const day = times.day(iso);
+    return day === 'today' ? t('chat.today') : day === 'yesterday' ? t('chat.yesterday') : day;
+  };
+  /** Your messages on their way, or that didn't go through. */
+  const [pending, setPending] = useState<PendingMessage[]>([]);
+  /** The message you are answering. */
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  /** The message whose reactions bar is open, and where its bubble is. */
+  const [acting, setActing] = useState<{ message: Message; anchor: BubbleAnchor } | null>(null);
+  /** When they last typed. Shown as "typing" for a few seconds after. */
+  const [typedAt, setTypedAt] = useState<number | null>(null);
+  const [typing, setTyping] = useState(false);
   const seed = seedFromRoom(room, myId, t);
   // You were the one picked when you're the room's winner; otherwise you chose together.
   const winner = room?.winnerId != null && room.winnerId === myId;
   const emptyLine = t(winner ? 'chat.emptyWinner' : 'chat.emptyTogether', { name });
 
   const hearIncoming = useEffectEvent((message: Message) => {
-    const line = t('chat.incoming', { name, text: filter(message.text) });
+    const line = t('chat.incoming', {
+      name,
+      text: message.voice ? t('chat.voiceMessage') : filter(message.text),
+    });
     // VoiceOver ignores live regions, so iOS queues an announcement after whatever it's saying.
     if (Platform.OS === 'ios') {
       AccessibilityInfo.announceForAccessibilityWithOptions(line, { queue: true });
@@ -235,6 +278,23 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
     setAttempt((count) => count + 1);
   }
 
+  useEffect(() => api.watchTyping(match.id, setTypedAt), [match.id]);
+  // "Typing" lasts a few seconds past their last keystroke, and ends when their message lands.
+  const theirLast = messages?.findLast((message) => message.senderId !== myId)?.id ?? null;
+  useEffect(() => {
+    const left = typedAt === null ? 0 : TYPING_MS - (Date.now() - typedAt);
+    const show = setTimeout(() => setTyping(left > 0), 0);
+    const hide = left > 0 ? setTimeout(() => setTyping(false), left) : undefined;
+    return () => {
+      clearTimeout(show);
+      clearTimeout(hide);
+    };
+  }, [typedAt]);
+  useEffect(() => {
+    const id = setTimeout(() => setTyping(false), 0);
+    return () => clearTimeout(id);
+  }, [theirLast]);
+
   function scrollToEnd(animated: boolean) {
     scrollRef.current?.scrollToEnd({ animated: animated && !reduced });
   }
@@ -244,14 +304,77 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
     nearEnd.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - NEAR_END;
   }
 
-  function send(text: string) {
+  /** Sends one pending message. It shows at once; the server's copy takes its place when it arrives. */
+  function deliver(item: PendingMessage) {
+    const first = !messages?.some((message) => message.senderId === myId);
+    const going = item.voice
+      ? api.sendVoice(
+          match.id,
+          { uri: item.voice.url, durationMs: item.voice.durationMs, waveform: item.voice.waveform },
+          item.replyTo,
+        )
+      : api.sendMessage(match.id, item.text, item.replyTo);
+    going.then(
+      (sent) => {
+        if (first) track('first_message_sent');
+        haptics.light();
+        setPending((list) =>
+          list.map((other) => (other.localId === item.localId ? { ...other, sentId: sent.id } : other)),
+        );
+      },
+      () => {
+        haptics.error();
+        if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(t('chat.sendFailed'));
+        setPending((list) =>
+          list.map((other) => (other.localId === item.localId ? { ...other, failed: true } : other)),
+        );
+      },
+    );
+  }
+
+  function send(text: string, recording?: Recording) {
     // Your own message always scrolls into view, even if you were reading further up.
     nearEnd.current = true;
-    const first = !messages?.some((message) => message.senderId === myId);
-    return api.sendMessage(match.id, text).then((sent) => {
-      if (first) track('first_message_sent');
-      return sent;
-    });
+    pendingCount += 1;
+    const item: PendingMessage = {
+      localId: `pending-${pendingCount}`,
+      text: text.trim(),
+      voice: recording
+        ? { url: recording.uri, durationMs: recording.durationMs, waveform: recording.waveform }
+        : undefined,
+      replyTo: replyingTo?.id,
+      failed: false,
+    };
+    setReplyingTo(null);
+    // Messages the server has since delivered leave the waiting list.
+    setPending((list) => [
+      ...list.filter((other) => !other.sentId || !messages?.some((message) => message.id === other.sentId)),
+      item,
+    ]);
+    deliver(item);
+  }
+
+  function retrySend(localId: string) {
+    const item = pending.find((other) => other.localId === localId);
+    if (!item) return;
+    const again = { ...item, failed: false };
+    setPending((list) => list.map((other) => (other.localId === localId ? again : other)));
+    deliver(again);
+  }
+
+  function react(message: Message, emoji: string | null) {
+    haptics.selection();
+    api.reactToMessage(match.id, message.id, emoji).catch(() => haptics.error());
+  }
+
+  /** A double tap gives a heart, or takes yours back. */
+  function heart(message: Message) {
+    const mine = message.reactions?.find((reaction) => reaction.userId === myId)?.emoji;
+    react(message, mine === '❤️' ? null : '❤️');
+  }
+
+  function openLink(url: string) {
+    WebBrowser.openBrowserAsync(url).catch(() => {});
   }
 
   function openOptions() {
@@ -263,7 +386,27 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   return (
     <Screen
       contentStyle={styles.content}
-      footer={<ChatFooter name={name} messageCount={messages?.length ?? null} onSend={send} />}>
+      footer={
+        <ChatFooter
+          matchId={match.id}
+          name={name}
+          messageCount={messages?.length ?? null}
+          onSend={send}
+          onSendVoice={(recording) => send('', recording)}
+          replyingTo={
+            replyingTo
+              ? {
+                  label:
+                    replyingTo.senderId === myId
+                      ? t('chat.replyingToSelf')
+                      : t('chat.replyingTo', { name }),
+                  text: replyingTo.senderId === myId ? replyingTo.text : filter(replyingTo.text),
+                }
+              : null
+          }
+          onCancelReply={() => setReplyingTo(null)}
+        />
+      }>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -323,7 +466,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
           ) : (
             <MessagesLoading label={t('chat.loading')} />
           )
-        ) : messages.length === 0 && !seed ? (
+        ) : messages.length === 0 && pending.length === 0 && !typing && !seed ? (
           <Animated.View entering={contentIn} style={styles.empty}>
             <Avatar name={name} uri={match.other.photo} tone={tone} size={64} />
             <ThemedText type="body" themeColor="textSecondary" style={styles.centeredText}>
@@ -333,12 +476,22 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         ) : (
           <MessageList
             messages={messages}
+            pending={pending}
             myId={myId}
             name={name}
             filter={filter}
-            formatTime={formatTime}
+            formatTime={times.clock}
+            formatDay={formatDay}
             seed={seed}
             firstOpen={firstOpen}
+            typing={typing}
+            onOpenActions={(message, anchor) => {
+              haptics.selection();
+              setActing({ message, anchor });
+            }}
+            onHeart={heart}
+            onRetry={retrySend}
+            onOpenLink={openLink}
           />
         )}
       </ScrollView>
@@ -350,6 +503,20 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         </ThemedText>
       ) : null}
 
+      <MessageActions
+        anchor={acting?.anchor ?? null}
+        mine={acting?.message.senderId === myId}
+        current={acting?.message.reactions?.find((reaction) => reaction.userId === myId)?.emoji ?? null}
+        onReact={(emoji) => {
+          if (acting) react(acting.message, emoji);
+          setActing(null);
+        }}
+        onReply={() => {
+          if (acting) setReplyingTo(acting.message);
+          setActing(null);
+        }}
+        onClose={() => setActing(null)}
+      />
       {people.element}
       <CheckInSheet
         visible={checkingIn}
@@ -362,54 +529,63 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
 }
 
 type ChatFooterProps = {
+  matchId: string;
   name: string;
   /** How many messages there are, or null while they load. */
   messageCount: number | null;
-  /** Sends one message; rejects if it didn't go through. */
-  onSend: (text: string) => Promise<unknown>;
+  /** Sends one message. It shows in the chat at once, with how it went. */
+  onSend: (text: string) => void;
+  onSendVoice: (recording: Recording) => void;
+  replyingTo: { label: string; text: string } | null;
+  onCancelReply: () => void;
 };
 
 /**
- * Under the messages: a send error, date ideas while the chat is young, and the
- * composer. The draft lives here, so typing doesn't redraw the messages above.
+ * Under the messages: date ideas while the chat is young, what you are answering,
+ * and the composer. The draft lives here, so typing doesn't redraw the messages above.
  */
-function ChatFooter({ name, messageCount, onSend }: ChatFooterProps) {
+function ChatFooter({
+  matchId,
+  name,
+  messageCount,
+  onSend,
+  onSendVoice,
+  replyingTo,
+  onCancelReply,
+}: ChatFooterProps) {
   const t = useT();
   const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /** A voice message is being recorded, in the message field's place. */
+  const [recording, setRecording] = useState(false);
+  /** Why the last recording didn't happen: no microphone access, or it failed. */
+  const [recordError, setRecordError] = useState<string | null>(null);
+  /** When the server last heard that you type, so it hears at most every few seconds. */
+  const toldAt = useRef(0);
 
   function send() {
     const text = draft;
-    if (!text.trim() || sending) return;
-    setSending(true);
-    setError(null);
-    onSend(text).then(
-      () => {
-        setSending(false);
-        haptics.light();
-        // Keep anything typed while it was sending.
-        setDraft((current) => (current.startsWith(text) ? current.slice(text.length) : current));
-      },
-      () => {
-        setSending(false);
-        fail(t('chat.sendFailed'));
-      },
-    );
+    if (!text.trim()) return;
+    setDraft('');
+    onSend(text);
   }
 
-  function fail(message: string) {
-    setError(message);
-    haptics.error();
-    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(message);
+  function change(text: string) {
+    setDraft(text);
+    const now = Date.now();
+    if (text.trim() && now - toldAt.current >= TYPING_PING_MS) {
+      toldAt.current = now;
+      // Only a hint for the other person: a miss costs nothing.
+      api.setTyping(matchId).catch(() => {});
+    }
   }
 
   // Early on, a few date ideas sit over the composer; a tap drafts one to edit and send.
-  const showIdeas = messageCount !== null && messageCount < DATE_IDEAS_UNTIL && !draft;
+  const showIdeas =
+    messageCount !== null && messageCount < DATE_IDEAS_UNTIL && !draft && !replyingTo && !recording;
 
   return (
     <>
-      {error ? <ErrorLine message={error} /> : null}
+      {recordError ? <ErrorLine message={recordError} /> : null}
       {showIdeas ? (
         <ScrollView
           horizontal
@@ -427,7 +603,36 @@ function ChatFooter({ name, messageCount, onSend }: ChatFooterProps) {
           ))}
         </ScrollView>
       ) : null}
-      <ChatComposer value={draft} onChangeText={setDraft} onSend={send} sending={sending} name={name} />
+      {recording ? (
+        <VoiceRecorder
+          onSend={(taken) => {
+            setRecording(false);
+            onSendVoice(taken);
+          }}
+          onClose={(error) => {
+            setRecording(false);
+            if (error) {
+              setRecordError(error);
+              haptics.error();
+              if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(error);
+            }
+          }}
+        />
+      ) : (
+        <ChatComposer
+          value={draft}
+          onChangeText={change}
+          onSend={send}
+          sending={false}
+          name={name}
+          replyingTo={replyingTo}
+          onCancelReply={onCancelReply}
+          onRecord={() => {
+            setRecordError(null);
+            setRecording(true);
+          }}
+        />
+      )}
     </>
   );
 }

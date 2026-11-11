@@ -6,6 +6,7 @@ import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
 import { isBlockedEitherWay, personCard } from './lib/people';
+import { deleteImage } from './lib/uploads';
 
 function otherOf(match: Doc<'matches'>, viewerId: Id<'users'>) {
   return match.popperId === viewerId ? match.winnerId : match.popperId;
@@ -76,7 +77,12 @@ export async function endMatch(ctx: MutationCtx, match: Doc<'matches'>) {
     await ctx.db.insert('endedChats', {
       aId,
       bId,
-      messages: newest.reverse().map((m) => ({ senderId: m.senderId, text: m.text, sentAt: m.sentAt })),
+      // A recording isn't kept: the report shows that there was one.
+      messages: newest.reverse().map((m) => ({
+        senderId: m.senderId,
+        text: m.voice ? '(voice message)' : m.text,
+        sentAt: m.sentAt,
+      })),
       endedAt: Date.now(),
     });
   }
@@ -104,7 +110,11 @@ export const purgeMessages = internalMutation({
       .query('messages')
       .withIndex('by_match', (q) => q.eq('matchId', matchId))
       .take(PURGE_BATCH);
-    for (const message of batch) await ctx.db.delete(message._id);
+    for (const message of batch) {
+      // A voice message's recording goes with it.
+      if (message.voice) await deleteImage(ctx, message.voice.storageId);
+      await ctx.db.delete(message._id);
+    }
     if (batch.length === PURGE_BATCH) {
       await ctx.scheduler.runAfter(0, internal.matches.purgeMessages, { matchId });
     }

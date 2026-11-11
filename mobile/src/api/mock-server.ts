@@ -38,6 +38,15 @@ import {
   viewOf,
   type BalloonWallet,
 } from '@/shared/balloons';
+import {
+  bareLinkPreview,
+  fetchLinkPreview,
+  firstUrl,
+  isReaction,
+  MAX_VOICE_MS,
+  MIN_VOICE_MS,
+  type VoiceNote,
+} from '@/shared/chat';
 import { DEFAULT_SETTINGS } from '@/shared/settings';
 import {
   ANSWER_GRACE_MS,
@@ -284,6 +293,11 @@ const BOT_REPLIES = [
   'Okay, your turn: worst habit, go.',
 ];
 
+/** What the bot says to a voice message. */
+const BOT_VOICE_REPLIES = ['Okay, I like your voice.', 'Say that again, slower.', 'A voice message already? Bold.'];
+/** Short answers the bot hangs right onto your message. */
+const BOT_QUICK_REPLIES = ['haha', 'okay, fair', 'no way', 'same', 'tell me more'];
+
 type Player = RoomPlayer & { isBot: boolean };
 
 type Seat = {
@@ -400,6 +414,7 @@ class MockServer implements PopdateApi {
   private blocked: BlockedPerson[] = [];
   private messages = new Map<string, Message[]>();
   private messageListeners = new Map<string, Set<(messages: Message[]) => void>>();
+  private typingListeners = new Map<string, Set<(typedAt: number | null) => void>>();
 
   nextRole: MockRole = 'random';
   /**
@@ -1036,7 +1051,7 @@ class MockServer implements PopdateApi {
     };
   }
 
-  async sendMessage(matchId: string, text: string) {
+  async sendMessage(matchId: string, text: string, replyTo?: string) {
     await this.restore();
     const match = this.requireMatch(matchId);
     const trimmed = text.trim();
@@ -1045,19 +1060,121 @@ class MockServer implements PopdateApi {
     if (this.isBlocked(match.other.id)) {
       throw new Error("You blocked this person, so you can't message them.");
     }
-    const message = this.addMessage(matchId, this.userId ?? 'me', trimmed);
+    const answers = (this.messages.get(matchId) ?? []).some((m) => m.id === replyTo) ? replyTo : undefined;
+    const message = this.addMessage(matchId, this.userId ?? 'me', trimmed, answers);
+    const url = firstUrl(trimmed);
+    if (url) {
+      // Phones read the page; the web can't (CORS), so it shows the host alone.
+      void fetchLinkPreview(url).then((link) =>
+        this.changeMessage(matchId, message.id, { link: link ?? bareLinkPreview(url) }),
+      );
+    }
     // The other person is a bot: it answers now and then, after a little while.
+    const alive = () => this.matches.some((m) => m.id === matchId) && !this.isBlocked(match.other.id);
     if (Math.random() < 0.8) {
-      this.later(randomInt(1500, 4000), () => {
-        if (this.matches.some((m) => m.id === matchId) && !this.isBlocked(match.other.id)) {
-          this.addMessage(matchId, match.other.id, pickRandom(BOT_REPLIES));
-        }
+      const thinks = randomInt(900, 1800);
+      // It likes what you wrote now and then, types for a moment, then answers,
+      // sometimes right onto your message.
+      if (Math.random() < 0.35) {
+        this.later(thinks - 300, () => {
+          if (alive()) this.setReaction(matchId, message.id, match.other.id, pickRandom(['❤️', '😂', '🔥']));
+        });
+      }
+      this.later(thinks, () => {
+        if (alive()) this.emitTyping(matchId, Date.now());
+      });
+      this.later(thinks + randomInt(1500, 3200), () => {
+        this.emitTyping(matchId, null);
+        if (!alive()) return;
+        if (Math.random() < 0.3) this.addMessage(matchId, match.other.id, pickRandom(BOT_QUICK_REPLIES), message.id);
+        else this.addMessage(matchId, match.other.id, pickRandom(BOT_REPLIES));
       });
     }
     return message;
   }
 
-  private addMessage(matchId: string, senderId: string, text: string) {
+  /** The recording stays on the phone: the mock plays it from where it was recorded. */
+  async sendVoice(
+    matchId: string,
+    recording: { uri: string; durationMs: number; waveform: number[] },
+    replyTo?: string,
+  ) {
+    await this.restore();
+    const match = this.requireMatch(matchId);
+    if (this.isBlocked(match.other.id)) {
+      throw new Error("You blocked this person, so you can't message them.");
+    }
+    if (recording.durationMs < MIN_VOICE_MS) throw new Error('That voice message is too short.');
+    if (recording.durationMs > MAX_VOICE_MS + 1000) throw new Error('That voice message is too long.');
+    const answers = (this.messages.get(matchId) ?? []).some((m) => m.id === replyTo) ? replyTo : undefined;
+    const message = this.addMessage(matchId, this.userId ?? 'me', '', answers, {
+      url: recording.uri,
+      durationMs: Math.round(recording.durationMs),
+      waveform: recording.waveform,
+    });
+    // The bot can't listen, but it answers.
+    this.later(randomInt(2500, 5000), () => {
+      if (this.matches.some((m) => m.id === matchId) && !this.isBlocked(match.other.id)) {
+        this.addMessage(matchId, match.other.id, pickRandom(BOT_VOICE_REPLIES));
+      }
+    });
+    return message;
+  }
+
+  async reactToMessage(matchId: string, messageId: string, emoji: string | null) {
+    await this.restore();
+    const match = this.requireMatch(matchId);
+    if (this.isBlocked(match.other.id)) throw new Error("You can't message this person anymore.");
+    if (emoji !== null && !isReaction(emoji)) throw new Error("That reaction doesn't exist.");
+    if (!(this.messages.get(matchId) ?? []).some((m) => m.id === messageId)) {
+      throw new Error("This message doesn't exist.");
+    }
+    this.setReaction(matchId, messageId, this.userId ?? 'me', emoji);
+  }
+
+  /** The bot can't see you type, so this only has to succeed. */
+  async setTyping(matchId: string) {
+    await this.restore();
+    this.requireMatch(matchId);
+  }
+
+  watchTyping(matchId: string, onChange: (typedAt: number | null) => void) {
+    const listeners = this.typingListeners.get(matchId) ?? new Set();
+    listeners.add(onChange);
+    this.typingListeners.set(matchId, listeners);
+    onChange(null);
+    return () => {
+      listeners.delete(onChange);
+    };
+  }
+
+  private emitTyping(matchId: string, typedAt: number | null) {
+    this.typingListeners.get(matchId)?.forEach((listener) => listener(typedAt));
+  }
+
+  private setReaction(matchId: string, messageId: string, userId: string, emoji: string | null) {
+    const message = (this.messages.get(matchId) ?? []).find((m) => m.id === messageId);
+    if (!message) return;
+    const others = (message.reactions ?? []).filter((reaction) => reaction.userId !== userId);
+    this.changeMessage(matchId, messageId, {
+      reactions: emoji === null ? others : [...others, { userId, emoji }],
+    });
+  }
+
+  private changeMessage(matchId: string, messageId: string, change: Partial<Message>) {
+    const list = (this.messages.get(matchId) ?? []).map((message) =>
+      message.id === messageId ? { ...message, ...change } : message,
+    );
+    this.saveMessages(matchId, list);
+  }
+
+  private saveMessages(matchId: string, list: Message[]) {
+    this.messages.set(matchId, list);
+    void writeJson(messagesKey(matchId), list);
+    this.messageListeners.get(matchId)?.forEach((listener) => listener([...list]));
+  }
+
+  private addMessage(matchId: string, senderId: string, text: string, replyTo?: string, voice?: VoiceNote) {
     const message: Message = {
       id: `msg-${randomId()}`,
       matchId,
@@ -1065,11 +1182,12 @@ class MockServer implements PopdateApi {
       // The server's own filter: the worst words never reach anyone.
       text: maskProfanity(text),
       sentAt: new Date().toISOString(),
+      replyTo: replyTo ?? null,
+      reactions: [],
+      link: null,
+      voice: voice ?? null,
     };
-    const list = [...(this.messages.get(matchId) ?? []), message].slice(-MESSAGES_LIMIT);
-    this.messages.set(matchId, list);
-    void writeJson(messagesKey(matchId), list);
-    this.messageListeners.get(matchId)?.forEach((listener) => listener([...list]));
+    this.saveMessages(matchId, [...(this.messages.get(matchId) ?? []), message].slice(-MESSAGES_LIMIT));
     return message;
   }
 

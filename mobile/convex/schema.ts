@@ -181,16 +181,47 @@ export default defineSchema({
     popperId: v.id('users'),
     winnerId: v.id('users'),
     createdAt: v.number(),
+    /** The chat's newest message: when, and from whom. For the "your turn" nudge. */
+    lastMessageAt: v.optional(v.number()),
+    lastSenderId: v.optional(v.id('users')),
+    /** When the "your turn" push last went out, so a waiting message is nudged once. */
+    nudgedAt: v.optional(v.number()),
   })
     .index('by_popper', ['popperId'])
-    .index('by_winner', ['winnerId']),
+    .index('by_winner', ['winnerId'])
+    .index('by_last_message', ['lastMessageAt']),
 
   messages: defineTable({
     matchId: v.id('matches'),
     senderId: v.id('users'),
     text: v.string(),
     sentAt: v.number(),
+    /** The message of this chat that this one answers. */
+    replyTo: v.optional(v.id('messages')),
+    /** One reaction per person. */
+    reactions: v.optional(v.array(v.object({ userId: v.id('users'), emoji: v.string() }))),
+    /** A voice message: the audio file, its length and its waveform. The text is then empty. */
+    voice: v.optional(
+      v.object({ storageId: v.id('_storage'), durationMs: v.number(), waveform: v.array(v.number()) }),
+    ),
+    /** The preview of the first link in the text, once its page has been read. */
+    link: v.optional(
+      v.object({
+        url: v.string(),
+        title: v.string(),
+        description: v.optional(v.string()),
+        image: v.optional(v.string()),
+        site: v.string(),
+      }),
+    ),
   }).index('by_match', ['matchId']),
+
+  /** Who is typing in which chat, and when they last were. */
+  typing: defineTable({
+    matchId: v.id('matches'),
+    userId: v.id('users'),
+    at: v.number(),
+  }).index('by_match_user', ['matchId', 'userId']),
 
   blocks: defineTable({
     blockerId: v.id('users'),

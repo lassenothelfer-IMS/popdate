@@ -25,5 +25,7 @@ export function previewLine(
   myId: string | null,
 ) {
   if (!last) return t('home.matchNote');
-  return last.senderId === myId ? t('home.youWrote', { text: last.text }) : filter(last.text);
+  // A voice message has no words to show.
+  const text = last.voice ? t('chat.voiceMessage') : last.senderId === myId ? last.text : filter(last.text);
+  return last.senderId === myId ? t('home.youWrote', { text }) : text;
 }

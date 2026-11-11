@@ -421,8 +421,44 @@ export class ConvexServer implements PopdateApi {
     return this.watch(api.chat.list, { matchId }, onChange, () => (onError ? onError() : onChange([])));
   }
 
-  async sendMessage(matchId: string, text: string): Promise<Message> {
-    return await this.mutation(api.chat.send, { matchId, text });
+  async sendMessage(matchId: string, text: string, replyTo?: string): Promise<Message> {
+    return await this.mutation(api.chat.send, { matchId, text, replyTo });
+  }
+
+  async sendVoice(
+    matchId: string,
+    recording: { uri: string; durationMs: number; waveform: number[] },
+    replyTo?: string,
+  ): Promise<Message> {
+    const uploadUrl = await this.mutation(api.profiles.generateUploadUrl, {});
+    const blob = await (await fetch(recording.uri)).blob();
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      // Phones record AAC in an MP4 container; a blob read from a file may not say so.
+      headers: { 'Content-Type': blob.type.startsWith('audio/') ? blob.type : 'audio/mp4' },
+      body: blob,
+    });
+    if (!response.ok) throw new Error('Your voice message did not upload. Try again.');
+    const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
+    return await this.mutation(api.chat.sendVoice, {
+      matchId,
+      storageId,
+      durationMs: recording.durationMs,
+      waveform: recording.waveform,
+      replyTo,
+    });
+  }
+
+  async reactToMessage(matchId: string, messageId: string, emoji: string | null) {
+    await this.mutation(api.chat.react, { matchId, messageId, emoji });
+  }
+
+  async setTyping(matchId: string) {
+    await this.mutation(api.chat.typing, { matchId });
+  }
+
+  watchTyping(matchId: string, onChange: (typedAt: number | null) => void) {
+    return this.watch(api.chat.typingOf, { matchId }, onChange, () => onChange(null));
   }
 }
 
