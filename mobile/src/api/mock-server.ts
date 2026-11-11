@@ -12,6 +12,7 @@ import type {
   Gender,
   Interest,
   Match,
+  MatchProfile,
   Message,
   PopdateApi,
   ReportReason,
@@ -292,6 +293,23 @@ const BOT_REPLIES = [
   'Hi! What made you pick me?',
   'Okay, your turn: worst habit, go.',
 ];
+
+/** What a bot's profile says, picked by its id so it stays the same every time you look. */
+const BOT_CITIES = ['Zürich', 'Basel', 'Bern', 'Luzern', 'Winterthur', 'St. Gallen'];
+const BOT_JOBS = ['Architect', 'Nurse', 'Product designer', 'Law student', 'Carpenter', 'Barista', 'Physio', ''];
+const BOT_BIOS = [
+  'Sunday markets, long walks, bad puns.',
+  'Will trade playlists for restaurant tips.',
+  'Mountains in summer, cinema in winter.',
+  'Learning to cook one country at a time.',
+  '',
+];
+
+function hashOf(text: string) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  return hash;
+}
 
 /** What the bot says to a voice message. */
 const BOT_VOICE_REPLIES = ['Okay, I like your voice.', 'Say that again, slower.', 'A voice message already? Bold.'];
@@ -746,6 +764,42 @@ class MockServer implements PopdateApi {
     await this.restore();
     const match = this.matches.find((m) => m.id === matchId);
     return match && !this.isBlocked(match.other.id) ? match : null;
+  }
+
+  async getMatchProfile(matchId: string): Promise<MatchProfile | null> {
+    const match = await this.getMatch(matchId);
+    if (!match) return null;
+    const room = this.rooms.get(match.roomId);
+    const theyChose = room?.popper.id === match.other.id;
+    const player = theyChose ? room?.popper : room?.seats.find((seat) => seat.player.id === match.other.id)?.player;
+    // The balloon of the two: them, or you when they were the chooser.
+    const balloon = room?.seats.find((seat) => seat.player.id === (theyChose ? this.userId : match.other.id));
+    const rounds = room
+      ? [...room.usedQuestionIds].map((id, index) => ({
+          round: index + 1,
+          question: QUESTIONS.find((question) => question.id === id)?.text ?? '',
+          answer: balloon?.answers.get(index + 1) ?? null,
+        }))
+      : [];
+    const seed = hashOf(match.other.id);
+    return {
+      id: match.other.id,
+      name: match.other.name,
+      age: match.other.age,
+      gender: BOT_NAMES.woman.includes(match.other.name) ? 'woman' : 'man',
+      city: BOT_CITIES[seed % BOT_CITIES.length],
+      job: BOT_JOBS[(seed >>> 3) % BOT_JOBS.length],
+      bio: BOT_BIOS[(seed >>> 6) % BOT_BIOS.length],
+      heightCm: (seed >>> 9) % 4 === 0 ? null : 158 + ((seed >>> 11) % 34),
+      photos: player?.photos.length ? [...player.photos] : [match.other.photo],
+      verified: (seed >>> 2) % 3 !== 0,
+      role: theyChose ? 'popper' : 'contestant',
+      rounds,
+      wonInRound:
+        room && room.winnerId === balloon?.player.id
+          ? (rounds.findLast((round) => round.answer !== null)?.round ?? null)
+          : null,
+    };
   }
 
   async unmatch(matchId: string) {

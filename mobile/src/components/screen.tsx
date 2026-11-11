@@ -126,6 +126,8 @@ type ScreenProps = {
    * (welcome, onboarding, the match, the popped screen).
    */
   footerStyle?: 'bar' | 'plain';
+  /** Keeps the footer mounted but out of sight, so what was typed in it survives. */
+  footerHidden?: boolean;
   scroll?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
   /** Drawn full bleed behind the content, like the welcome screen's video. */
@@ -138,6 +140,7 @@ export function Screen({
   children,
   footer,
   footerStyle = 'bar',
+  footerHidden = false,
   scroll = false,
   contentStyle,
   background,
@@ -222,6 +225,7 @@ export function Screen({
               style={[
                 styles.footer,
                 { paddingBottom: bottom },
+                footerHidden && { display: 'none' },
                 footerStyle === 'bar' && {
                   backgroundColor: theme.page,
                   borderTopColor: theme.border,

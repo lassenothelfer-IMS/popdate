@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { Message } from '@/api';
+import { Balloon } from '@/components/balloon';
 import { ThemedText } from '@/components/themed-text';
 import { VoiceMessage } from '@/features/chat/voice-message';
 import { Ease, Fonts, Motion, Radius, Space } from '@/constants/theme';
@@ -108,8 +109,10 @@ const cornerIn = webSafeKeyframe(
 const quietIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /** The room's last round, laid into the top of the chat: who asked what, and the answer. */
-export type SeedEntry = { key: string; mine: boolean; label: string; text: string; question: boolean };
-export type Seed = { pill: string; entries: SeedEntry[] };
+/** The room's last round, over the messages: whose answer it is, the question, and the answer. */
+export type Seed = { kicker: string; question: string; answer: string | null; answerMine: boolean };
+/** The seed's key, so the first open knows to rise it in before the room loads. */
+export const SEED_KEY = 'seed-card';
 
 type MessageListProps = {
   messages: Message[];
@@ -193,7 +196,7 @@ export function MessageList({
 
   // Everything on screen at first open rises in, top to bottom.
   const keys = [
-    ...(seed ? ['seed-pill', ...seed.entries.map((entry) => entry.key)] : []),
+    ...(seed ? [SEED_KEY] : []),
     ...groups.map((group) => group.key),
   ].filter((key) => firstOpen?.has(key));
   const entering = (key: string) => {
@@ -243,34 +246,31 @@ export function MessageList({
   return (
     <View style={styles.list}>
       {seed ? (
-        <>
-          <Animated.View entering={entering('seed-pill')} style={styles.pillRow}>
-            <View style={[styles.pill, { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` }]}>
-              <ThemedText type="caption" themeColor="textSecondary">
-                {seed.pill}
-              </ThemedText>
-            </View>
-          </Animated.View>
-          {seed.entries.map((entry) => (
-            <Animated.View
-              key={entry.key}
-              entering={entering(entry.key)}
-              accessible
-              accessibilityLabel={`${entry.label}: ${entry.text}`}
-              style={[styles.group, entry.mine ? styles.mine : styles.theirs]}>
-              <ThemedText type="caption" themeColor="textTertiary" style={styles.seedLabel}>
-                {entry.label}
-              </ThemedText>
-              <View style={bubbleStyle(entry.mine, false)}>
-                <ThemedText
-                  themeColor={entry.mine ? 'onInverse' : 'text'}
-                  style={[styles.text, entry.question && styles.serif]}>
-                  {entry.mine ? entry.text : filter(entry.text)}
-                </ThemedText>
-              </View>
-            </Animated.View>
-          ))}
-        </>
+        <Animated.View
+          entering={entering(SEED_KEY)}
+          accessible
+          accessibilityLabel={[
+            seed.kicker,
+            seed.question,
+            seed.answer ? (seed.answerMine ? seed.answer : filter(seed.answer)) : '',
+          ]
+            .filter(Boolean)
+            .join('. ')}
+          style={[
+            styles.seed,
+            { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` },
+          ]}>
+          <View style={styles.seedTop}>
+            <Balloon color={theme.brandPale} size={9} />
+            <ThemedText style={[styles.seedKicker, { color: theme.textTertiary }]}>{seed.kicker}</ThemedText>
+          </View>
+          <ThemedText type="questionRow" themeColor="textSecondary" style={styles.seedQuestion}>
+            {seed.question}
+          </ThemedText>
+          {seed.answer ? (
+            <ThemedText type="quoteLong">{`“${seed.answerMine ? seed.answer : filter(seed.answer)}”`}</ThemedText>
+          ) : null}
+        </Animated.View>
       ) : null}
 
       {groups.map((group, groupIndex) => {
@@ -592,13 +592,35 @@ const styles = StyleSheet.create({
   dayAndGroup: {
     gap: 10,
   },
+  // The day over its messages, centered.
   pillRow: {
     alignItems: 'center',
   },
-  pill: {
-    paddingVertical: 6,
-    paddingHorizontal: Space.sm,
-    borderRadius: Radius.pill,
+  // The room's last round: a card as wide as the chat, over the first message.
+  seed: {
+    gap: 6,
+    paddingVertical: 14,
+    paddingHorizontal: Space.md,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    marginBottom: Space.xs,
+  },
+  seedTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  seedKicker: {
+    flex: 1,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: 600,
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+  },
+  seedQuestion: {
+    fontSize: 16,
+    lineHeight: 21,
   },
   group: {
     gap: 2,
@@ -611,12 +633,6 @@ const styles = StyleSheet.create({
   theirs: {
     alignSelf: 'flex-start',
     alignItems: 'flex-start',
-  },
-  seedLabel: {
-    fontSize: 11,
-    lineHeight: 14,
-    paddingHorizontal: Space.xxs,
-    marginBottom: 2,
   },
   bubble: {
     paddingVertical: 10,

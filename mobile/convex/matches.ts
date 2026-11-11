@@ -5,7 +5,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from './_generated/server';
 import { requireUserId } from './lib/auth';
-import { isBlockedEitherWay, personCard } from './lib/people';
+import { ageFromBirthDate, getProfile, isBlockedEitherWay, personCard, photoUrls } from './lib/people';
 import { deleteImage } from './lib/uploads';
 
 function otherOf(match: Doc<'matches'>, viewerId: Id<'users'>) {
@@ -132,6 +132,67 @@ export const purgeEndedChats = internalMutation({
       .take(200);
     for (const row of old) await ctx.db.delete(row._id);
     if (old.length === 200) await ctx.scheduler.runAfter(0, internal.matches.purgeEndedChats, {});
+  },
+});
+
+/**
+ * The full profile of the person you matched with, and the room you matched in:
+ * the `MatchProfile` shape in `src/api/types.ts`. Only for the two of a match,
+ * and gone with the match or behind a block.
+ */
+export const profile = query({
+  args: { matchId: v.string() },
+  handler: async (ctx, { matchId }) => {
+    const userId = await getAuthUserId(ctx);
+    const id = ctx.db.normalizeId('matches', matchId);
+    const match = userId && id ? await ctx.db.get(id) : null;
+    if (!userId || !match) return null;
+    if (match.popperId !== userId && match.winnerId !== userId) return null;
+    const otherId = otherOf(match, userId);
+    if (await isBlockedEitherWay(ctx, userId, otherId)) return null;
+    const [theirs, room, verification] = await Promise.all([
+      getProfile(ctx, otherId),
+      ctx.db.get(match.roomId),
+      ctx.db
+        .query('verifications')
+        .withIndex('by_user', (q) => q.eq('userId', otherId))
+        .first(),
+    ]);
+    if (!theirs) return null;
+    // The answers are the balloon's: the match's winner, who is the room's winner or, after a second chance, its runner-up.
+    const rounds = room
+      ? await Promise.all(
+          room.usedQuestionIds.map(async (questionId, index) => {
+            const question = await ctx.db.get(questionId);
+            const answers = await ctx.db
+              .query('answers')
+              .withIndex('by_room_round', (q) => q.eq('roomId', room._id).eq('round', index + 1))
+              .collect();
+            const answer = answers.find((given) => given.userId === match.winnerId);
+            return { round: index + 1, question: question?.text ?? '', answer: answer?.text ?? null };
+          }),
+        )
+      : [];
+    return {
+      id: otherId as string,
+      name: theirs.name,
+      age: ageFromBirthDate(theirs.birthDate),
+      gender: theirs.gender,
+      genderIdentity: theirs.genderIdentity,
+      sexuality: theirs.sexuality,
+      city: theirs.city,
+      job: theirs.job,
+      bio: theirs.bio,
+      heightCm: theirs.heightCm ?? null,
+      photos: (await photoUrls(ctx, theirs.photos)).filter(Boolean),
+      verified: verification?.status === 'verified',
+      role: match.popperId === otherId ? ('popper' as const) : ('contestant' as const),
+      rounds,
+      wonInRound:
+        room && room.winnerId === match.winnerId
+          ? (rounds.findLast((round) => round.answer !== null)?.round ?? null)
+          : null,
+    };
   },
 });
 

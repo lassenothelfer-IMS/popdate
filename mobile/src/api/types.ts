@@ -162,6 +162,36 @@ export type Match = {
   createdAt: string;
 };
 
+/**
+ * Everything on the profile of someone you matched with, and the room you
+ * matched in, round by round. Only the two people of a match can read it.
+ */
+export type MatchProfile = {
+  id: string;
+  name: string;
+  age: number;
+  gender: Gender;
+  genderIdentity?: string;
+  sexuality?: string;
+  city: string;
+  /** Empty when they left it out. */
+  job: string;
+  bio: string;
+  heightCm: number | null;
+  /** All their photos, in their order. */
+  photos: string[];
+  verified: boolean;
+  /** What they were in your room: the chooser, or one of the balloons. */
+  role: 'popper' | 'contestant';
+  /**
+   * The room's rounds. The answers are the balloon's: theirs when they held
+   * one, yours when they were the chooser. Null where there was none.
+   */
+  rounds: { round: number; question: string; answer: string | null }[];
+  /** The round whose answer kept the last balloon, when the room ended with you two. */
+  wonInRound: number | null;
+};
+
 export type Unsubscribe = () => void;
 
 /**
@@ -276,6 +306,8 @@ export interface PopdateApi {
   /** Accepting makes a match and resolves with it; declining resolves with null. */
   answerSecondChance(id: string, accept: boolean): Promise<Match | null>;
   getMatch(matchId: string): Promise<Match | null>;
+  /** The full profile of the person you matched with, or null when the match is gone. */
+  getMatchProfile(matchId: string): Promise<MatchProfile | null>;
   /** Ends a match for both of you; the chat goes with it. */
   unmatch(matchId: string): Promise<void>;
 

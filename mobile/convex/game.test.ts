@@ -1064,3 +1064,24 @@ test('a voice message carries its audio, and only audio of a fair length is one'
     lena.as.mutation(api.chat.sendVoice, { matchId, storageId: await store('image/png'), durationMs: 4200, waveform }),
   ).rejects.toThrow('That is not a voice message.');
 });
+
+test("a match shows the other person's full profile and the room's rounds, and only to the two of them", async () => {
+  const { lena, luca, noah, matchId } = await matchedChat();
+
+  // Lena chose: she sees Luca, whose answer kept the last balloon.
+  const hers = await lena.as.query(api.matches.profile, { matchId });
+  expect(hers).toMatchObject({ id: luca.id, role: 'contestant', verified: false, wonInRound: 1 });
+  expect(hers?.rounds).toEqual([{ round: 1, question: expect.any(String), answer: 'A' }]);
+  expect(hers?.rounds[0].question).not.toBe('');
+
+  // Luca sees Lena, who asked; the answer on her profile is his own.
+  const his = await luca.as.query(api.matches.profile, { matchId });
+  expect(his).toMatchObject({ id: lena.id, role: 'popper', wonInRound: 1 });
+  expect(his?.rounds[0].answer).toBe('A');
+
+  // Popped in the room, Noah gets nothing.
+  expect(await noah.as.query(api.matches.profile, { matchId })).toBeNull();
+
+  await lena.as.mutation(api.matches.unmatch, { matchId });
+  expect(await luca.as.query(api.matches.profile, { matchId })).toBeNull();
+});

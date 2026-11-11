@@ -8,6 +8,7 @@ import type { Id } from '../../convex/_generated/dataModel';
 import type {
   Balloons,
   Match,
+  MatchProfile,
   Message,
   PopdateApi,
   Profile,
@@ -340,6 +341,10 @@ export class ConvexServer implements PopdateApi {
 
   async getMatch(matchId: string): Promise<Match | null> {
     return await this.query(api.matches.get, { matchId });
+  }
+
+  async getMatchProfile(matchId: string): Promise<MatchProfile | null> {
+    return await this.query(api.matches.profile, { matchId });
   }
 
   async unmatch(matchId: string) {

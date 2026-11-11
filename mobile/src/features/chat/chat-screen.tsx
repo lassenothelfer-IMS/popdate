@@ -24,11 +24,14 @@ import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { VerifiedCheck } from '@/components/verified-check';
+import { Ease, Fonts, Gutter, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { ChatComposer } from '@/features/chat/chat-composer';
 import { MessageActions } from '@/features/chat/message-actions';
+import { MatchProfileView, useMatchProfile } from '@/features/chat/match-profile';
 import {
   MessageList,
+  SEED_KEY,
   type BubbleAnchor,
   type PendingMessage,
   type Seed,
@@ -46,40 +49,29 @@ import { useFilterText, useSettings } from '@/state/settings';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 
-/** The seed's pieces are always these, so the first open knows to rise them in before the room loads. */
-const SEED_KEYS = ['seed-pill', 'seed-question', 'seed-answer'] as const;
-
 /**
- * The room's last round at the top of the chat: who asked what, and the answer
- * that kept the last balloon. The room only keeps its final round, so earlier
- * rounds can't be seeded yet.
+ * The room's last round at the top of the chat: the question, and the answer
+ * that kept the last balloon. The room only keeps its final round here; all of
+ * them are on the Profile side.
  */
 function seedFromRoom(room: Room | null | undefined, myId: string, t: Translate): Seed | null {
   if (!room || room.status !== 'finished' || !room.question) return null;
   const winner = room.contestants.find((contestant) => contestant.id === room.winnerId);
-  const round = room.round;
-  const askedByMe = room.popper.id === myId;
-  const entries: Seed['entries'] = [
-    {
-      key: SEED_KEYS[1],
-      mine: askedByMe,
-      label: askedByMe ? t('chat.youAsked', { round }) : t('chat.theyAsked', { name: room.popper.name, round }),
-      text: room.question.text,
-      question: true,
-    },
-  ];
-  if (winner?.answer) {
-    const answeredByMe = winner.id === myId;
-    entries.push({
-      key: SEED_KEYS[2],
-      mine: answeredByMe,
-      label: answeredByMe ? t('chat.youAnswered') : t('chat.theyAnswered', { name: winner.name }),
-      text: winner.answer,
-      question: false,
-    });
-  }
-  return { pill: t('chat.seedPill', { count: room.totalRounds }), entries };
+  const answer = winner?.answer ?? null;
+  const answerMine = winner?.id === myId;
+  return {
+    kicker: !answer
+      ? t('chat.seedQuestion')
+      : answerMine
+        ? t('chat.seedYours')
+        : t('chat.seedTheirs', { name: winner?.name ?? '' }),
+    question: room.question.text,
+    answer,
+    answerMine,
+  };
 }
+
+type Tab = 'chat' | 'profile';
 
 /** Within this distance of the end, a new message scrolls into view; further up, you're reading. */
 const NEAR_END = 80;
@@ -150,6 +142,8 @@ function makeTimeFormat(locale: string, region: string | null) {
   const time: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
   const dated: Intl.DateTimeFormatOptions = { ...time, day: 'numeric', month: 'short' };
   const day: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+  const weekday: Intl.DateTimeFormatOptions = { weekday: 'long' };
+  const date: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
   const make = (options: Intl.DateTimeFormatOptions) => {
     try {
       return new Intl.DateTimeFormat(tag, options);
@@ -158,13 +152,23 @@ function makeTimeFormat(locale: string, region: string | null) {
       return new Intl.DateTimeFormat(locale, options);
     }
   };
-  const formats = { time: make(time), dated: make(dated), day: make(day) };
+  const formats = { time: make(time), dated: make(dated), day: make(day), weekday: make(weekday), date: make(date) };
   return {
     /** When you matched: today just the time, earlier days the date too. */
     stamp(iso: string) {
       const date = new Date(iso);
       const today = new Date().toDateString() === date.toDateString();
       return (today ? formats.time : formats.dated).format(date);
+    },
+    /** The day you matched, for the header: today, a weekday within the week, or the date. */
+    matched(iso: string): { when: 'today' } | { when: 'weekday' | 'date'; day: string } {
+      const then = new Date(iso);
+      const now = new Date();
+      if (now.toDateString() === then.toDateString()) return { when: 'today' };
+      const days = (now.getTime() - then.getTime()) / (24 * 60 * 60_000);
+      return days < 6
+        ? { when: 'weekday', day: formats.weekday.format(then) }
+        : { when: 'date', day: formats.date.format(then) };
     },
     /** A message's time. Its day stands on the divider above it. */
     clock: (iso: string) => formats.time.format(new Date(iso)),
@@ -213,7 +217,26 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const { name, age } = match.other;
   const tone = seatFor(seats, match.other.id);
   const times = useMemo(() => makeTimeFormat(locale, region), [locale, region]);
-  const formatTime = times.stamp;
+  /** Chat or Profile: the two sides of a match. */
+  const [tab, setTab] = useState<Tab>('chat');
+  /** The Profile side is drawn from the first time it is opened, and then kept. */
+  const [profileOpened, setProfileOpened] = useState(false);
+  /** "Plan a date" on the profile brings the date ideas back out, however long the chat is. */
+  const [ideasOut, setIdeasOut] = useState(false);
+  const theirProfile = useMatchProfile(match.id);
+  const verified = theirProfile.profile?.verified === true;
+  const matched = times.matched(match.createdAt);
+  const matchedLine =
+    matched.when === 'today'
+      ? t('chat.matchedToday')
+      : t(matched.when === 'weekday' ? 'chat.matchedOnWeekday' : 'chat.matchedOnDate', { day: matched.day });
+
+  function show(next: Tab) {
+    if (next === tab) return;
+    haptics.selection();
+    if (next === 'profile') setProfileOpened(true);
+    setTab(next);
+  }
   const formatDay = (iso: string) => {
     const day = times.day(iso);
     return day === 'today' ? t('chat.today') : day === 'yesterday' ? t('chat.yesterday') : day;
@@ -255,7 +278,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       setMessages(list);
       if (seen === null) {
         seen = new Set(list.map((message) => message.id));
-        setFirstOpen(new Set([...SEED_KEYS, ...seen]));
+        setFirstOpen(new Set([SEED_KEY, ...seen]));
         return;
       }
       for (const message of list) {
@@ -386,11 +409,13 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   return (
     <Screen
       contentStyle={styles.content}
+      footerHidden={tab !== 'chat'}
       footer={
         <ChatFooter
           matchId={match.id}
           name={name}
           messageCount={messages?.length ?? null}
+          ideasOut={ideasOut}
           onSend={send}
           onSendVoice={(recording) => send('', recording)}
           replyingTo={
@@ -419,15 +444,24 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         <View
           accessible
           accessibilityRole="header"
-          accessibilityLabel={`${t('common.nameAge', { name, age })}, ${t('chat.matchedAt', { time: formatTime(match.createdAt) })}`}
+          accessibilityLabel={[
+            t('common.nameAge', { name, age }),
+            verified ? t('home.verifiedLabel') : '',
+            matchedLine,
+          ]
+            .filter(Boolean)
+            .join(', ')}
           style={styles.person}>
           <Avatar name={name} uri={match.other.photo} tone={tone} size={40} />
           <View style={styles.name}>
-            <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
-              {t('common.nameAge', { name, age })}
-            </ThemedText>
+            <View style={styles.nameRow}>
+              <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
+                {name}
+              </ThemedText>
+              {verified ? <VerifiedCheck /> : null}
+            </View>
             <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1}>
-              {t('chat.matchedAt', { time: formatTime(match.createdAt) })}
+              {matchedLine}
             </ThemedText>
           </View>
         </View>
@@ -439,9 +473,44 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         />
       </View>
 
+      <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` }]}>
+        {(['chat', 'profile'] as const).map((side) => {
+          const selected = tab === side;
+          return (
+            <Pressable
+              key={side}
+              accessibilityRole="tab"
+              accessibilityState={{ selected }}
+              aria-selected={selected}
+              onPress={() => show(side)}
+              style={[
+                styles.tab,
+                selected && { backgroundColor: theme.page, boxShadow: '0 1px 3px rgba(25, 25, 25, 0.12)' },
+              ]}>
+              <ThemedText style={[styles.tabLabel, selected ? styles.tabLabelOn : { color: theme.textSecondary }]}>
+                {t(side === 'chat' ? 'chat.tabChat' : 'chat.tabProfile')}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {profileOpened ? (
+        <View style={[styles.fill, tab !== 'profile' && styles.hidden]}>
+          <MatchProfileView
+            load={theirProfile}
+            name={name}
+            onPlanDate={() => {
+              setIdeasOut(true);
+              show('chat');
+            }}
+          />
+        </View>
+      ) : null}
+
       <ScrollView
         ref={scrollRef}
-        style={styles.fill}
+        style={[styles.fill, tab !== 'chat' && styles.hidden]}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
         // On-drag rather than interactive: the footer can't follow an interactive drag.
@@ -533,6 +602,8 @@ type ChatFooterProps = {
   name: string;
   /** How many messages there are, or null while they load. */
   messageCount: number | null;
+  /** Show the date ideas even in a long chat: "Plan a date" was pressed. */
+  ideasOut: boolean;
   /** Sends one message. It shows in the chat at once, with how it went. */
   onSend: (text: string) => void;
   onSendVoice: (recording: Recording) => void;
@@ -548,12 +619,14 @@ function ChatFooter({
   matchId,
   name,
   messageCount,
+  ideasOut,
   onSend,
   onSendVoice,
   replyingTo,
   onCancelReply,
 }: ChatFooterProps) {
   const t = useT();
+  const theme = useTheme();
   const [draft, setDraft] = useState('');
   /** A voice message is being recorded, in the message field's place. */
   const [recording, setRecording] = useState(false);
@@ -581,7 +654,11 @@ function ChatFooter({
 
   // Early on, a few date ideas sit over the composer; a tap drafts one to edit and send.
   const showIdeas =
-    messageCount !== null && messageCount < DATE_IDEAS_UNTIL && !draft && !replyingTo && !recording;
+    messageCount !== null &&
+    (ideasOut || messageCount < DATE_IDEAS_UNTIL) &&
+    !draft &&
+    !replyingTo &&
+    !recording;
 
   return (
     <>
@@ -593,6 +670,9 @@ function ChatFooter({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.ideas}
           accessibilityLabel={t('chat.ideasLabel')}>
+          <View style={[styles.ideasLabel, { backgroundColor: theme.brandWash }]}>
+            <ThemedText style={[styles.ideasLabelText, { color: theme.brand }]}>{t('chat.planDate')}</ThemedText>
+          </View>
           {DATE_IDEAS.map((idea) => (
             <Chip
               key={idea}
@@ -683,6 +763,54 @@ const styles = StyleSheet.create({
   ideas: {
     gap: Space.xs,
     paddingBottom: Space.xs,
+  },
+  // Names the row: the same pill as the ideas, in the brand's wash, and not a button.
+  ideasLabel: {
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: Space.md,
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
+  },
+  ideasLabelText: {
+    fontFamily: Fonts.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: 500,
+  },
+  // Chat | Profile: one pill, the chosen side lifted in white.
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: Gutter,
+    marginBottom: Space.xs,
+    padding: 3,
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
+  },
+  tab: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.pill,
+    borderCurve: 'continuous',
+  },
+  tabLabel: {
+    fontFamily: Fonts.sans,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: 500,
+  },
+  tabLabelOn: {
+    fontWeight: 600,
+  },
+  hidden: {
+    display: 'none',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   centered: {
     flexGrow: 1,
