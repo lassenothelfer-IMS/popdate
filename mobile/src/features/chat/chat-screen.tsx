@@ -38,7 +38,8 @@ import {
 } from '@/features/chat/message-list';
 import { CheckInSheet } from '@/features/chat/check-in-sheet';
 import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
-import { VoiceRecorder, type Recording } from '@/features/chat/voice-recorder';
+import type { Recording } from '@/features/chat/voice-recorder';
+import { voiceAvailable } from '@/features/chat/voice-support';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
@@ -72,6 +73,12 @@ function seedFromRoom(room: Room | null | undefined, myId: string, t: Translate)
 }
 
 type Tab = 'chat' | 'profile';
+
+/** The recorder, loaded only where the phone's audio module exists. */
+const recorder = voiceAvailable
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded only where the audio module exists, or the chat would crash without it
+    (require('@/features/chat/voice-recorder') as typeof import('@/features/chat/voice-recorder'))
+  : null;
 
 /** Within this distance of the end, a new message scrolls into view; further up, you're reading. */
 const NEAR_END = 80;
@@ -683,8 +690,8 @@ function ChatFooter({
           ))}
         </ScrollView>
       ) : null}
-      {recording ? (
-        <VoiceRecorder
+      {recording && recorder ? (
+        <recorder.VoiceRecorder
           onSend={(taken) => {
             setRecording(false);
             onSendVoice(taken);
@@ -707,10 +714,15 @@ function ChatFooter({
           name={name}
           replyingTo={replyingTo}
           onCancelReply={onCancelReply}
-          onRecord={() => {
-            setRecordError(null);
-            setRecording(true);
-          }}
+          // No mic button where this app can't record.
+          onRecord={
+            recorder
+              ? () => {
+                  setRecordError(null);
+                  setRecording(true);
+                }
+              : undefined
+          }
         />
       )}
     </>
