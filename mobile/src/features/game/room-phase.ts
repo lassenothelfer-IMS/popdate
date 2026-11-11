@@ -54,8 +54,7 @@ export type RoomFooterKind =
   | 'composer'
   | 'sent'
   | 'ask'
-  /** The final two: keep one, the other pops. */
-  | 'keep'
+  /** The pop bar: greyed out until a balloon is marked, then hold to pop. The final two as well. */
   | 'hold';
 
 export type RoomPhase = {
@@ -204,9 +203,7 @@ export function roomPhase(input: RoomPhaseInput): RoomPhase {
     footer = me.answered ? 'sent' : 'composer';
   } else if (isPopper && pickingNow) {
     footer = 'ask';
-  } else if (isPopper && isPopping && !pending && up.length === 2) {
-    footer = 'keep';
-  } else if (isPopper && isPopping && selected && !pending) {
+  } else if (isPopper && isPopping && !pending) {
     footer = 'hold';
   }
 

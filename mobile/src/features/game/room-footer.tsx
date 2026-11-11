@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import type { Contestant } from '@/api';
@@ -101,56 +101,30 @@ export function RoomFooter(props: RoomFooterProps) {
           />
         </Animated.View>
       );
-    case 'keep': {
-      // The final pick: keep one, the other balloon pops. No hold here: the choice is the moment.
-      // Both buttons look alike, so neither reads as the one the app wants you to keep.
-      const [a, b] = props.up;
-      return (
-        <Animated.View entering={reduced ? popButtonFade : popButtonIn} style={styles.popFooter}>
-          {showHints ? (
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.centerText}>
-              {t('game.keepHint')}
-            </ThemedText>
-          ) : null}
-          <View style={styles.keepRow}>
-            <View style={styles.flex}>
-              <Button
-                variant="tinted"
-                title={t('game.keep', { name: a.name })}
-                accessibilityHint={t('game.popsHint', { name: b.name })}
-                onPress={() => props.onPop(b)}
-              />
-            </View>
-            <View style={styles.flex}>
-              <Button
-                variant="tinted"
-                title={t('game.keep', { name: b.name })}
-                accessibilityHint={t('game.popsHint', { name: a.name })}
-                onPress={() => props.onPop(a)}
-              />
-            </View>
-          </View>
-        </Animated.View>
-      );
-    }
     case 'hold': {
       const { selected } = props;
-      if (!selected || !props.selectedColor) return null;
+      // The final two pops like every round: the one you don't pop is your match.
+      const hint = props.up.length === 2 ? t('game.finalTwoHint') : showHints ? t('game.holdToPop') : null;
+      // The bar is there from the reveal on, so marking a card never moves the page.
       // Held on the button itself: the pop only goes out once the fill is full.
       // Keyed by the balloon, so marking someone else starts a fresh hold.
       return (
         <Animated.View entering={reduced ? popButtonFade : popButtonIn} style={styles.popFooter}>
-          {showHints ? (
+          {hint ? (
             <ThemedText type="footnote" themeColor="textSecondary" style={styles.centerText}>
-              {t('game.holdToPop')}
+              {hint}
             </ThemedText>
           ) : null}
-          <HoldToPopButton
-            key={selected.id}
-            name={selected.name}
-            balloonColor={props.selectedColor}
-            onPop={() => props.onPop(selected)}
-          />
+          {selected && props.selectedColor ? (
+            <HoldToPopButton
+              key={selected.id}
+              name={selected.name}
+              balloonColor={props.selectedColor}
+              onPop={() => props.onPop(selected)}
+            />
+          ) : (
+            <Button title={t('game.pickToPop')} disabled />
+          )}
         </Animated.View>
       );
     }
@@ -158,17 +132,10 @@ export function RoomFooter(props: RoomFooterProps) {
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
   centerText: {
     textAlign: 'center',
   },
   popFooter: {
     gap: Space.sm,
-  },
-  keepRow: {
-    flexDirection: 'row',
-    gap: 10,
   },
 });

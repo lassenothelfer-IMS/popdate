@@ -1,4 +1,3 @@
-import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Redirect, router, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -510,10 +509,8 @@ function HeroScrim() {
 }
 
 /**
- * A glass button over the photo: a circle with an icon, or a pill with its label.
- * The icon takes the ink Button gives a glass label (theme text on real glass,
- * accent text on the tinted fallback), so the gear reads like the Edit pill
- * on any photo, in both themes.
+ * A button over the photo: a circle with an icon, or a pill with its label. A solid
+ * light pill, not glass: glass takes on a dark photo and its dark ink disappears.
  */
 function GlassButton({
   label,
@@ -527,12 +524,11 @@ function GlassButton({
   iconSize?: number;
 }) {
   const theme = useTheme();
-  const nativeGlass = Platform.OS === 'ios' && isLiquidGlassAvailable();
-  const ink = nativeGlass ? theme.text : theme.accentText;
+  const ink = theme.text;
   return (
     <Button
       title={label}
-      variant="glass"
+      variant="tinted"
       size="small"
       fullWidth={false}
       iconOnly={icon !== undefined}

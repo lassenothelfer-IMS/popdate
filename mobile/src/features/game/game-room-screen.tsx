@@ -469,9 +469,12 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               contentContainerStyle={[
                 styles.scroll,
                 {
-                  paddingBottom: hasFooter ? Space.xl : insets.bottom + Space.xl,
+                  // The chooser's cards are sized to end just above the pop bar: no spare page under them.
+                  paddingBottom: revealing ? Space.xs : hasFooter ? Space.xl : insets.bottom + Space.xl,
                 },
               ]}
+              bounces={!revealing}
+              overScrollMode={revealing ? 'never' : 'auto'}
               onScroll={develop.onScroll}
               onLayout={develop.onScrollLayout}
               scrollEventThrottle={32}

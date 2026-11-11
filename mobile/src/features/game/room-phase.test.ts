@@ -157,10 +157,10 @@ describe('roomPhase: popping', () => {
     expect(p.showList).toBe(false);
   });
 
-  it('has no Pop button until a balloon is marked', () => {
+  it('shows the pop bar before a balloon is marked', () => {
     const p = phase(room(CHOOSER, popping));
     expect(p.selected).toBeUndefined();
-    expect(p.footer).toBeNull();
+    expect(p.footer).toBe('hold');
   });
 
   it('stops marking while a pop is on its way', () => {
@@ -219,11 +219,11 @@ describe('roomPhase: final two', () => {
   const finalTwo = { status: 'popping', round: 4, question } as const;
   const out = { a: popped(1), b: popped(2), c: popped(3) };
 
-  it('offers the chooser Keep buttons instead of a hold', () => {
+  it('gives the chooser the pop bar in the final two, like every round', () => {
     const p = phase(room(CHOOSER, finalTwo, out), { selectedId: 'd' });
     expect(p.finalTwo).toBe(true);
     expect(p.up.map((c) => c.id)).toEqual(['d', 'e']);
-    expect(p.footer).toBe('keep');
+    expect(p.footer).toBe('hold');
     expect(p.view).toBe('reveal');
   });
 

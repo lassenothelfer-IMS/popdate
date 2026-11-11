@@ -269,7 +269,8 @@ export function PlusPaywall() {
         <PlusMark />
         <Button
           title={t('common.close')}
-          variant="glass"
+          // Solid, not glass: it sits on the hero photo and has to read on any of it.
+          variant="tinted"
           size="small"
           iconOnly
           fullWidth={false}
