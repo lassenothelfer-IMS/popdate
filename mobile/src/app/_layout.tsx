@@ -15,6 +15,7 @@ import { Platform } from 'react-native';
 
 import { ApiProvider } from '@/api/provider';
 import { ErrorScreen } from '@/components/error-screen';
+import { KeyboardProvider } from '@/components/keyboard';
 import { OfflineBanner } from '@/components/offline-banner';
 import { Colors, Fonts, Radius } from '@/constants/theme';
 import { SessionProvider } from '@/state/session';
@@ -91,7 +92,9 @@ export default function RootLayout() {
     <ApiProvider>
       <SessionProvider>
         <SettingsProvider>
-          <ThemedStack />
+          <KeyboardProvider>
+            <ThemedStack />
+          </KeyboardProvider>
         </SettingsProvider>
       </SessionProvider>
     </ApiProvider>

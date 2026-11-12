@@ -27,6 +27,7 @@ import { Avatar } from '@/components/avatar';
 import { Button } from '@/components/button';
 import { Chip } from '@/components/chip';
 import { ErrorLine } from '@/components/error-line';
+import { keyboardDismissMode } from '@/components/keyboard';
 import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
@@ -614,9 +615,8 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         style={styles.fill}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
-        // On-drag rather than interactive: the footer can't follow an interactive drag.
-        // On web a click starts a scroll gesture, so any dismiss mode would blur the field.
-        keyboardDismissMode={Platform.select({ ios: 'on-drag', android: 'on-drag', default: 'none' })}
+        // Drag the messages down and the keyboard follows your finger, the field riding on it.
+        keyboardDismissMode={keyboardDismissMode}
         onScroll={trackScroll}
         scrollEventThrottle={64}
         // The newest message stays in view as messages arrive and the keyboard comes and goes.

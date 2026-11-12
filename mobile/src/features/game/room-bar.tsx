@@ -76,7 +76,7 @@ export function RoomBar({
           </ThemedText>
           <View style={styles.phase}>
             <ThemedText
-              type="caption"
+              type="callout"
               themeColor="textSecondary"
               maxFontSizeMultiplier={BAR_TEXT_MAX_SCALE}
               style={styles.shrink}>

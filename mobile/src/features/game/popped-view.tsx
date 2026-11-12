@@ -10,10 +10,10 @@ import {
   type ViewInstance,
 } from 'react-native';
 import Animated, { Keyframe } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
 
 import { Balloon } from '@/components/balloon';
 import { ErrorLine } from '@/components/error-line';
+import { Icon } from '@/components/icon';
 import { Bob, Pulse, Stage, StageBlock, stageText, stageType } from '@/components/stage';
 import { BrandBalloon, Ease } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
@@ -210,9 +210,7 @@ export function PoppedView({
             <Text {...stageText} style={[stageType.sans, styles.watchText, { color: theme.brand }]}>
               {watch}
             </Text>
-            <Svg width={8} height={14} viewBox="0 0 8 14" fill="none">
-              <Path d="M1 1l6 6-6 6" stroke={theme.brand} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
+            <Icon name="chevronRight" size={13} color={theme.brand} />
           </View>
         </Pressable>
       </StageBlock>

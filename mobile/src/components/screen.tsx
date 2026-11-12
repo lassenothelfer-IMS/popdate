@@ -1,7 +1,6 @@
 import { createContext, use, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   RefreshControl,
   ScrollView,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyboardAvoidingView, keyboardDismissMode } from '@/components/keyboard';
 import { Gutter, MaxContentWidth, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -204,13 +204,8 @@ export function Screen({
                       />
                     ) : undefined
                   }
-                  // On web a click starts a scroll gesture, so any dismiss mode would blur every field.
-                  // On-drag rather than interactive: the footer can't follow an interactive drag.
-                  keyboardDismissMode={Platform.select({
-                    ios: 'on-drag',
-                    android: 'on-drag',
-                    default: 'none',
-                  })}>
+                  // Interactive where the footer can follow the drag (see keyboard.tsx).
+                  keyboardDismissMode={keyboardDismissMode}>
                   {children}
                 </ScrollView>
               </View>

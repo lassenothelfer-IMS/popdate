@@ -20,6 +20,7 @@ import {
   balloonInks,
 } from '@/components/balloon';
 import { ErrorLine } from '@/components/error-line';
+import { Icon } from '@/components/icon';
 import {
   Bob,
   Pulse,
@@ -134,15 +135,13 @@ export function QueueStage({ found, needed, waited, leaving, locked, error, onLe
           {leaving ? (
             <ActivityIndicator size="small" color={theme.text} />
           ) : (
-            <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
-              <Path d="M10 3 5 8l5 5" stroke={theme.text} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
+            <Icon name="back" size={17} color={theme.text} />
           )}
           <Text {...stageText} style={[stageType.sans, styles.leaveText, { color: theme.text }]}>
             {t('queue.leaveLine')}
           </Text>
         </Pressable>
-        <View style={[styles.waited, { backgroundColor: theme.field }]}>
+        <View style={styles.waited}>
           <Text {...stageText} style={[stageType.sans, styles.waitedText, { color: theme.text }]}>
             {t('queue.waited', { time: waited })}
           </Text>
@@ -526,16 +525,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: 600,
   },
+  // How long you've waited, as plain figures on the page: no pill behind it.
   waited: {
     height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   waitedText: {
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: 600,
     fontVariant: ['tabular-nums'],
   },
