@@ -1,6 +1,7 @@
 import { NativeTabs } from 'expo-router/native-tabs';
 
 import { useYourTurnCount } from '@/features/matches/use-your-turn';
+import { useYouTabIcon } from '@/features/profile/you-tab-icon';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
@@ -14,7 +15,10 @@ export default function TabsLayout() {
   const t = useT();
   const theme = useTheme();
   const yourTurn = useYourTurnCount();
+  const you = useYouTabIcon();
   return (
+    <>
+    {you.capture}
     <NativeTabs tintColor={theme.text}>
       <NativeTabs.Trigger name="home">
         <NativeTabs.Trigger.Icon sf={{ default: 'balloon', selected: 'balloon.fill' }} md="circle" />
@@ -31,9 +35,15 @@ export default function TabsLayout() {
         {yourTurn > 0 ? <NativeTabs.Trigger.Badge>{String(yourTurn)}</NativeTabs.Trigger.Badge> : null}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="you">
-        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} md="account_circle" />
+        {/* Your own photo, round, once it has been drawn; the person symbol until then. */}
+        {you.icons ? (
+          <NativeTabs.Trigger.Icon src={you.icons} renderingMode="original" md="account_circle" />
+        ) : (
+          <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} md="account_circle" />
+        )}
         <NativeTabs.Trigger.Label>{t('home.tabYou')}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
+    </>
   );
 }
