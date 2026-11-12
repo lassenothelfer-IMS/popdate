@@ -63,7 +63,7 @@ export function PlanRow({ title, detail, price, tag, selected, onPress }: PlanRo
           <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
             {title}
           </Text>
-          <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+          <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
             {detail}
           </ThemedText>
         </View>

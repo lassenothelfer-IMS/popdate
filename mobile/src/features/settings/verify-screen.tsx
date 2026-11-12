@@ -225,7 +225,7 @@ export function VerifyScreen() {
                 accessible
                 style={[styles.status, { backgroundColor: theme.field, borderColor: theme.border }]}>
                 <View style={styles.statusLine}>
-                  <ThemedText type="footnote" themeColor="textSecondary">
+                  <ThemedText type="callout" themeColor="textSecondary">
                     {t('settings.status')}
                   </ThemedText>
                   <ThemedText type="row" themeColor={current.color}>
@@ -248,7 +248,7 @@ export function VerifyScreen() {
               </View>
               <View style={styles.flex}>
                 <ThemedText type="headline">{t('settings.verifyPerkTitle')}</ThemedText>
-                <ThemedText type="caption" themeColor="textSecondary">
+                <ThemedText type="footnote" themeColor="textSecondary">
                   {t('settings.verifyPerkBody')}
                 </ThemedText>
               </View>
@@ -318,7 +318,7 @@ export function VerifyScreen() {
             />
           ))}
         </View>
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.stepNote}>
+        <ThemedText type="callout" themeColor="textSecondary" style={styles.stepNote}>
           {t('settings.verifyStep', { step })}
         </ThemedText>
       </View>

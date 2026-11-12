@@ -48,7 +48,7 @@ export function PickingView(props: PickingViewProps) {
       entering={props.entering}
       exiting={pickingOut}
       style={styles.pickingLine}>
-      <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
+      <ThemedText type="callout" themeColor="textSecondary" accessibilityLiveRegion="polite">
         {t('game.isPicking', { name: props.popperName })}…
         {props.round > 1
           ? ` ${sentence(t('game.balloonsLeft', { count: props.upCount }))}`

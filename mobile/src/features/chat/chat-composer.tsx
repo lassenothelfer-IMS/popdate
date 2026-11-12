@@ -83,7 +83,7 @@ export function ChatComposer({
             <ThemedText type="captionStrong" numberOfLines={1}>
               {replyingTo.label}
             </ThemedText>
-            <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+            <ThemedText type="callout" themeColor="textSecondary" numberOfLines={1}>
               {replyingTo.text}
             </ThemedText>
           </View>
@@ -138,7 +138,7 @@ export function ChatComposer({
         </PressableScale>
       </View>
       {text.length >= COUNTER_FROM ? (
-        <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
+        <ThemedText type="callout" themeColor="textSecondary" accessibilityLiveRegion="polite">
           {countLabel}
         </ThemedText>
       ) : null}

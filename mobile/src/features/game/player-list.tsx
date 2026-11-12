@@ -45,7 +45,7 @@ export function PlayerList({
   if (showAnswered && stillIn.length > 0) {
     rows.push(
       <Animated.View key="answered-header" layout={cardTransition} style={styles.answeredHeader}>
-        <ThemedText type="footnote" themeColor="textSecondary" accessibilityRole="header">
+        <ThemedText type="callout" themeColor="textSecondary" accessibilityRole="header">
           {t('game.answeredCount', {
             count: stillIn.filter((contestant) => contestant.answered).length,
             total: stillIn.length,
@@ -69,7 +69,7 @@ export function PlayerList({
   if (popped.length > 0) {
     rows.push(
       <Animated.View key="popped-header" layout={cardTransition} style={styles.poppedHeader}>
-        <ThemedText type="footnote" themeColor="textSecondary" accessibilityRole="header">
+        <ThemedText type="callout" themeColor="textSecondary" accessibilityRole="header">
           {t('game.popped')}
         </ThemedText>
       </Animated.View>,

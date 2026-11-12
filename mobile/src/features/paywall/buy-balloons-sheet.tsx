@@ -312,7 +312,7 @@ export function BuyBalloonsSheet() {
                 trailing={(color) => <Icon name="chevronRight" size={12} color={color} />}
               />
               <ThemedText
-                type="caption"
+                type="footnote"
                 themeColor="textSecondary"
                 style={[styles.center, styles.fine]}>
                 {t('paywall.oneTime')}{' '}
@@ -531,8 +531,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   fine: {
-    fontSize: 11,
-    lineHeight: 15,
   },
   link: {
     textDecorationLine: 'underline',

@@ -312,7 +312,7 @@ export function PlusPaywall() {
               }
             />
           )}
-          <ThemedText type="caption" themeColor="textSecondary" style={[styles.center, styles.fine]}>
+          <ThemedText type="footnote" themeColor="textSecondary" style={[styles.center, styles.fine]}>
             {plan ? `${t(RENEWS[plan.plan], { price: money(plan.price, plan.currency) })} ` : ''}
             <Text
               accessibilityRole="link"
@@ -547,8 +547,6 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   fine: {
-    fontSize: 11,
-    lineHeight: 15,
     maxWidth: 330,
   },
   link: {

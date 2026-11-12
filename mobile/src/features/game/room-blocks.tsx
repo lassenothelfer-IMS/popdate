@@ -53,7 +53,7 @@ export function LockLine() {
   return (
     <View style={styles.lock}>
       <Icon name="lock" size={13} color={theme.textSecondary} />
-      <ThemedText type="footnote" themeColor="textSecondary" style={styles.shrink}>
+      <ThemedText type="callout" themeColor="textSecondary" style={styles.shrink}>
         {t('game.photosUnlock')}
       </ThemedText>
     </View>

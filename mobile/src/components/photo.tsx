@@ -83,7 +83,7 @@ export function Photo({
         style={[styles.frame, styles.placeholder, styles.failed, { backgroundColor: theme.surface }, style]}>
         <Icon name="photo" size={22} color={theme.textSecondary} />
         <ThemedText
-          type="caption"
+          type="footnote"
           themeColor="textSecondary"
           maxFontSizeMultiplier={1.2}
           numberOfLines={2}

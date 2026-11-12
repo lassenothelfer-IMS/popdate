@@ -44,7 +44,7 @@ export function RoomStatusLine(props: RoomStatusLineProps) {
             {props.popReminder ? t('game.waitingOnYou') : t('game.choosePop')}
           </ThemedText>
           {showHints && !props.popReminder && props.upCount > 2 ? (
-            <ThemedText type="footnote" themeColor="textSecondary">
+            <ThemedText type="callout" themeColor="textSecondary">
               {t('game.swipeHint', { people: numberWord(t, props.upCount) })}
             </ThemedText>
           ) : null}
@@ -54,7 +54,7 @@ export function RoomStatusLine(props: RoomStatusLineProps) {
   }
   return (
     <Animated.View entering={questionIn} style={styles.afterQuestion}>
-      <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
+      <ThemedText type="callout" themeColor="textSecondary" accessibilityLiveRegion="polite">
         {t('game.isDeciding', { name: props.popperName })}…
         {props.myPhotoLine ? ` ${props.myPhotoLine}` : ''}
       </ThemedText>

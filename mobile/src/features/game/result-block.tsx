@@ -73,7 +73,7 @@ export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: Resu
           <ThemedText type="body" themeColor="textSecondary">
             {t('game.chooserLeftBody')}
           </ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.note}>
+          <ThemedText type="callout" themeColor="textSecondary" style={styles.note}>
             {t('game.holderLeavesNote')}
           </ThemedText>
         </Animated.View>
@@ -84,7 +84,7 @@ export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: Resu
         <ThemedText type="display" accessibilityRole="header">
           {t('game.endedEarly')}
         </ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary">
+        <ThemedText type="callout" themeColor="textSecondary">
           {t('game.noMatch')}
         </ThemedText>
       </Animated.View>
@@ -97,7 +97,7 @@ export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: Resu
         <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.5}>
           {resultLine(t, viewer, popper.name, winner.name)}
         </ThemedText>
-        <ThemedText type="footnote" themeColor="textSecondary">
+        <ThemedText type="callout" themeColor="textSecondary">
           {t('game.lastStanding', { count: rounds })}
         </ThemedText>
       </View>

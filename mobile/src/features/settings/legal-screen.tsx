@@ -107,7 +107,7 @@ export function LegalScreen({ doc }: { doc: LegalDoc }) {
       <ThemedText type="display" accessibilityRole="header" style={styles.title}>
         {doc === 'terms' ? t('settings.terms') : t('settings.privacy')}
       </ThemedText>
-      <ThemedText type="footnote" themeColor="textSecondary" style={styles.updated}>
+      <ThemedText type="callout" themeColor="textSecondary" style={styles.updated}>
         {t('settings.legalUpdated', { date: UPDATED })}
       </ThemedText>
       <View style={styles.list}>

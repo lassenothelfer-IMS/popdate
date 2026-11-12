@@ -49,7 +49,7 @@ export function SafetyTipsScreen() {
         ))}
       </View>
 
-      <ThemedText type="footnote" themeColor="textSecondary" style={styles.emergency}>
+      <ThemedText type="callout" themeColor="textSecondary" style={styles.emergency}>
         {t('settings.tipsEmergency')}
       </ThemedText>
     </Screen>

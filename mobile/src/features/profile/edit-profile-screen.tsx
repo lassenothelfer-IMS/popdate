@@ -164,7 +164,7 @@ export function EditProfileScreen() {
             <ErrorLine message={error} />
           </View>
         ) : missing ? (
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.note}>
+          <ThemedText type="callout" themeColor="textSecondary" style={styles.note}>
             {missing}
           </ThemedText>
         ) : null}

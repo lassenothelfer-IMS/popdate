@@ -264,7 +264,7 @@ export function SettingsScreen() {
           title={t('settings.account')}
           footer={
             profile ? (
-              <ThemedText type="footnote" themeColor="textSecondary">
+              <ThemedText type="callout" themeColor="textSecondary">
                 {t('settings.birthdayNote')}
               </ThemedText>
             ) : null
@@ -333,7 +333,7 @@ export function SettingsScreen() {
             isWeb || showDenied || error?.section === 'notifications' ? (
               <>
                 {isWeb ? (
-                  <ThemedText type="footnote" themeColor="textSecondary">
+                  <ThemedText type="callout" themeColor="textSecondary">
                     {t('settings.notificationsWeb')}
                   </ThemedText>
                 ) : null}

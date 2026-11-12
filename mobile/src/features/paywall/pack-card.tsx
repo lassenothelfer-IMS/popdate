@@ -125,7 +125,7 @@ export function PackCard({
           <ThemedText type="headline" themeColor="textSecondary" style={styles.each}>
             {each}
           </ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.blurb}>
+          <ThemedText type="callout" themeColor="textSecondary" style={styles.blurb}>
             {blurb}
           </ThemedText>
         </Pressable>
@@ -179,7 +179,6 @@ const styles = StyleSheet.create({
   blurb: {
     width: 190,
     marginTop: 4,
-    lineHeight: 17,
     textAlign: 'center',
   },
   tagRow: {

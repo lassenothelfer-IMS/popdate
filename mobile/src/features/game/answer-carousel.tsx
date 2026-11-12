@@ -453,7 +453,7 @@ function AnswerCard({
           {answer ? (
             <Quote text={answer} />
           ) : (
-            <ThemedText type="footnote" themeColor="textSecondary">
+            <ThemedText type="callout" themeColor="textSecondary">
               {t('game.noAnswer')}
             </ThemedText>
           )}

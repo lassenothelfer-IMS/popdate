@@ -147,7 +147,7 @@ export function SecondChances({ onMatched, refreshes = 0 }: { onMatched?: () => 
               />
               <View style={styles.text}>
                 <ThemedText type="headline">{name}</ThemedText>
-                <ThemedText type="footnote" themeColor="textSecondary">
+                <ThemedText type="callout" themeColor="textSecondary">
                   {note}
                 </ThemedText>
               </View>

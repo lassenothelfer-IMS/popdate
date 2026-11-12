@@ -149,7 +149,7 @@ export function AnswerComposer({
         </PressableScale>
       </View>
       {text.length >= COUNTER_FROM ? (
-        <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
+        <ThemedText type="callout" themeColor="textSecondary" accessibilityLiveRegion="polite">
           {t('game.charactersLeft', { count: left })}
         </ThemedText>
       ) : null}

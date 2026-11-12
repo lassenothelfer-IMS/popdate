@@ -40,7 +40,7 @@ export function QuestionPicker({
       <ThemedText type="headline" accessibilityRole="header">
         {t('game.askSomething')}
       </ThemedText>
-      <ThemedText type="footnote" themeColor="textSecondary" style={styles.hint}>
+      <ThemedText type="callout" themeColor="textSecondary" style={styles.hint}>
         {answering === 2
           ? t('game.pickHintBoth')
           : t('game.pickHintAll', { count: answering })}

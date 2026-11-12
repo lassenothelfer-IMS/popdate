@@ -310,7 +310,7 @@ export function MessageList({
           <View key={group.key} style={styles.dayAndGroup}>
             {newDay ? (
               <Animated.View entering={entering(group.key)} style={styles.pillRow}>
-                <ThemedText type="caption" themeColor="textSecondary" accessibilityRole="header">
+                <ThemedText type="footnote" themeColor="textSecondary" accessibilityRole="header">
                   {formatDay(first.sentAt)}
                 </ThemedText>
               </Animated.View>
@@ -425,7 +425,7 @@ export function MessageList({
               })}
               {/* Each bubble already says its time to screen readers. */}
               <ThemedText
-                type="caption"
+                type="footnote"
                 themeColor="textSecondary"
                 accessibilityElementsHidden={!sent}
                 importantForAccessibility={sent ? 'auto' : 'no'}
@@ -470,7 +470,7 @@ export function MessageList({
                 </ThemedText>
               </Pressable>
             ) : (
-              <ThemedText type="caption" themeColor="textSecondary" style={styles.time}>
+              <ThemedText type="footnote" themeColor="textSecondary" style={styles.time}>
                 {t('chat.sending')}
               </ThemedText>
             )}
