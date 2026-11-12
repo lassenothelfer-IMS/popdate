@@ -318,7 +318,7 @@ export function VerifyScreen() {
             />
           ))}
         </View>
-        <ThemedText type="footnote" themeColor="textTertiary" style={styles.stepNote}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.stepNote}>
           {t('settings.verifyStep', { step })}
         </ThemedText>
       </View>
@@ -356,7 +356,7 @@ function Oval({ children, scanning }: { children: ReactNode; scanning: boolean }
     pass.set(withRepeat(withTiming(1, { duration: SCAN_MS, easing: Easing.inOut(Easing.ease) }), -1, true));
   }, [animate, pass]);
   const from = theme.text;
-  const to = theme.textTertiary;
+  const to = theme.textSecondary;
   const ring = useAnimatedStyle(() => ({
     borderColor: interpolateColor(pass.get(), [0, 1], [from, to]),
   }));

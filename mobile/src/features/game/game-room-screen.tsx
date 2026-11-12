@@ -21,7 +21,6 @@ import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { LeaveSheet } from '@/features/game/leave-sheet';
 import { PhaseCurtain, usePhaseCurtain } from '@/features/game/phase-curtain';
 import { PickingView } from '@/features/game/picking-view';
-import { PlayerList } from '@/features/game/player-list';
 import { afterBeatIn } from '@/features/game/pop-news';
 import { PoppedView } from '@/features/game/popped-view';
 import { PopperPresence } from '@/features/game/popper-presence';
@@ -97,6 +96,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   /** Drawn as popped while the pop is on its way, so the burst lands on the press. */
   const [pendingPopId, setPendingPopId] = useState<string | null>(null);
   const [watching, setWatching] = useState(false);
+  /** Whose photo the live reveal has just brought up, so the stage shows it at the same moment. */
+  const [photoUp, setPhotoUp] = useState<string | null>(null);
   // The answer draft lives here, so it survives the leave flow.
   // It belongs to one round and starts empty in the next.
   const [draft, setDraft] = useState({ round: 0, text: '' });
@@ -231,7 +232,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   if (room === undefined) return <LoadingScreen label={t('game.loadingRoom')} />;
   if (room === null || !phase) return <RoomGone />;
 
-  const { isPopper, me, iAmActive, finished, answering } = phase;
+  const { isPopper, me, iAmActive, finished } = phase;
   const { pending, selected, selectedQuestion, winner, canSelect, up, revealing } = phase;
   const othersInRoom: Person[] = [room.popper, ...room.contestants]
     .filter((player) => player.id !== room.me.id)
@@ -416,18 +417,27 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     );
   }
 
-  const { beatPop, news, myAnswer } = phase;
-  // The list sits a step further from the pop news than from a quiet line. For
-  // contestants the popper's block sits between the news and the list.
-  const listStyle =
-    news && (isPopper || finished)
-      ? styles.listAfterNews
-      : (!isPopper && phase.pickingNow) || myAnswer
-        ? styles.listAfterLine
-        : styles.list;
+  const { beatPop, news } = phase;
 
   // From round 2 on, the picking phase arrives as a beat ends: it waits for the pop news to fade.
   const pickingIn = room.round > 1 ? afterBeatIn : phaseIn;
+
+  // Until the reveal has shown someone's new photo, the stage keeps their last one:
+  // everyone during the "answers are in" beat, then whoever's turn hasn't come or just began.
+  const revealRunning = room.status === 'popping' && !!room.reveal && (!!curtain || !!phase.spotlight);
+  const unrevealed: ReadonlySet<string> = revealRunning
+    ? new Set(
+        (room.reveal?.turns ?? [])
+          .filter(
+            (turn, index) =>
+              !!curtain ||
+              !revealTurn ||
+              index > revealTurn.index ||
+              (index === revealTurn.index && photoUp !== turn.id),
+          )
+          .map((turn) => turn.id),
+      )
+    : NOTHING_DEVELOPED;
 
   const footer = phase.footer ? (
     <RoomFooter
@@ -484,6 +494,9 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               onLeave={askLeave}
               onMore={() => void people.openAmong(othersInRoom)}
               onSelect={selectBalloon}
+              spotlightId={spotlightOn?.id ?? null}
+              unrevealed={unrevealed}
+              onPop={(id) => void handlePop(room.contestants.find((contestant) => contestant.id === id))}
               onLayout={(event) => {
                 const { height } = event.nativeEvent.layout;
                 if (height !== barHeight) setBarHeight(height);
@@ -496,13 +509,17 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
               style={styles.flex}
               contentContainerStyle={[
                 styles.scroll,
+                // While everyone writes, the question stands in the middle of the page, not at its top.
+                phase.answering && !curtain && styles.centered,
                 {
                   // The chooser's cards are sized to end just above the pop bar: no spare page under them.
                   paddingBottom: revealing ? Space.xs : hasFooter ? Space.xl : insets.bottom + Space.xl,
                 },
               ]}
-              bounces={!revealing}
-              overScrollMode={revealing ? 'never' : 'auto'}
+              bounces={!revealing && !phase.answering}
+              alwaysBounceVertical={false}
+              scrollEnabled={!phase.answering || !isPopper}
+              overScrollMode={revealing || phase.answering ? 'never' : 'auto'}
               onScroll={develop.onScroll}
               onLayout={develop.onScrollLayout}
               scrollEventThrottle={32}
@@ -597,6 +614,7 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                     total={room.reveal?.turns.length ?? 0}
                     startsAt={revealTurn.startsAt}
                     isMe={spotlightOn.id === room.me.id}
+                    onPhotoShown={() => setPhotoUp(spotlightOn.id)}
                   />
                 </View>
               ) : null}
@@ -617,18 +635,6 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                 onMyPhotoLayout={develop.onMyPhotoLayout}
               />
 
-              {phase.showList ? (
-                <PlayerList
-                  stillIn={phase.stillIn}
-                  popped={phase.poppedRows}
-                  seatOf={seatOf}
-                  meId={room.me.id}
-                  round={room.round}
-                  pendingId={pending?.id ?? null}
-                  showAnswered={answering}
-                  style={listStyle}
-                />
-              ) : null}
             </ScrollView>
             {curtain ? (
               <PhaseCurtain
@@ -679,6 +685,10 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: Gutter,
   },
+  centered: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
   result: {
     paddingTop: Space.xl,
   },
@@ -686,15 +696,6 @@ const styles = StyleSheet.create({
     marginTop: Space.md,
   },
   presenceAfterNews: {
-    marginTop: Space.lg,
-  },
-  list: {
-    marginTop: Space.md,
-  },
-  listAfterLine: {
-    marginTop: Space.sm,
-  },
-  listAfterNews: {
     marginTop: Space.lg,
   },
 });

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { MAX_PINNED_ANSWERS, type PinnedAnswer, type RoomSummary } from '@/api/types';
+import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { Icon } from '@/components/icon';
@@ -11,16 +12,18 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
+import { Bob } from '@/components/stage';
 import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { TabSwipe } from '@/components/tab-swipe';
+import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
-import { CssEase, Ease, MinTouch, Motion, Radius, Space } from '@/constants/theme';
+import { BrandBalloon, CssEase, Ease, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { acknowledge } from '@/features/chat/prompts';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
-import { useTheme } from '@/hooks/use-theme';
+import { useSeats, useTheme } from '@/hooks/use-theme';
 import { useLocale, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
@@ -118,7 +121,7 @@ export function RoomsScreen() {
               {t('rooms.title')}
             </ThemedText>
             {stats && stats.played > 0 ? (
-              <ThemedText type="callout" themeColor="textSecondary" style={styles.summary}>
+              <ThemedText type="body" style={styles.summary}>
                 {t('rooms.summary', {
                   count: stats.played,
                   wins: t('rooms.summaryWins', { count: stats.lastBalloon }),
@@ -138,16 +141,7 @@ export function RoomsScreen() {
               <Skeleton style={styles.skeleton} />
             </View>
           ) : history.length === 0 ? (
-            <Rise index={1} style={styles.empty}>
-              <ThemedText type="display" style={styles.centered}>
-                {t('rooms.emptyTitle')}
-              </ThemedText>
-              <ThemedText type="callout" themeColor="textSecondary" style={styles.centered}>
-                {t('rooms.emptyBody')}
-              </ThemedText>
-              <Button title={t('home.play')} loading={joining} onPress={() => void join()} />
-              {error ? <ErrorLine message={error} /> : null}
-            </Rise>
+            <EmptyRooms joining={joining} error={error} onJoin={() => void join()} />
           ) : (
             <View style={styles.list}>
               {history.map((room, index) => {
@@ -178,6 +172,40 @@ export function RoomsScreen() {
   );
 }
 
+const EMPTY_SEATS = ['a', 'b', 'c', 'a', 'c', 'b'] as const;
+/** How far down each empty seat hangs, so the six read as floating and not as a row of icons. */
+const SEAT_DROP = [26, 0, 40, 10, 34, 4];
+
+/** No rooms yet: six empty seats, which is what a room is, then the words and one quiet way in. */
+function EmptyRooms({ joining, error, onJoin }: { joining: boolean; error: string | null; onJoin: () => void }) {
+  const t = useT();
+  const theme = useTheme();
+  return (
+    <View style={styles.empty}>
+      <Rise index={1}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.seats}>
+          {EMPTY_SEATS.map((kind, i) => (
+            <Bob key={i} kind={kind} style={{ marginTop: SEAT_DROP[i] }}>
+              <Balloon color={BrandBalloon.color} size={40} ghost ghostInk={theme.brand} />
+            </Bob>
+          ))}
+        </View>
+      </Rise>
+      <Rise index={2} style={styles.emptyWords}>
+        <ThemedText type="display" accessibilityRole="header">
+          {t('rooms.emptyTitle')}
+        </ThemedText>
+        <ThemedText type="body">{t('rooms.emptyBody')}</ThemedText>
+        <TextLink title={t('home.play')} loading={joining} onPress={onJoin} />
+        {error ? <ErrorLine message={error} /> : null}
+      </Rise>
+    </View>
+  );
+}
+
 type RoomCardProps = {
   room: RoomSummary;
   /** Showing its questions and answers, or folded to its one line. */
@@ -191,12 +219,15 @@ type RoomCardProps = {
 };
 
 /**
- * One room. Folded: when and how it went, on one line. Open: who was choosing,
- * each question with your answer, and where it led. The top line opens and folds it.
+ * One room, as an entry in a journal: a balloon in the margin for how it ended
+ * (whole when it ended with a match, torn when you were popped or left), the
+ * day, how it went, and one thing you said. Open: who was choosing, each
+ * question with your answer, and where it led. The top opens and folds it.
  */
 function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCardProps) {
   const t = useT();
   const theme = useTheme();
+  const seats = useSeats();
   const locale = useLocale();
   const reduced = useReduceMotion();
   const date = new Date(room.endedAt).toLocaleDateString(locale, {
@@ -208,23 +239,35 @@ function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCa
   const answered = roundsYouSaw(room);
   // A room you left may still be playing, so there's no recap to see.
   const showRecap = room.outcome !== 'left';
+  const matched = room.outcome === 'won' || room.outcome === 'chose';
+  /** Something you said in it, under the headline while the entry is folded. */
+  const said = answered.find((round) => round.answer)?.answer ?? null;
   return (
-    <View style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}>
+    <View style={[styles.card, { borderBottomColor: theme.border }]}>
       <PressableHighlight
         accessibilityRole="button"
         accessibilityLabel={`${date}, ${outcome}`}
         accessibilityState={{ expanded: open }}
         accessibilityHint={open ? t('rooms.foldHint') : t('rooms.openHint')}
         onPress={onToggle}
-        background={theme.field}
+        background={theme.page}
         style={styles.cardTop}>
-        <ThemedText type="kicker">{date}</ThemedText>
-        <ThemedText
-          type="captionStrong"
-          themeColor={room.outcome === 'won' || room.outcome === 'chose' ? 'accentText' : 'textSecondary'}
-          style={styles.outcome}>
-          {outcome}
-        </ThemedText>
+        <View style={styles.mark} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {matched ? (
+            <Balloon color={BrandBalloon.color} size={24} />
+          ) : (
+            <Balloon color={seats[1].color} size={24} popped />
+          )}
+        </View>
+        <View style={styles.entry}>
+          <ThemedText style={styles.day}>{date}</ThemedText>
+          <ThemedText type="heading">{outcome}</ThemedText>
+          {!open && said ? (
+            <ThemedText style={styles.said} numberOfLines={2}>
+              {said}
+            </ThemedText>
+          ) : null}
+        </View>
         {/* Points right while folded, down while open. */}
         <Animated.View
           style={{
@@ -233,13 +276,13 @@ function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCa
             transitionDuration: reduced ? 0 : Motion.state,
             transitionTimingFunction: CssEase.out,
           }}>
-          <Icon name="chevronRight" size={13} color={theme.textTertiary} />
+          <Icon name="chevronRight" size={13} color={theme.text} />
         </Animated.View>
       </PressableHighlight>
 
       {open ? (
         <Animated.View entering={fadeIn ? detailsIn : undefined} style={styles.cardBody}>
-          <ThemedText type="footnote" themeColor="textSecondary">
+          <ThemedText type="body">
             {room.role === 'popper' ? t('rooms.youChose') : t('rooms.theyChose', { name: room.popperName })}
           </ThemedText>
 
@@ -248,12 +291,10 @@ function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCa
             const pinned = pin ? pins.some((p) => samePin(p, pin)) : false;
             return (
               <View key={`${room.roomId}-${i}`} style={[styles.round, { borderTopColor: theme.border }]}>
-                <ThemedText type="questionRow">{round.question}</ThemedText>
+                <ThemedText style={styles.asked}>{round.question}</ThemedText>
                 {pin ? (
                   <View style={styles.answerRow}>
-                    <ThemedText type="callout" themeColor="textSecondary" style={styles.answer}>
-                      {`“${pin.answer}”`}
-                    </ThemedText>
+                    <ThemedText style={[styles.answer, styles.said]}>{pin.answer}</ThemedText>
                     <Button
                       title={pinned ? t('rooms.unpin') : t('rooms.pin')}
                       variant={pinned ? 'tinted' : 'plain'}
@@ -265,7 +306,7 @@ function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCa
                     />
                   </View>
                 ) : room.role === 'contestant' ? (
-                  <ThemedText type="footnote" themeColor="textTertiary">
+                  <ThemedText type="callout" themeColor="textSecondary">
                     {t('rooms.noAnswer')}
                   </ThemedText>
                 ) : null}
@@ -312,42 +353,55 @@ const styles = StyleSheet.create({
     marginTop: Space.xs,
   },
   list: {
-    marginTop: Space.lg,
-    gap: Space.md,
+    marginTop: Space.md,
   },
   skeleton: {
     height: 180,
     borderRadius: Radius.xl,
   },
   empty: {
-    marginTop: 80,
+    marginTop: Space.xl,
+    gap: 56,
+  },
+  seats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    minHeight: 110,
+  },
+  emptyWords: {
     gap: Space.md,
   },
-  centered: {
-    textAlign: 'center',
-  },
-  // Clips the top line's press fill to the card's corners.
+  // One entry: no box, a hairline under it.
   card: {
-    borderRadius: Radius.xl,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  // The whole top line is the open and fold target, 44 pt at least.
+  // The whole top is the open and fold target.
   cardTop: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Space.sm,
     minHeight: MinTouch,
-    paddingHorizontal: Space.md,
-    paddingVertical: Space.sm,
+    paddingVertical: Space.md,
   },
-  outcome: {
+  mark: {
+    width: 26,
+    paddingTop: 2,
+  },
+  entry: {
     flex: 1,
-    textAlign: 'right',
+    gap: 4,
+  },
+  // The one label style: small capitals in the text color.
+  day: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: 600,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   cardBody: {
-    paddingHorizontal: Space.md,
+    paddingLeft: 26 + Space.sm,
     paddingBottom: Space.md,
     gap: Space.xs,
   },
@@ -364,6 +418,19 @@ const styles = StyleSheet.create({
   },
   answer: {
     flex: 1,
+  },
+  // A question is small and in the system font; what was said is large and in the serif.
+  asked: {
+    fontFamily: Fonts.sans,
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: 600,
+  },
+  said: {
+    fontFamily: Fonts.serif,
+    fontSize: 20,
+    lineHeight: 25,
+    letterSpacing: -0.3,
   },
   actions: {
     flexDirection: 'row',

@@ -155,7 +155,7 @@ export function RoundsArt({ fit }: ArtProps) {
           <ThemedText type="callout" style={styles.flex}>
             <Text style={styles.bold}>{t('common.you')}</Text>
             {'  '}
-            <Text style={{ color: theme.textTertiary }}>{t('onboarding.roundsTyping')}</Text>
+            <Text style={{ color: theme.textSecondary }}>{t('onboarding.roundsTyping')}</Text>
           </ThemedText>
         </View>
       </View>

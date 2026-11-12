@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/constants/theme';
-import { BackButton } from '@/features/onboarding/back-button';
+import { PageBack } from '@/features/settings/page-back';
 import { goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -103,7 +103,7 @@ export function LegalScreen({ doc }: { doc: LegalDoc }) {
   const sections = DOCS[doc];
   return (
     <Screen scroll>
-      <BackButton onPress={() => (router.canGoBack() ? router.back() : goBackOr(SETTINGS_PAGE))} />
+      <PageBack onPress={() => (router.canGoBack() ? router.back() : goBackOr(SETTINGS_PAGE))} />
       <ThemedText type="display" accessibilityRole="header" style={styles.title}>
         {doc === 'terms' ? t('settings.terms') : t('settings.privacy')}
       </ThemedText>

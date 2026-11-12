@@ -227,6 +227,8 @@ export function Button({
             isInteractive
             glassEffectStyle="regular"
             colorScheme="light"
+            // A light tint, so the dark label stays readable when the glass is over a dark photo.
+            tintColor="rgba(255, 253, 254, 0.7)"
             style={[StyleSheet.absoluteFill, styles.capsule]}
           />
         ) : null}

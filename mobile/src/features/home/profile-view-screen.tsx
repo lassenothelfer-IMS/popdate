@@ -251,14 +251,14 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             <ThemedText type="kicker" accessibilityRole="header">
               {t('profile.aboutYou')}
             </ThemedText>
-            <View style={[styles.about, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <View style={styles.about}>
               {about.map((row, index) => (
                 <View
                   key={row.label}
                   accessible
                   accessibilityLabel={`${row.label}, ${row.value}`}
                   style={[styles.aboutRow, index > 0 && [styles.aboutRule, { borderTopColor: theme.border }]]}>
-                  <ThemedText type="footnote" themeColor="textSecondary">
+                  <ThemedText type="callout" themeColor="textSecondary">
                     {row.label}
                   </ThemedText>
                   <ThemedText type="body">{row.value}</ThemedText>
@@ -268,7 +268,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
           </Rise>
 
           {asTab && stats ? (
-            <Rise index={1} style={[styles.stats, statGrid && styles.statsGrid]}>
+            <Rise index={1} style={[styles.stats, { borderColor: theme.border }, statGrid && styles.statsGrid]}>
               <Stat half={statGrid} value={stats.played} label={t('you.statRooms', { count: stats.played })} />
               <Stat
                 half={statGrid}
@@ -288,9 +288,9 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               {profile.pinnedAnswers.map((pin) => (
                 <View
                   key={`${pin.question}|${pin.answer}`}
-                  style={[styles.pin, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                  style={[styles.pin, { borderTopColor: theme.border }]}>
                   <View style={styles.pinTop}>
-                    <ThemedText type="footnote" themeColor="textSecondary" style={styles.pinQuestion}>
+                    <ThemedText type="headline" style={styles.pinQuestion}>
                       {pin.question}
                     </ThemedText>
                     {asTab ? (
@@ -306,7 +306,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
                       />
                     ) : null}
                   </View>
-                  <ThemedText type="questionRow">{`“${pin.answer}”`}</ThemedText>
+                  <ThemedText type="questionRow">{pin.answer}</ThemedText>
                 </View>
               ))}
             </Rise>
@@ -315,9 +315,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               <ThemedText type="kicker" accessibilityRole="header">
                 {t('you.pinnedTitle')}
               </ThemedText>
-              <ThemedText type="footnote" themeColor="textSecondary">
-                {t('you.pinnedEmpty')}
-              </ThemedText>
+              <ThemedText type="body">{t('you.pinnedEmpty')}</ThemedText>
             </Rise>
           ) : null}
 
@@ -328,8 +326,8 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
                 accessibilityLabel={verified ? t('home.verifiedTitle') : t('home.unverifiedTitle')}
                 disabled={verified}
                 onPress={() => router.push('/settings/verify' as Href)}
-                background={theme.field}
-                style={[styles.verify, { borderColor: theme.border }]}>
+                background={theme.page}
+                style={[styles.verify, { borderTopColor: theme.border, borderBottomColor: theme.border }]}>
                 <View style={[styles.verifyIcon, { backgroundColor: theme.accentWash }]}>
                   <VerifiedCheck size={16} />
                 </View>
@@ -337,7 +335,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
                   <ThemedText type="headline">
                     {verified ? t('home.verifiedTitle') : t('home.unverifiedTitle')}
                   </ThemedText>
-                  <ThemedText type="footnote" themeColor="textSecondary">
+                  <ThemedText type="callout" themeColor="textSecondary">
                     {verified ? t('home.verifiedNote') : t('home.unverifiedNote')}
                   </ThemedText>
                 </View>
@@ -361,11 +359,11 @@ function Stat({ value, label, half }: { value: number; label: string; half: bool
     <View
       accessible
       accessibilityLabel={`${value} ${label}`}
-      style={[styles.stat, half && styles.statHalf, { backgroundColor: theme.field, borderColor: theme.border }]}>
-      <ThemedText type="heading" style={styles.statValue}>
+      style={[styles.stat, half && styles.statHalf, { borderLeftColor: theme.border }]}>
+      <ThemedText type="display" style={styles.statValue}>
         {String(value)}
       </ThemedText>
-      <ThemedText type="caption" themeColor="textSecondary" numberOfLines={2} style={styles.statLabel}>
+      <ThemedText type="callout" numberOfLines={2} style={styles.statLabel}>
         {label}
       </ThemedText>
     </View>
@@ -523,8 +521,9 @@ function HeroScrim() {
 }
 
 /**
- * A button over the photo: a circle with an icon, or a pill with its label. A solid
- * light pill, not glass: glass takes on a dark photo and its dark ink disappears.
+ * A button over the photo: a circle with an icon, or a pill with its label. On iOS 26
+ * it is Liquid Glass with a light tint, so its dark ink holds on a dark photo; elsewhere
+ * a solid light pill.
  */
 function GlassButton({
   label,
@@ -542,7 +541,7 @@ function GlassButton({
   return (
     <Button
       title={label}
-      variant="tinted"
+      variant="glass"
       size="small"
       fullWidth={false}
       iconOnly={icon !== undefined}
@@ -556,9 +555,12 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  // Four numbers in a row between two hairlines, not four tiles.
   stats: {
     flexDirection: 'row',
-    gap: Space.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: Space.sm,
   },
   // Two per row: a 40% basis leaves room for the gap and flex grows each to half; rows stretch tiles to one height.
   statsGrid: {
@@ -569,27 +571,24 @@ const styles = StyleSheet.create({
   },
   stat: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: Space.sm,
-    paddingHorizontal: 4,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    borderLeftWidth: StyleSheet.hairlineWidth,
     gap: 2,
   },
   statValue: {
     fontVariant: ['tabular-nums'],
   },
   statLabel: {
-    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 18,
   },
   pins: {
     gap: Space.xs,
   },
   pin: {
     gap: 4,
-    padding: Space.md,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingTop: Space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   pinTop: {
     flexDirection: 'row',
@@ -673,11 +672,7 @@ const styles = StyleSheet.create({
     fontSize: 19,
     lineHeight: 25,
   },
-  about: {
-    paddingHorizontal: Space.md,
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
+  about: {},
   aboutRow: {
     gap: 2,
     paddingVertical: Space.sm,
@@ -690,10 +685,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
     paddingVertical: 14,
-    paddingHorizontal: Space.md,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   verifyIcon: {
     width: 36,

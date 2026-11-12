@@ -167,7 +167,7 @@ export function PoppedView({
             pressed && styles.pressed,
           ]}>
           <View style={styles.cardHead}>
-            <Text {...stageText} style={[stageType.sans, styles.cardLabel, { color: theme.textTertiary }]}>
+            <Text {...stageText} style={[stageType.sans, styles.cardLabel, { color: theme.textSecondary }]}>
               {t('game.stillFloating')}
             </Text>
             <View style={styles.cardCount}>
@@ -196,7 +196,7 @@ export function PoppedView({
                     style={[
                       stageType.sans,
                       styles.seatName,
-                      { color: gone ? theme.textTertiary : theme.textSecondary },
+                      { color: gone ? theme.textSecondary : theme.textSecondary },
                       gone && styles.struck,
                       mine && styles.bold,
                     ]}>

@@ -105,7 +105,7 @@ export function ChatComposer({
         <TextInput
           accessibilityLabel={t('chat.messageLabel')}
           placeholder={t('chat.placeholder', { name })}
-          placeholderTextColor={theme.textTertiary}
+          placeholderTextColor={theme.textSecondary}
           keyboardAppearance="light"
           selectionColor={theme.text}
           // Read when the field gets focus, once the count shows.

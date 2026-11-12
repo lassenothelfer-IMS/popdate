@@ -9,7 +9,7 @@ import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { MinTouch, Space } from '@/constants/theme';
-import { BackButton } from '@/features/onboarding/back-button';
+import { PageBack } from '@/features/settings/page-back';
 import { languageName, regionSettingLabel } from '@/features/settings/options';
 import {
   ChoiceRow,
@@ -251,7 +251,7 @@ export function SettingsScreen() {
     <View style={styles.flex}>
       <Screen scroll>
         {/* Back to the screen that opened it; from a link or a reload, to Home. */}
-        <BackButton onPress={() => goBackOr('/home')} />
+        <PageBack onPress={() => goBackOr('/home')} />
         <ThemedText
           type="title"
           accessibilityRole="header"
@@ -417,7 +417,7 @@ export function SettingsScreen() {
             onPress={handleDelete}
             pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
             style={({ pressed }) => [styles.delete, pressed && styles.pressed]}>
-            <ThemedText type="label" themeColor={ending === 'delete' ? 'textTertiary' : 'danger'}>
+            <ThemedText type="label" themeColor={ending === 'delete' ? 'textSecondary' : 'danger'}>
               {ending === 'delete' ? t('settings.deleting') : t('settings.deleteAccount')}
             </ThemedText>
           </Pressable>

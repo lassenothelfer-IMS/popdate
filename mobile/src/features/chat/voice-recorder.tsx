@@ -175,7 +175,7 @@ export function VoiceRecorder({ onSend, onClose }: VoiceRecorderProps) {
           {live.map((bar) => (
             <View
               key={bar.tick}
-              style={[styles.level, { height: 4 + 20 * bar.level, backgroundColor: theme.textTertiary }]}
+              style={[styles.level, { height: 4 + 20 * bar.level, backgroundColor: theme.textSecondary }]}
             />
           ))}
         </View>

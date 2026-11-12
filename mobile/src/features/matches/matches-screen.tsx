@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { api } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
@@ -13,7 +12,9 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
+import { Bob } from '@/components/stage';
 import { TAB_BAR_CLEARANCE, useTabFocus } from '@/components/tab-bar';
+import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
 import { BrandBalloon, Radius, Space } from '@/constants/theme';
 import { usePersonActions, type Person } from '@/features/chat/person-actions';
@@ -205,7 +206,7 @@ function ThreadRow({
   const name = t('common.nameAge', { name: match.other.name, age: match.other.age });
   const preview = previewLine(t, filter, thread, myId);
   const time = shortTime(t, locale, last?.sentAt ?? match.createdAt);
-  const quiet = highlighted ? 'textSecondary' : 'textTertiary';
+  const quiet = 'textSecondary' as const;
   /** They wrote last: the row says so with a plum dot and a darker preview. */
   const replied = !!last && last.senderId !== myId;
   return (
@@ -219,13 +220,8 @@ function ThreadRow({
       onAccessibilityAction={(event) => {
         if (event.nativeEvent.actionName === 'more') onMore();
       }}
-      background={highlighted ? theme.field : 'transparent'}
-      style={[
-        styles.thread,
-        highlighted
-          ? [styles.threadCard, { borderColor: theme.border }]
-          : [styles.threadRow, { borderBottomColor: theme.border }],
-      ]}>
+      background="transparent"
+      style={[styles.thread, styles.threadRow, { borderBottomColor: theme.border }]}>
       <View style={highlighted ? [styles.ring, { borderColor: theme.accent }] : null}>
         <Avatar
           name={match.other.name}
@@ -239,7 +235,7 @@ function ThreadRow({
           <ThemedText type="row" style={styles.threadName} numberOfLines={1}>
             {name}
           </ThemedText>
-          <ThemedText type="caption" themeColor={quiet}>
+          <ThemedText type="footnote" themeColor={quiet}>
             {time}
           </ThemedText>
         </View>
@@ -260,19 +256,19 @@ function ThreadRow({
 
 /** Under the list: why the list is short, and a way to make it longer. */
 function EarnedCard({ onJoin, joining }: { onJoin: () => void; joining: boolean }) {
-  const theme = useTheme();
   const t = useT();
   return (
-    <View style={[styles.earned, { backgroundColor: theme.field, borderColor: theme.border }]}>
-      <ThemedText type="questionRow">{t('home.earnedTitle')}</ThemedText>
-      <View style={styles.earnedButton}>
-        <Button title={t('home.play')} variant="tinted" loading={joining} onPress={onJoin} />
-      </View>
+    <View style={styles.earned}>
+      <ThemedText type="heading">{t('home.earnedTitle')}</ThemedText>
+      <TextLink title={t('home.play')} loading={joining} onPress={onJoin} />
     </View>
   );
 }
 
-/** No matches yet: the brand balloon on a gold string, one line of why, and the way in. */
+/**
+ * No matches yet: the words big and to the left, and beside them a balloon in
+ * dashes, waiting to be filled. One quiet way in, no black bar.
+ */
 function EmptyMatches({
   onJoin,
   joining,
@@ -286,34 +282,22 @@ function EmptyMatches({
   const t = useT();
   return (
     <View style={styles.empty}>
-      <Rise index={1} style={styles.emptyArt}>
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.emptyArt}>
-          <Balloon color={BrandBalloon.color} size={120} string={false} />
-          <Svg width={8} height={70} style={styles.emptyString}>
-            <Defs>
-              <LinearGradient id="matchesEmptyString" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={theme.gold} stopOpacity={1} />
-                <Stop offset="1" stopColor={theme.gold} stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Rect x={3} width={2} height={70} fill="url(#matchesEmptyString)" />
-          </Svg>
-        </View>
-      </Rise>
-      <Rise index={2} style={styles.emptyText}>
-        <ThemedText type="display" style={styles.centered}>
+      <Rise index={1}>
+        <ThemedText type="hero" accessibilityRole="header" style={styles.emptyTitle}>
           {t('home.emptyTitle')}
         </ThemedText>
-        <ThemedText type="body" themeColor="textSecondary" style={[styles.centered, styles.emptyBody]}>
-          {t('home.emptyBody')}
-        </ThemedText>
       </Rise>
-      <Rise index={3} style={styles.emptyAction}>
-        <Button title={t('home.play')} loading={joining} onPress={onJoin} />
-        {error ? <ErrorLine message={error} /> : null}
+      <Rise index={2} style={styles.emptyRow}>
+        <View style={styles.emptyWords}>
+          <ThemedText type="body">{t('home.emptyBody')}</ThemedText>
+          <TextLink title={t('home.play')} loading={joining} onPress={onJoin} />
+          {error ? <ErrorLine message={error} /> : null}
+        </View>
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Bob>
+            <Balloon color={BrandBalloon.color} size={112} ghost ghostInk={theme.brand} />
+          </Bob>
+        </View>
       </Rise>
     </View>
   );
@@ -401,38 +385,26 @@ const styles = StyleSheet.create({
   },
   earned: {
     marginTop: Space.xl,
-    padding: 18,
-    gap: 6,
-    borderRadius: Radius.xl,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  earnedButton: {
-    marginTop: Space.xs,
+    gap: Space.md,
   },
   empty: {
     flexGrow: 1,
-    marginTop: 64,
+    marginTop: 56,
   },
-  emptyArt: {
-    alignItems: 'center',
+  emptyTitle: {
+    fontSize: 60,
+    lineHeight: 60,
+    letterSpacing: -1.8,
+    maxWidth: 260,
   },
-  emptyString: {
-    marginTop: -2,
-    transform: [{ rotate: '6deg' }],
-    transformOrigin: 'top',
-  },
-  emptyText: {
-    alignItems: 'center',
-    gap: 10,
-    marginTop: Space.md,
-  },
-  emptyBody: {
-    maxWidth: 300,
-    fontSize: 16,
-  },
-  emptyAction: {
+  emptyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Space.md,
     marginTop: Space.xl,
-    gap: Space.sm,
+  },
+  emptyWords: {
+    flex: 1,
+    gap: Space.lg,
   },
 });

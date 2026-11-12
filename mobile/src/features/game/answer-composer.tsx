@@ -190,8 +190,8 @@ export function SentAnswerCard({ text }: { text: string }) {
       entering={sentIn}
       accessible
       accessibilityLabel={t('game.yourAnswerLabel', { text })}
-      style={[styles.card, { backgroundColor: theme.field, borderColor: theme.outline }]}>
-      <ThemedText type="footnote" themeColor="textSecondary">
+      style={[styles.card, { borderLeftColor: theme.text }]}>
+      <ThemedText type="callout" themeColor="textSecondary">
         {t('game.yourAnswer')}
       </ThemedText>
       <ThemedText type={text.length <= SHORT_ANSWER ? 'quote' : 'quoteLong'}>
@@ -255,12 +255,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'center',
   },
+  // Your answer as a quote with a rule beside it, not a box.
   card: {
     gap: Space.xxs,
-    paddingVertical: 14,
-    paddingHorizontal: Space.md,
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
+    paddingLeft: Space.md,
+    borderLeftWidth: 2,
   },
 });

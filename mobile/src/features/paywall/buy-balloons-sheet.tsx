@@ -54,6 +54,11 @@ const ENTER_MS = 620;
 /** A drag this far down, or a flick this fast, closes the sheet. */
 const DISMISS_DISTANCE = 120;
 const DISMISS_VELOCITY = 800;
+/**
+ * On iOS the route is the system's form sheet (see the root layout): it brings its own
+ * dim, grabber, rise and pull-down. Elsewhere the shop draws all of that itself.
+ */
+const nativeSheet = Platform.OS === 'ios';
 
 const BLURBS: Record<number, TranslationKey> = {
   5: 'paywall.blurb5',
@@ -115,6 +120,10 @@ export function BuyBalloonsSheet() {
     if (leaving.get()) return;
     leaving.set(true);
     if (result) settleShop(result);
+    if (nativeSheet) {
+      goBackOr('/home' as Href);
+      return;
+    }
     shown.set(
       withTiming(0, { duration: Motion.exit, easing: Ease.out }, (finished) => {
         if (finished) scheduleOnRN(goBackOr, '/home' as Href);
@@ -192,29 +201,8 @@ export function BuyBalloonsSheet() {
   const ready = catalogState.status === 'ready' && pack !== undefined;
   const failed = catalogState.status === 'failed';
 
-  return (
-    <GestureHandlerRootView style={styles.fill}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }, dim]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.close')}
-          style={StyleSheet.absoluteFill}
-          onPress={() => close()}
-        />
-      </Animated.View>
-      <View style={styles.anchor} pointerEvents="box-none">
-        <GestureDetector gesture={pull}>
-          <Animated.View
-            accessibilityViewIsModal
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: theme.sheet,
-                paddingBottom: Math.max(insets.bottom, Space.md),
-              },
-              sheet,
-            ]}>
-            <View style={[styles.grabber, { backgroundColor: theme.text }]} />
+  const body = (
+    <>
             <Button
               title={t('common.close')}
               variant="glass"
@@ -325,17 +313,50 @@ export function BuyBalloonsSheet() {
               />
               <ThemedText
                 type="caption"
-                themeColor="textTertiary"
+                themeColor="textSecondary"
                 style={[styles.center, styles.fine]}>
                 {t('paywall.oneTime')}{' '}
                 <Text
                   accessibilityRole="link"
                   onPress={restore}
-                  style={[styles.link, { color: theme.textTertiary }]}>
+                  style={[styles.link, { color: theme.textSecondary }]}>
                   {t('paywall.restore')}
                 </Text>
               </ThemedText>
             </View>
+    </>
+  );
+
+  if (nativeSheet) {
+    return (
+      <GestureHandlerRootView style={[styles.native, { backgroundColor: theme.sheet }]}>{body}</GestureHandlerRootView>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={styles.fill}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.scrim }, dim]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.close')}
+          style={StyleSheet.absoluteFill}
+          onPress={() => close()}
+        />
+      </Animated.View>
+      <View style={styles.anchor} pointerEvents="box-none">
+        <GestureDetector gesture={pull}>
+          <Animated.View
+            accessibilityViewIsModal
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.sheet,
+                paddingBottom: Math.max(insets.bottom, Space.md),
+              },
+              sheet,
+            ]}>
+            <View style={[styles.grabber, { backgroundColor: theme.text }]} />
+            {body}
           </Animated.View>
         </GestureDetector>
       </View>
@@ -424,6 +445,11 @@ function PackCarousel({ packs, selected, onSelect, render }: CarouselProps) {
 const styles = StyleSheet.create({
   fill: {
     flex: 1,
+  },
+  // The form sheet sizes to this; the system grabber sits over the first 13 pt.
+  native: {
+    paddingTop: 13,
+    paddingBottom: Space.md,
   },
   anchor: {
     flex: 1,

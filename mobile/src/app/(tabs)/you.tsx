@@ -1,7 +1,5 @@
-/**
- * On phones the tabs layout draws You inside its pager, next to the other tabs,
- * so the route itself renders nothing. The web renders the screen here (you.web.tsx).
- */
+import { ProfileViewScreen } from '@/features/home/profile-view-screen';
+
 export default function YouRoute() {
-  return null;
+  return <ProfileViewScreen asTab />;
 }

@@ -1,113 +1,39 @@
-import { router, Slot, usePathname } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import PagerView from 'react-native-pager-view';
+import { NativeTabs } from 'expo-router/native-tabs';
 
-import { TAB_ROUTES, TabBar, TabPageContext, TABS, type Tab } from '@/components/tab-bar';
-import { HomeScreen } from '@/features/home/home-screen';
-import { ProfileViewScreen } from '@/features/home/profile-view-screen';
-import { MatchesScreen } from '@/features/matches/matches-screen';
 import { useYourTurnCount } from '@/features/matches/use-your-turn';
-import { RoomsScreen } from '@/features/rooms/rooms-screen';
+import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
-import { haptics } from '@/utils/haptics';
-
-const ORDER = TABS;
-const ROUTES = TAB_ROUTES;
-
-/** The tab a path belongs to, or -1 for a screen over the tabs, like Edit profile or Settings. */
-function tabOf(pathname: string): number {
-  return ORDER.findIndex((tab) => pathname.startsWith(`/${tab}`));
-}
 
 /**
- * Play, Rooms, Matches and You side by side: swipe and the next page follows the
- * finger, or tap the floating tab bar. The URL follows the page, so links to
- * /home, /rooms, /matches or /you land on the right one. All four stay mounted,
- * so a page keeps its scroll and state while you're on another. Each page knows
- * whether it's the one showing (TabPageContext): it reloads when you page to it
- * and holds its loops and polls still while it's off screen.
+ * Play, Rooms, Matches and You on the system's own tab bar: Liquid Glass on
+ * iOS 26 and later, the classic bar before that, Material on Android. The
+ * system draws it, so it gets the glass, the selection capsule and the drag
+ * along the bar for free. Each tab is its own route and renders its own screen.
  */
 export default function TabsLayout() {
   const t = useT();
-  const pathname = usePathname();
+  const theme = useTheme();
   const yourTurn = useYourTurnCount();
-  const pager = useRef<PagerView>(null);
-  const routeTab = tabOf(pathname);
-  const [page, setPage] = useState(Math.max(0, routeTab));
-  // While a sheet or a pushed screen is over the tabs, the page under it stays where it is.
-  const routeIndex = routeTab < 0 ? page : routeTab;
-
-  // Arriving by a link (Back to home from a match, a push): slide to that page.
-  useEffect(() => {
-    if (routeIndex !== page) pager.current?.setPage(routeIndex);
-    // Only a new route moves the pager; the pager itself moves `page`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeIndex]);
-
-  function select(tab: Tab) {
-    pager.current?.setPage(ORDER.indexOf(tab));
-  }
-
   return (
-    <View style={styles.fill}>
-      <PagerView
-        ref={pager}
-        style={styles.fill}
-        initialPage={routeIndex}
-        onPageSelected={({ nativeEvent }) => {
-          const index = nativeEvent.position;
-          if (index === page) return;
-          setPage(index);
-          haptics.selection();
-          if (index !== routeIndex) router.navigate(ROUTES[ORDER[index]]);
-        }}>
-        <View key="home" style={styles.fill}>
-          <TabPageContext value={page === 0}>
-            <HomeScreen />
-          </TabPageContext>
-        </View>
-        <View key="rooms" style={styles.fill}>
-          <TabPageContext value={page === 1}>
-            <RoomsScreen />
-          </TabPageContext>
-        </View>
-        <View key="matches" style={styles.fill}>
-          <TabPageContext value={page === 2}>
-            <MatchesScreen />
-          </TabPageContext>
-        </View>
-        <View key="you" style={styles.fill}>
-          <TabPageContext value={page === 3}>
-            <ProfileViewScreen asTab />
-          </TabPageContext>
-        </View>
-      </PagerView>
-      <TabBar
-        active={ORDER[page]}
-        labels={{
-          home: t('home.tabHome'),
-          rooms: t('home.tabRooms'),
-          matches: t('home.tabMatches'),
-          you: t('home.tabYou'),
-        }}
-        onSelect={select}
-        counts={{ matches: yourTurn }}
-        dotLabels={{ matches: t('home.tabMatchesYourTurn') }}
-      />
-      {/* The routes themselves render nothing; the pages above are the screens. */}
-      <View style={styles.hidden}>
-        <Slot />
-      </View>
-    </View>
+    <NativeTabs tintColor={theme.text}>
+      <NativeTabs.Trigger name="home">
+        <NativeTabs.Trigger.Icon sf={{ default: 'balloon', selected: 'balloon.fill' }} md="circle" />
+        <NativeTabs.Trigger.Label>{t('home.tabHome')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="rooms">
+        <NativeTabs.Trigger.Icon sf="clock.arrow.circlepath" md="history" />
+        <NativeTabs.Trigger.Label>{t('home.tabRooms')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="matches">
+        <NativeTabs.Trigger.Icon sf={{ default: 'bubble.left', selected: 'bubble.left.fill' }} md="chat_bubble" />
+        <NativeTabs.Trigger.Label>{t('home.tabMatches')}</NativeTabs.Trigger.Label>
+        {/* Chats waiting on you, as the system's own badge. */}
+        {yourTurn > 0 ? <NativeTabs.Trigger.Badge>{String(yourTurn)}</NativeTabs.Trigger.Badge> : null}
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="you">
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }} md="account_circle" />
+        <NativeTabs.Trigger.Label>{t('home.tabYou')}</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }
-
-const styles = StyleSheet.create({
-  fill: {
-    flex: 1,
-  },
-  hidden: {
-    display: 'none',
-  },
-});

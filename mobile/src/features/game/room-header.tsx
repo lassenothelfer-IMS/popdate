@@ -1,7 +1,7 @@
 import type { LayoutChangeEvent } from 'react-native';
 
 import type { Room, RoomStatus } from '@/api';
-import { BalloonRail } from '@/features/game/balloon-rail';
+import { BalloonStage } from '@/features/game/balloon-stage';
 import { RoomBar } from '@/features/game/room-bar';
 import type { RoomPhase } from '@/features/game/room-phase';
 import { RoundTimer } from '@/features/game/round-timer';
@@ -35,6 +35,12 @@ type RoomHeaderProps = {
   onLeave: () => void;
   onMore: () => void;
   onSelect: (id: string) => void;
+  /** Whose turn it is in the live reveal, if it is running. */
+  spotlightId: string | null;
+  /** Set while the chooser may pop: holding a balloon on the stage pops it. */
+  onPop?: (id: string) => void;
+  /** People whose newest photo the reveal hasn't shown yet. */
+  unrevealed: ReadonlySet<string>;
   onLayout: (event: LayoutChangeEvent) => void;
 };
 
@@ -48,6 +54,9 @@ export function RoomHeader({
   onLeave,
   onMore,
   onSelect,
+  spotlightId,
+  onPop,
+  unrevealed,
   onLayout,
 }: RoomHeaderProps) {
   const t = useT();
@@ -89,14 +98,18 @@ export function RoomHeader({
           : roundOf,
       }}
       rail={
-        <BalloonRail
+        <BalloonStage
           contestants={room.contestants}
           meId={room.me.id}
           markedId={pending ? null : (selected?.id ?? null)}
           poppingId={pending?.id ?? null}
           risenId={finished ? room.winnerId : null}
           inView={phase.revealing ? inView : null}
+          spotlightId={spotlightId}
+          answering={answering}
+          unrevealed={unrevealed}
           onSelect={phase.canSelect && phase.revealing ? onSelect : undefined}
+          onPop={phase.canSelect && phase.revealing ? onPop : undefined}
         />
       }
       onLayout={onLayout}

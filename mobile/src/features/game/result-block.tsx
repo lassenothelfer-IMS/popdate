@@ -73,7 +73,7 @@ export function ResultBlock({ popper, winner, winnerTone, rounds, viewer }: Resu
           <ThemedText type="body" themeColor="textSecondary">
             {t('game.chooserLeftBody')}
           </ThemedText>
-          <ThemedText type="footnote" themeColor="textTertiary" style={styles.note}>
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.note}>
             {t('game.holderLeavesNote')}
           </ThemedText>
         </Animated.View>

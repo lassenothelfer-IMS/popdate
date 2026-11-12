@@ -22,8 +22,8 @@ export function BalloonLine({ balloons }: { balloons: BalloonState }) {
 
   return (
     <View style={styles.row} accessible accessibilityLabel={text}>
-      <Balloon color={BrandBalloon.color} size={12} shine={false} />
-      <ThemedText type="footnote" themeColor="textSecondary" style={styles.text}>
+      <Balloon color={BrandBalloon.color} size={14} shine={false} />
+      <ThemedText type="callout" style={styles.text}>
         {text}
       </ThemedText>
     </View>

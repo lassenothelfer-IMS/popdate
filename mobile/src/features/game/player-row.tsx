@@ -119,7 +119,7 @@ export function LiveRow({ contestant, color, isMe, status }: LiveRowProps) {
         </Animated.View>
       ) : writing ? (
         <View style={styles.writing}>
-          <ThemedText type="footnote" themeColor="textTertiary">
+          <ThemedText type="footnote" themeColor="textSecondary">
             {t('game.writing')}
           </ThemedText>
           <WritingDots />
@@ -173,7 +173,7 @@ function WritingDot({
   });
   return (
     <Animated.View style={style}>
-      <ThemedText type="footnote" themeColor="textTertiary">
+      <ThemedText type="footnote" themeColor="textSecondary">
         .
       </ThemedText>
     </Animated.View>
@@ -225,7 +225,7 @@ export function PoppedRow({ contestant, color, isMe, round, last }: PoppedRowPro
         </ThemedText>
         {isMe ? <YouTag /> : null}
       </View>
-      <ThemedText type="footnote" themeColor="textTertiary">
+      <ThemedText type="footnote" themeColor="textSecondary">
         {what}
       </ThemedText>
     </Animated.View>

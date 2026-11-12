@@ -1,4 +1,5 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, Stack } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
@@ -12,7 +13,14 @@ import {
   type NativeSyntheticEvent,
   type ScrollViewInstance,
 } from 'react-native';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { api, type Match, type Message, type Room } from '@/api';
 import { Avatar } from '@/components/avatar';
@@ -22,6 +30,7 @@ import { ErrorLine } from '@/components/error-line';
 import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
 import { Screen } from '@/components/screen';
+import { SideSwipe } from '@/components/side-swipe';
 import { Skeleton } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { VerifiedCheck } from '@/components/verified-check';
@@ -60,7 +69,11 @@ function seedFromRoom(room: Room | null | undefined, myId: string, t: Translate)
   const winner = room.contestants.find((contestant) => contestant.id === room.winnerId);
   const answer = winner?.answer ?? null;
   const answerMine = winner?.id === myId;
+  // The photo the last round revealed: theirs, whichever of you two held the balloon.
+  const them = room.popper.id === myId ? winner : room.popper;
   return {
+    photo: them?.photos.at(-1),
+    name: them?.name ?? '',
     kicker: !answer
       ? t('chat.seedQuestion')
       : answerMine
@@ -200,6 +213,9 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   const seats = useSeats();
   const reduced = useReduceMotion();
   const filter = useFilterText();
+  // On iOS the system's navigation bar is over the chat: the screen starts under it.
+  const barHeight = useHeaderHeight();
+  const headerHeight = Platform.OS === 'ios' ? barHeight : 0;
   const { locale, region } = useSettings();
   const room = useRoom(match.roomId);
   // Report, block or unmatch; any of the last two closes the chat.
@@ -238,12 +254,25 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
       ? t('chat.matchedToday')
       : t(matched.when === 'weekday' ? 'chat.matchedOnWeekday' : 'chat.matchedOnDate', { day: matched.day });
 
+  /** 0 on the chat, 1 on the profile: the two sides trade places as it moves. */
+  const side = useSharedValue(0);
   function show(next: Tab) {
     if (next === tab) return;
     haptics.selection();
     if (next === 'profile') setProfileOpened(true);
     setTab(next);
+    const to = next === 'profile' ? 1 : 0;
+    side.set(reduced ? to : withTiming(to, { duration: 280, easing: Easing.bezier(0.3, 0, 0.2, 1) }));
   }
+  const chatPane = useAnimatedStyle(() => ({
+    opacity: 1 - side.get(),
+    transform: [{ translateX: -36 * side.get() }],
+  }));
+  const profilePane = useAnimatedStyle(() => ({
+    opacity: side.get(),
+    transform: [{ translateX: 36 * (1 - side.get()) }],
+  }));
+  const tabLine = useAnimatedStyle(() => ({ left: `${side.get() * 50}%` }));
   const formatDay = (iso: string) => {
     const day = times.day(iso);
     return day === 'today' ? t('chat.today') : day === 'yesterday' ? t('chat.yesterday') : day;
@@ -416,6 +445,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
   return (
     <Screen
       contentStyle={styles.content}
+      headerHeight={headerHeight}
       footerHidden={tab !== 'chat'}
       footer={
         <ChatFooter
@@ -439,48 +469,97 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
           onCancelReply={() => setReplyingTo(null)}
         />
       }>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('common.back')}
-          onPress={leave}
-          pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={({ pressed }) => [styles.iconButton, styles.back, pressed && styles.pressed]}>
-          <Icon name="back" size={20} color={theme.text} />
-        </Pressable>
-        <View
-          accessible
-          accessibilityRole="header"
-          accessibilityLabel={[
-            t('common.nameAge', { name, age }),
-            verified ? t('home.verifiedLabel') : '',
-            matchedLine,
-          ]
-            .filter(Boolean)
-            .join(', ')}
-          style={styles.person}>
-          <Avatar name={name} uri={match.other.photo} tone={tone} size={40} />
-          <View style={styles.name}>
-            <View style={styles.nameRow}>
-              <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
-                {name}
-              </ThemedText>
-              {verified ? <VerifiedCheck /> : null}
-            </View>
-            <ThemedText type="caption" themeColor="textTertiary" numberOfLines={1}>
-              {matchedLine}
-            </ThemedText>
-          </View>
-        </View>
-        <MoreButton
-          label={t('chat.options')}
-          hint={t('chat.optionsHint', { name })}
-          disabled={people.busy}
-          onPress={openOptions}
+      {/* On iOS the system's navigation bar carries the chat's top: its own back button
+          (glass on iOS 26, with the swipe from the edge), who you're talking to in the
+          middle, and the options on the right. Elsewhere the app draws the same row. */}
+      {Platform.OS === 'ios' ? (
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            headerShadowVisible: false,
+            headerBackButtonDisplayMode: 'minimal',
+            headerTintColor: theme.text,
+            headerStyle: { backgroundColor: theme.page },
+            headerTitle: () => (
+              <View
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={[
+                  t('common.nameAge', { name, age }),
+                  verified ? t('home.verifiedLabel') : '',
+                  matchedLine,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+                style={styles.person}>
+                <Avatar name={name} uri={match.other.photo} tone={tone} size={32} />
+                <View style={styles.name}>
+                  <View style={styles.nameRow}>
+                    <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
+                      {name}
+                    </ThemedText>
+                    {verified ? <VerifiedCheck /> : null}
+                  </View>
+                  <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+                    {matchedLine}
+                  </ThemedText>
+                </View>
+              </View>
+            ),
+            headerRight: () => (
+              <MoreButton
+                label={t('chat.options')}
+                hint={t('chat.optionsHint', { name })}
+                disabled={people.busy}
+                onPress={openOptions}
+              />
+            ),
+          }}
         />
-      </View>
+      ) : (
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={leave}
+            pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            style={({ pressed }) => [styles.iconButton, styles.back, pressed && styles.pressed]}>
+            <Icon name="back" size={20} color={theme.text} />
+          </Pressable>
+          <View
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={[
+              t('common.nameAge', { name, age }),
+              verified ? t('home.verifiedLabel') : '',
+              matchedLine,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            style={styles.person}>
+            <Avatar name={name} uri={match.other.photo} tone={tone} size={40} />
+            <View style={styles.name}>
+              <View style={styles.nameRow}>
+                <ThemedText type="task" numberOfLines={1} style={styles.nameText}>
+                  {name}
+                </ThemedText>
+                {verified ? <VerifiedCheck /> : null}
+              </View>
+              <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
+                {matchedLine}
+              </ThemedText>
+            </View>
+          </View>
+          <MoreButton
+            label={t('chat.options')}
+            hint={t('chat.optionsHint', { name })}
+            disabled={people.busy}
+            onPress={openOptions}
+          />
+        </View>
+      )}
 
-      <View accessibilityRole="tablist" style={[styles.tabs, { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` }]}>
+      <View accessibilityRole="tablist" style={[styles.tabs, { borderBottomColor: theme.border }]}>
         {(['chat', 'profile'] as const).map((side) => {
           const selected = tab === side;
           return (
@@ -490,34 +569,49 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
               accessibilityState={{ selected }}
               aria-selected={selected}
               onPress={() => show(side)}
-              style={[
-                styles.tab,
-                selected && { backgroundColor: theme.page, boxShadow: '0 1px 3px rgba(25, 25, 25, 0.12)' },
-              ]}>
+              style={styles.tab}>
               <ThemedText style={[styles.tabLabel, selected ? styles.tabLabelOn : { color: theme.textSecondary }]}>
                 {t(side === 'chat' ? 'chat.tabChat' : 'chat.tabProfile')}
               </ThemedText>
             </Pressable>
           );
         })}
+        {/* One line, which travels to whichever side you are on. */}
+        <Animated.View style={[styles.tabLineTrack, tabLine]} pointerEvents="none">
+          <View style={[styles.tabLine, { backgroundColor: theme.text }]} />
+        </Animated.View>
       </View>
 
+      <View style={styles.fill}>
+
       {profileOpened ? (
-        <View style={[styles.fill, tab !== 'profile' && styles.hidden]}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, profilePane]}
+          pointerEvents={tab === 'profile' ? 'auto' : 'none'}
+          accessibilityElementsHidden={tab !== 'profile'}
+          importantForAccessibility={tab === 'profile' ? 'auto' : 'no-hide-descendants'}>
           <MatchProfileView
             load={theirProfile}
             name={name}
+            onSwipeBack={() => show('chat')}
             onPlanDate={() => {
               setIdeasOut(true);
               show('chat');
             }}
           />
-        </View>
+        </Animated.View>
       ) : null}
 
+      {/* A swipe to the left on the chat opens their profile. */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, chatPane]}
+        pointerEvents={tab === 'chat' ? 'auto' : 'none'}
+        accessibilityElementsHidden={tab !== 'chat'}
+        importantForAccessibility={tab === 'chat' ? 'auto' : 'no-hide-descendants'}>
+      <SideSwipe onLeft={() => show('profile')}>
       <ScrollView
         ref={scrollRef}
-        style={[styles.fill, tab !== 'chat' && styles.hidden]}
+        style={styles.fill}
         contentContainerStyle={styles.messages}
         keyboardShouldPersistTaps="handled"
         // On-drag rather than interactive: the footer can't follow an interactive drag.
@@ -571,6 +665,9 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
           />
         )}
       </ScrollView>
+      </SideSwipe>
+      </Animated.View>
+      </View>
 
       {/* Android and the web read their newest message from here; iOS announces it instead. */}
       {Platform.OS !== 'ios' ? (
@@ -791,21 +888,26 @@ const styles = StyleSheet.create({
     fontWeight: 500,
   },
   // Chat | Profile: one pill, the chosen side lifted in white.
+  // Chat | Profile: two words over a hairline, with a line under the one you are on.
   tabs: {
     flexDirection: 'row',
-    marginHorizontal: Gutter,
-    marginBottom: Space.xs,
-    padding: 3,
-    borderRadius: Radius.pill,
-    borderCurve: 'continuous',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tab: {
     flex: 1,
-    minHeight: 36,
+    minHeight: MinTouch,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.pill,
-    borderCurve: 'continuous',
+  },
+  tabLineTrack: {
+    position: 'absolute',
+    bottom: -1,
+    width: '50%',
+    paddingHorizontal: Gutter,
+  },
+  tabLine: {
+    height: 2,
+    borderRadius: 1,
   },
   tabLabel: {
     fontFamily: Fonts.sans,

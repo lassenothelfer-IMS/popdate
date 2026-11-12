@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
 
@@ -41,6 +41,8 @@ type RevealSpotlightProps = {
   total: number;
   /** When this turn started, on the room's schedule. */
   startsAt: number;
+  /** The photo has come up: the room's stage shows it on their face from now. */
+  onPhotoShown?: () => void;
   isMe: boolean;
 };
 
@@ -49,7 +51,15 @@ type RevealSpotlightProps = {
  * own, then this round's photo. Every phone shows the same turn at the same time.
  * The parent keys it by contestant, so each turn enters fresh.
  */
-export function RevealSpotlight({ contestant, seat, index, total, startsAt, isMe }: RevealSpotlightProps) {
+export function RevealSpotlight({
+  contestant,
+  seat,
+  index,
+  total,
+  startsAt,
+  isMe,
+  onPhotoShown,
+}: RevealSpotlightProps) {
   const theme = useTheme();
   const reduced = useReduceMotion();
   const t = useT();
@@ -71,6 +81,10 @@ export function RevealSpotlight({ contestant, seat, index, total, startsAt, isMe
     }, photoAt - Date.now());
     return () => clearTimeout(timer);
   }, [photoAt, photoShown, photo]);
+  const shown = useEffectEvent(() => onPhotoShown?.());
+  useEffect(() => {
+    if (photoShown) shown();
+  }, [photoShown]);
 
   return (
     <Animated.View

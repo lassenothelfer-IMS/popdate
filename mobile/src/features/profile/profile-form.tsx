@@ -772,7 +772,7 @@ function PhotoSlot({
       accessible
       accessibilityLabel={t('profile.emptySlot', { position })}
       style={[styles.slot, size, { backgroundColor: theme.surface }]}>
-      <Text style={[styles.emptyNumber, { color: theme.textTertiary }]} maxFontSizeMultiplier={1.2}>
+      <Text style={[styles.emptyNumber, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
         {position}
       </Text>
     </View>

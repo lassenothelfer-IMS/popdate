@@ -27,7 +27,12 @@ export function useJoinQueue() {
     }, []),
   );
 
-  async function join() {
+  /**
+   * `takeOff`: something to play once you are in the line and before it opens,
+   * like Play's balloon flying off. Anything that isn't a function is ignored,
+   * so `onPress={join}` keeps working.
+   */
+  async function join(takeOff?: unknown) {
     if (joining) return;
     haptics.light();
     setJoining(true);
@@ -39,6 +44,7 @@ export function useJoinQueue() {
       }
       await api.joinQueue();
       startLineClock();
+      if (typeof takeOff === 'function') await (takeOff as () => Promise<void> | void)();
       router.push('/queue');
     } catch (cause) {
       // The server can still say none: a pack's balloons land a moment after the purchase.

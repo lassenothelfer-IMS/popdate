@@ -15,7 +15,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { Message } from '@/api';
-import { Balloon } from '@/components/balloon';
+import { Photo } from '@/components/photo';
+import { Prompt } from '@/components/prompt';
 import { ThemedText } from '@/components/themed-text';
 import { VoiceMessage } from '@/features/chat/voice-message';
 import { Ease, Fonts, Motion, Radius, Space } from '@/constants/theme';
@@ -80,7 +81,10 @@ function groupMessages(messages: Message[], myId: string): Group[] {
   return groups;
 }
 
-/** On first open each bubble rises 12 pt and grows from .96, 600 ms, 150 ms after the one before. */
+/**
+ * On first open the newest bubbles rise 10 pt into place, the last one first and each 45 ms
+ * after the one below it, so the chat is already there as the screen finishes sliding in.
+ */
 const rises = new Map<number, ReturnType<typeof webSafeKeyframe>>();
 function riseIn(index: number) {
   const step = Math.min(index, MAX_STAGGER);
@@ -88,11 +92,11 @@ function riseIn(index: number) {
   if (!entering) {
     entering = webSafeKeyframe(
       new Keyframe({
-        0: { opacity: 0, transform: [{ translateY: 12 }, { scale: 0.96 }] },
+        0: { opacity: 0, transform: [{ translateY: 10 }, { scale: 0.98 }] },
         100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }], easing: Ease.rise },
       })
-        .duration(600)
-        .delay(200 + step * 150),
+        .duration(360)
+        .delay(60 + step * 45),
     );
     rises.set(step, entering);
   }
@@ -110,7 +114,15 @@ const quietIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(Redu
 
 /** The room's last round, laid into the top of the chat: who asked what, and the answer. */
 /** The room's last round, over the messages: whose answer it is, the question, and the answer. */
-export type Seed = { kicker: string; question: string; answer: string | null; answerMine: boolean };
+export type Seed = {
+  kicker: string;
+  question: string;
+  answer: string | null;
+  answerMine: boolean;
+  /** The photo of theirs that the last round revealed, and their name for its label. */
+  photo?: string;
+  name?: string;
+};
 /** The seed's key, so the first open knows to rise it in before the room loads. */
 export const SEED_KEY = 'seed-card';
 
@@ -194,14 +206,16 @@ export function MessageList({
   const waiting = pending.filter((item) => !item.sentId || !byId.has(item.sentId));
   const lastGroup = groups.at(-1);
 
-  // Everything on screen at first open rises in, top to bottom.
+  // What you see at first open rises in from the newest up. Older ones, off screen, are just there.
   const keys = [
     ...(seed ? [SEED_KEY] : []),
     ...groups.map((group) => group.key),
-  ].filter((key) => firstOpen?.has(key));
+  ]
+    .filter((key) => firstOpen?.has(key))
+    .reverse();
   const entering = (key: string) => {
     const index = keys.indexOf(key);
-    return reduced || index < 0 ? undefined : riseIn(index);
+    return reduced || index < 0 || index > MAX_STAGGER ? undefined : riseIn(index);
   };
 
   function bubbleStyle(mine: boolean, joinsAbove: boolean) {
@@ -243,6 +257,9 @@ export function MessageList({
     );
   }
 
+  /** Nothing written yet: the room's last answer stands in for the first message. */
+  const opener = messages.length === 0 && pending.length === 0;
+
   return (
     <View style={styles.list}>
       {seed ? (
@@ -256,19 +273,28 @@ export function MessageList({
           ]
             .filter(Boolean)
             .join('. ')}
-          style={[
-            styles.seed,
-            { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` },
-          ]}>
-          <View style={styles.seedTop}>
-            <Balloon color={theme.brandPale} size={9} />
-            <ThemedText style={[styles.seedKicker, { color: theme.textTertiary }]}>{seed.kicker}</ThemedText>
-          </View>
-          <ThemedText type="questionRow" themeColor="textSecondary" style={styles.seedQuestion}>
-            {seed.question}
-          </ThemedText>
-          {seed.answer ? (
-            <ThemedText type="quoteLong">{`“${seed.answerMine ? seed.answer : filter(seed.answer)}”`}</ThemedText>
+          // Before anyone has written, the answer is the whole opener: big, on the page, no box.
+          style={
+            opener
+              ? styles.opener
+              : [styles.seed, { borderBottomColor: theme.border }]
+          }>
+          {/* Their photo from the last round: over the words in the opener, beside them in the card. */}
+          {seed.photo && opener ? (
+            <View style={[styles.openerPhoto, { backgroundColor: theme.surface }]}>
+              <Photo uri={seed.photo} name={seed.name} hairline={false} style={StyleSheet.absoluteFill} />
+            </View>
+          ) : null}
+          <Prompt
+            question={seed.question}
+            answer={seed.answer ? (seed.answerMine ? seed.answer : filter(seed.answer)) : null}
+            size={opener ? 'large' : 'small'}
+            style={styles.seedWords}
+          />
+          {seed.photo && !opener ? (
+            <View style={[styles.seedPhoto, { backgroundColor: theme.surface }]}>
+              <Photo uri={seed.photo} name={seed.name} hairline={false} style={StyleSheet.absoluteFill} />
+            </View>
           ) : null}
         </Animated.View>
       ) : null}
@@ -284,7 +310,7 @@ export function MessageList({
           <View key={group.key} style={styles.dayAndGroup}>
             {newDay ? (
               <Animated.View entering={entering(group.key)} style={styles.pillRow}>
-                <ThemedText type="caption" themeColor="textTertiary" accessibilityRole="header">
+                <ThemedText type="caption" themeColor="textSecondary" accessibilityRole="header">
                   {formatDay(first.sentAt)}
                 </ThemedText>
               </Animated.View>
@@ -400,7 +426,7 @@ export function MessageList({
               {/* Each bubble already says its time to screen readers. */}
               <ThemedText
                 type="caption"
-                themeColor="textTertiary"
+                themeColor="textSecondary"
                 accessibilityElementsHidden={!sent}
                 importantForAccessibility={sent ? 'auto' : 'no'}
                 accessibilityLabel={sent ? t('chat.sent') : undefined}
@@ -444,7 +470,7 @@ export function MessageList({
                 </ThemedText>
               </Pressable>
             ) : (
-              <ThemedText type="caption" themeColor="textTertiary" style={styles.time}>
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.time}>
                 {t('chat.sending')}
               </ThemedText>
             )}
@@ -526,7 +552,7 @@ function LinkCard({ link, mine, onOpen }: { link: LinkPreview; mine: boolean; on
         <ThemedText
           type="caption"
           numberOfLines={1}
-          style={{ color: mine ? theme.onInverse : theme.textTertiary, opacity: mine ? 0.7 : 1 }}>
+          style={{ color: mine ? theme.onInverse : theme.textSecondary, opacity: mine ? 0.7 : 1 }}>
           {link.site}
         </ThemedText>
       </View>
@@ -558,7 +584,7 @@ function TypingBubble({ label }: { label: string }) {
           { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` },
         ]}>
         {[0, 1, 2].map((index) => (
-          <TypingDot key={index} index={index} turn={turn} still={reduced} color={theme.textTertiary} />
+          <TypingDot key={index} index={index} turn={turn} still={reduced} color={theme.textSecondary} />
         ))}
       </View>
     </Animated.View>
@@ -598,12 +624,39 @@ const styles = StyleSheet.create({
   },
   // The room's last round: a card as wide as the chat, over the first message.
   seed: {
-    gap: 6,
-    paddingVertical: 14,
-    paddingHorizontal: Space.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.sm,
+    // No box: the room's last round sits on the page, over a hairline.
+    paddingBottom: Space.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: Space.xs,
+  },
+  opener: {
+    gap: Space.sm,
+    paddingTop: Space.lg,
+    paddingBottom: Space.xl,
+  },
+  // Their photo from the last round: large over the opener, small in the card's corner later.
+  openerPhoto: {
+    width: 168,
+    aspectRatio: 0.8,
     borderRadius: 20,
     borderCurve: 'continuous',
-    marginBottom: Space.xs,
+    overflow: 'hidden',
+    marginBottom: Space.sm,
+  },
+  seedPhoto: {
+    width: 72,
+    aspectRatio: 0.8,
+    borderRadius: 12,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
+  seedWords: {
+    flexShrink: 1,
+    flexGrow: 1,
+    gap: 6,
   },
   seedTop: {
     flexDirection: 'row',

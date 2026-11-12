@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from '
 import Animated, {
   cancelAnimation,
   Easing,
+  Keyframe,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -29,11 +30,12 @@ import {
   stageType,
   YouChip,
 } from '@/components/stage';
-import { BrandBalloon, SeatColors } from '@/constants/theme';
+import { BrandBalloon, Ease, SeatColors } from '@/constants/theme';
 import { roomSeatIndex } from '@/features/game/room-seats';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
+import { webSafeKeyframe } from '@/utils/web-motion';
 
 // The queue and the two "room is ready" screens, drawn to design/four-screens on
 // the 390 x 844 stage. Positions are the design's own numbers.
@@ -75,10 +77,37 @@ type QueueStageProps = {
   onLeave: () => void;
 };
 
+/** A balloon drifts up into its seat from below. Yours comes from further: it flew off Play. */
+function seatIn(mine: boolean) {
+  return webSafeKeyframe(
+    new Keyframe({
+      0: { opacity: mine ? 1 : 0, transform: [{ translateY: mine ? 520 : 220 }] },
+      100: { opacity: 1, transform: [{ translateY: 0 }], easing: Ease.rise },
+    }).duration(mine ? 900 : 1000),
+  );
+}
+const yoursIn = seatIn(true);
+const othersIn = seatIn(false);
+
+/** The count rolls: the new number comes up from below as the old one leaves upward. */
+const numberIn = webSafeKeyframe(
+  new Keyframe({
+    0: { opacity: 0, transform: [{ translateY: 46 }] },
+    100: { opacity: 1, transform: [{ translateY: 0 }], easing: Ease.rise },
+  }).duration(420),
+);
+const numberOut = webSafeKeyframe(
+  new Keyframe({
+    0: { opacity: 1, transform: [{ translateY: 0 }] },
+    100: { opacity: 0, transform: [{ translateY: -46 }] },
+  }).duration(260),
+);
+
 /** In line: the count, the balloons of the seats taken, and what is still missing. */
 export function QueueStage({ found, needed, waited, leaving, locked, error, onLeave }: QueueStageProps) {
   const theme = useTheme();
   const t = useT();
+  const reduced = useReduceMotion();
   const taken = Math.max(1, Math.min(found, needed));
   const seats = FILL_ORDER.slice(0, needed);
   const filled = new Set(seats.slice(0, taken));
@@ -135,10 +164,18 @@ export function QueueStage({ found, needed, waited, leaving, locked, error, onLe
             {t('queue.seatsTaken')}
           </Text>
           <View style={styles.countRow}>
-            <Text {...stageText} style={[stageType.numeral, styles.countNumber, { color: theme.text }]}>
-              {taken}
-            </Text>
-            <Text {...stageText} style={[stageType.serif, styles.countOf, { color: theme.textTertiary }]}>
+            {/* Its own slot, as wide as a digit and with room above and below, so a roll cuts nothing off. */}
+            <View style={styles.countSlot}>
+              <Animated.Text
+                key={taken}
+                entering={reduced ? undefined : numberIn}
+                exiting={reduced ? undefined : numberOut}
+                {...stageText}
+                style={[stageType.numeral, styles.countNumber, styles.countDigit, { color: theme.text }]}>
+                {taken}
+              </Animated.Text>
+            </View>
+            <Text {...stageText} style={[stageType.serif, styles.countOf, { color: theme.textSecondary }]}>
               {t('queue.ofNeeded', { needed })}
             </Text>
           </View>
@@ -154,9 +191,14 @@ export function QueueStage({ found, needed, waited, leaving, locked, error, onLe
             const seat = LINEUP[slot];
             const place = { position: 'absolute', left: seat.cx - seat.width / 2, top: seat.top } as const;
             return filled.has(slot) ? (
-              <Bob key={slot} kind={seat.bob} style={place}>
-                <Balloon color={seat.color} size={seat.width} />
-              </Bob>
+              <Animated.View
+                key={`${slot}-in`}
+                entering={reduced ? undefined : slot === YOURS ? yoursIn : othersIn}
+                style={place}>
+                <Bob kind={seat.bob}>
+                  <Balloon color={seat.color} size={seat.width} />
+                </Bob>
+              </Animated.View>
             ) : (
               <Pulse key={slot} style={place}>
                 <Balloon color={seat.color} size={seat.width} ghost />
@@ -513,6 +555,17 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: 10,
     marginTop: 2,
+  },
+  countSlot: {
+    width: 84,
+    height: 136,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countDigit: {
+    position: 'absolute',
+    textAlign: 'center',
+    width: 120,
   },
   countNumber: {
     fontSize: 124,

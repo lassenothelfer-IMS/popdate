@@ -83,6 +83,8 @@ type BalloonProps = {
   size?: number;
   /** A seat that isn't filled, or is no longer: body and string as a dashed outline. */
   ghost?: boolean;
+  /** The ghost's dashed line. The quiet text color unless said otherwise. */
+  ghostInk?: string;
   /** Popped: the torn crown on the knot, with the bow and the string. */
   popped?: boolean;
   /** The highlight on the body. Off for the smallest marks. */
@@ -95,6 +97,7 @@ export function Balloon({
   color,
   size = 24,
   ghost = false,
+  ghostInk,
   popped = false,
   shine = true,
   string = true,
@@ -106,7 +109,7 @@ export function Balloon({
   if (ghost) {
     const dashed = {
       fill: 'none',
-      stroke: theme.textTertiary,
+      stroke: ghostInk ?? theme.textTertiary,
       strokeWidth: 0.7,
       strokeDasharray: [1.6, 1.4],
       strokeLinecap: 'round',

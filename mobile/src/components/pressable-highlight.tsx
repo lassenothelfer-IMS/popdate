@@ -12,7 +12,7 @@ type PressableHighlightProps = Omit<PressableProps, 'style' | 'children'> & {
   background?: string;
 };
 
-/** Press feedback for rows and cards: the fill darkens while pressed. */
+/** Press feedback for rows and cards: the row dims a little while pressed. No fill flashes in behind it. */
 export function PressableHighlight({
   children,
   style,
@@ -32,8 +32,9 @@ export function PressableHighlight({
           style={[
             style,
             {
-              backgroundColor: pressed && !disabled ? theme.surfacePressed : resting,
-              transitionProperty: 'backgroundColor',
+              backgroundColor: resting,
+              opacity: pressed && !disabled ? 0.55 : 1,
+              transitionProperty: 'opacity',
               transitionDuration: Motion.press,
               transitionTimingFunction: CssEase.out,
             },

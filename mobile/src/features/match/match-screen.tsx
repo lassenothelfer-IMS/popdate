@@ -1,24 +1,34 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { Keyframe } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  Keyframe,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { api, type Match } from '@/api';
+import { Balloon, balloonHeight } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
 import { LoadingScreen } from '@/components/loading-screen';
+import { Photo } from '@/components/photo';
+import { PhotoDisc } from '@/components/photo-disc';
 import { Screen } from '@/components/screen';
+import { Bob } from '@/components/stage';
+import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MaxContentWidth, MinTouch, Space, type Seat } from '@/constants/theme';
+import { Ease, Gutter, MinTouch, Space, Velvet } from '@/constants/theme';
 import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
-import { Aura } from '@/features/match/aura';
-import { PhotoCard } from '@/features/match/photo-card';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
-import { seatAt, seatFor, useSeats, useTheme, youSeat } from '@/hooks/use-theme';
+import { seatAt, seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
-import { useSession } from '@/state/session';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
@@ -31,53 +41,36 @@ type Role = 'popper' | 'winner' | null;
 const DEFAULT_PEOPLE = 5;
 const DEFAULT_ROUNDS = 4;
 
-/** The handoff draws this screen 390 pt wide. Everything on the stage scales with the width. */
-const DESIGN_WIDTH = 390;
-/** The kicker sits 84 pt from the phone's top edge, the stage 130 pt, the title 520 pt. */
-const KICKER_TOP = 84;
-const STAGE_TOP = 130;
-const STAGE_HEIGHT = 380;
-/** The chooser's card on the left, the winner's on the right, tilted apart. */
-const CHOOSER_CARD = { left: 50, top: 80, width: 150, height: 230, radius: 18, tilt: -6 };
-const WINNER_CARD = { left: 150, top: 20, width: 190, height: 290, radius: 20, tilt: 5 };
+/** The photo takes this much of the screen's height; the words sit on deep plum under it. */
+const PHOTO_SHARE = 0.62;
+/** How far the plum climbs into the photo's foot, so there is no edge between them. */
+const BLEND = 150;
+/** The match opens out of the last balloon's face: a circle this wide, before it fills its frame. */
+const FACE = 76;
+const BALLOON = 96;
+/** The balloon hangs a moment, then lifts off as the photo opens. */
+const OPEN_DELAY = 900;
+const OPEN_MS = 950;
 
-/** The kicker's line height; the stage overlaps it by this much. */
-const KICKER_LINE = 18;
-/** Room kept for the title: two lines of hero, its gap, two lines of body. */
-const TITLE_ROOM = Space.xs + 46 * 2 + 10 + 22 * 2;
-/** The footer above its bottom inset: a large button, a plain one, and their gaps. */
-const FOOTER_HEIGHT = Space.xs + 52 + Space.xs + 44;
-/** On a short phone the empty stage under the cards' tilted feet is cropped here. */
-const COMPACT_STAGE_HEIGHT = 320;
-/** The cards never shrink past this, however short the screen; the page scrolls instead. */
-const MIN_CARD_SCALE = 0.7;
-
-/** A card flies in from 60 pt below, untwisting to its tilt, 1.1 s, 200 ms after the other. */
-function cardIn(tilt: number, delay: number) {
+/** The headline's words land one by one, each from a little below and a little tipped. */
+function wordIn(index: number) {
   return webSafeKeyframe(
     new Keyframe({
-      0: { opacity: 0, transform: [{ translateY: 60 }, { rotate: `${tilt * 2.3}deg` }, { scale: 0.9 }] },
-      100: {
-        opacity: 1,
-        transform: [{ translateY: 0 }, { rotate: `${tilt}deg` }, { scale: 1 }],
-        easing: Ease.rise,
-      },
+      0: { opacity: 0, transform: [{ translateY: 26 }, { rotate: '3deg' }] },
+      100: { opacity: 1, transform: [{ translateY: 0 }, { rotate: '0deg' }], easing: Ease.rise },
     })
-      .duration(1100)
-      .delay(delay),
+      .duration(620)
+      .delay(OPEN_DELAY + OPEN_MS - 200 + index * 130),
   );
 }
-const chooserIn = cardIn(CHOOSER_CARD.tilt, 500);
-const winnerIn = cardIn(WINNER_CARD.tilt, 700);
-
-/** The title fades up from 20 pt at 1.3 s, once the cards have landed. */
-const titleIn = webSafeKeyframe(
+/** The line under it and the buttons follow once the words are down. */
+const restIn = webSafeKeyframe(
   new Keyframe({
-    0: { opacity: 0, transform: [{ translateY: 20 }] },
+    0: { opacity: 0, transform: [{ translateY: 14 }] },
     100: { opacity: 1, transform: [{ translateY: 0 }], easing: Ease.rise },
   })
-    .duration(900)
-    .delay(1300),
+    .duration(700)
+    .delay(OPEN_DELAY + OPEN_MS + 500),
 );
 
 /** The counts that have a word: `match.n0` to `match.n10`. */
@@ -132,6 +125,12 @@ export function MatchScreen({ matchId }: { matchId: string }) {
   return <MatchMoment match={match} role={role} />;
 }
 
+/**
+ * The match: their photo is the whole screen, with who chose whom over it and
+ * the way into the chat. Straight from the room it opens out of the last
+ * balloon: the balloon hangs over their face for a beat, lifts off, and the
+ * face widens until it fills the screen. Opened again later, it is simply there.
+ */
 function MatchMoment({ match, role }: { match: Match; role: Role }) {
   const t = useT();
   const theme = useTheme();
@@ -139,16 +138,15 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
   const actions = usePersonActions({ onGone: goHome });
   const seats = useSeats();
   const insets = useSafeAreaInsets();
-  const { profile } = useSession();
   const room = useRoom(match.roomId);
   const reduced = useReduceMotion();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const celebrated = useRef(false);
 
-  // Straight from the game, everything flies in with one success haptic.
-  // Opened again from Home, the screen is simply there.
   const fresh = role !== null;
   const animate = fresh && !reduced;
+  /** 0: a face under a balloon. 1: the photo fills the screen. */
+  const open = useSharedValue(animate ? 0 : 1);
 
   useEffect(() => {
     track('match_opened');
@@ -160,6 +158,11 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
     haptics.success();
   }, [fresh]);
 
+  useEffect(() => {
+    if (!animate) return;
+    open.set(withDelay(OPEN_DELAY, withTiming(1, { duration: OPEN_MS, easing: Easing.bezier(0.6, 0, 0.2, 1) })));
+  }, [animate, open]);
+
   const { name, age } = match.other;
   const hero =
     role === 'popper'
@@ -169,187 +172,121 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
         : t('match.youAnd', { name });
   const people = numberWord(t, room?.contestants.length ?? DEFAULT_PEOPLE);
   const rounds = numberWord(t, room?.totalRounds ?? DEFAULT_ROUNDS);
+  // Their balloon's color, once the room says who sat where.
+  const seatIndex = room ? room.contestants.findIndex((contestant) => contestant.id === match.other.id) : -1;
+  const seat = seatIndex >= 0 ? seatAt(seats, seatIndex) : seatFor(seats, match.other.id);
 
-  // A player's balloon, once the room says who sat where.
-  function roomSeat(playerId: string | null | undefined): Seat | null {
-    if (!room || !playerId) return null;
-    const index = room.contestants.findIndex((contestant) => contestant.id === playerId);
-    return index >= 0 ? seatAt(seats, index) : null;
-  }
-  const theirSeat = roomSeat(match.other.id) ?? seatFor(seats, match.other.id);
-  // You are crimson whenever you hold a balloon; a chooser has none, so you stay crimson.
-  const yourSeat = roomSeat(profile?.id) ?? youSeat(seats);
-
-  const them = {
-    uri: match.other.photo,
-    label: t('common.nameAge', { name, age }),
-    seat: theirSeat,
-    a11y: t('match.theirPhoto', { name }),
-  };
-  const you = profile
-    ? {
-        uri: profile.photos[0] ?? 'mock://you',
-        label: t('common.you'),
-        seat: yourSeat,
-        a11y: t('match.yourPhoto'),
-      }
-    : null;
-  // The chooser sits on the left, the last balloon on the right. From Home, you're on the left.
-  const left = role === 'winner' ? them : you;
-  const right = role === 'winner' ? you : them;
-
-  // The stage is drawn edge to edge, so it scales with the screen, not the content.
-  const stageWidth = Math.min(windowWidth, MaxContentWidth);
-  const scale = stageWidth / DESIGN_WIDTH;
-  const at = (value: number) => Math.round(value * scale);
-  const roomyTop = Math.max(Space.sm, KICKER_TOP - insets.top);
-  const roomyGap = at(STAGE_TOP - KICKER_TOP) - KICKER_LINE;
-
-  // A short phone (the SE) can't fit the drawn layout above the buttons. There the
-  // top gap and the empty stage below the cards shrink, and the cards scale with the
-  // height left, so the title and its line stay clear of the footer.
-  const spare = windowHeight - insets.top - FOOTER_HEIGHT - Math.max(insets.bottom, Space.md);
-  const compact = roomyTop + KICKER_LINE + roomyGap + at(STAGE_HEIGHT) + TITLE_ROOM + Space.lg > spare;
-  const top = compact ? Math.min(roomyTop, Space.xl) : roomyTop;
-  const fit = (spare - top - KICKER_LINE - TITLE_ROOM - Space.sm) / COMPACT_STAGE_HEIGHT;
-  const cardScale = compact ? Math.max(MIN_CARD_SCALE, Math.min(scale, fit)) : scale;
-  const card = (value: number) => Math.round(value * cardScale);
-  // Smaller cards stay centered on the stage.
-  const shift = Math.round((stageWidth - DESIGN_WIDTH * cardScale) / 2);
-  const stageHeight = compact ? card(COMPACT_STAGE_HEIGHT) : at(STAGE_HEIGHT);
+  const photoHeight = Math.round(height * PHOTO_SHARE);
+  const faceTop = height * 0.4;
+  const photo = useAnimatedStyle(() => {
+    const at = open.get();
+    return {
+      width: FACE + (width - FACE) * at,
+      height: FACE + (photoHeight - FACE) * at,
+      left: ((width - FACE) / 2) * (1 - at),
+      top: faceTop * (1 - at),
+      borderRadius: (FACE / 2) * (1 - at),
+    };
+  });
+  const lift = useAnimatedStyle(() => ({
+    opacity: 1 - open.get(),
+    transform: [{ translateY: -height * 0.6 * open.get() }],
+  }));
+  // What sits over the photo waits until there is a photo to sit on.
+  const over = useAnimatedStyle(() => ({ opacity: Math.max(0, (open.get() - 0.6) / 0.4) }));
 
   return (
-    <Screen
-      // Large Dynamic Type or a long name can still outgrow a short phone; there it scrolls.
-      scroll={compact}
-      footerStyle="plain"
-      contentStyle={[styles.content, { paddingTop: top }, compact && styles.compactContent]}
-      footer={
-        <>
+    <View style={[styles.root, { backgroundColor: theme.page }]}>
+      {/* The deep plum the words stand on, coming in as the photo opens. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: theme.brandDeep }, over]} pointerEvents="none" />
+      {animate ? (
+        <Animated.View
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[styles.balloon, { top: faceTop - balloonHeight(BALLOON) + 6, left: (width - BALLOON) / 2 }, lift]}>
+          <Bob>
+            <Balloon color={seat.color} size={BALLOON} />
+          </Bob>
+        </Animated.View>
+      ) : null}
+
+      <Animated.View style={[styles.photo, photo]}>
+        <Photo
+          uri={match.other.photo}
+          name={name}
+          tone={seat}
+          hairline={false}
+          accessibilityLabel={t('match.theirPhoto', { name })}
+          style={StyleSheet.absoluteFill}
+        />
+        {/* The plum climbs into the photo's foot. Sized in points: a percent-sized Svg collapses on the phone. */}
+        <Animated.View style={[styles.blend, over]} pointerEvents="none">
+          <Svg width={width} height={BLEND}>
+            <Defs>
+              <LinearGradient id="matchShade" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={theme.brandDeep} stopOpacity={0} />
+                <Stop offset="1" stopColor={theme.brandDeep} stopOpacity={1} />
+              </LinearGradient>
+            </Defs>
+            <Rect width={width} height={BLEND} fill="url(#matchShade)" />
+          </Svg>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Swipe-back is off on the match, so this is the way out besides chat and recap. */}
+      <Animated.View style={[styles.top, { top: insets.top + Space.xs }, over]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('match.backHome')}
+          onPress={goHome}
+          hitSlop={8}
+          style={({ pressed }) => [styles.round, pressed && styles.pressed]}>
+          <PhotoDisc radius={MinTouch / 2} />
+          <Icon name="close" size={16} color={theme.text} />
+        </Pressable>
+        <ThemedText style={styles.kicker}>{t('match.lastBalloon')}</ThemedText>
+        <MoreButton
+          label={t('chat.options')}
+          hint={t('chat.optionsHint', { name })}
+          disabled={actions.busy}
+          onPress={() => void actions.open({ id: match.other.id, name, age, matchId: match.id })}
+          style={styles.round}
+          backdrop={<PhotoDisc radius={MinTouch / 2} />}
+        />
+      </Animated.View>
+      {actions.element}
+
+      <View style={[styles.foot, { paddingBottom: Math.max(insets.bottom, Space.md) + Space.xs }]}>
+        <View accessible accessibilityRole="header" accessibilityLabel={hero} style={styles.words}>
+          {hero.split(' ').map((word, index) => (
+            <Animated.View key={`${word}-${index}`} entering={animate ? wordIn(index) : undefined}>
+              <ThemedText type="hero" maxFontSizeMultiplier={1.3} style={styles.word}>
+                {word}
+              </ThemedText>
+            </Animated.View>
+          ))}
+        </View>
+        <Animated.View entering={animate ? restIn : undefined} style={styles.rest}>
+          <ThemedText type="body" style={styles.sub}>
+            {t('match.outOf', { people, rounds })}
+          </ThemedText>
           <Button
             title={t('match.sayHi')}
+            variant="tinted"
             accessibilityHint={t('match.sayHiHint', { name })}
             onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
           />
-          <Button
-            title={t('match.recap')}
-            variant="plain"
-            onPress={() => router.push(`/recap/${match.roomId}` as Href)}
-          />
-        </>
-      }>
-      {/* Two auras in the match's colors, drifting behind everything. */}
-      <View style={[styles.auras, { left: -Gutter, width: stageWidth }]} pointerEvents="none">
-        <Aura
-          color={left?.seat.color ?? theirSeat.color}
-          size={at(360)}
-          blur={90}
-          opacity={0.32}
-          left={at(-80)}
-          top={at(120) - KICKER_TOP}
-          drift={{ x: 30, y: -20, scale: 1.15 }}
-          duration={9000}
-        />
-        <Aura
-          color={right?.seat.color ?? theirSeat.color}
-          size={at(380)}
-          blur={100}
-          opacity={0.28}
-          left={stageWidth - at(380) + at(100)}
-          top={at(300) - KICKER_TOP}
-          drift={{ x: -40, y: 30, scale: 1.2 }}
-          duration={11000}
-        />
-      </View>
-
-      {/* Swipe-back is off on the match, so this is the way out besides chat and recap. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t('match.backHome')}
-        onPress={goHome}
-        hitSlop={8}
-        style={({ pressed }) => [styles.close, { top: top - 12 }, pressed && styles.pressed]}>
-        <Icon name="close" size={18} color={theme.text} />
-      </Pressable>
-      <MoreButton
-        label={t('chat.options')}
-        hint={t('chat.optionsHint', { name: match.other.name })}
-        disabled={actions.busy}
-        onPress={() =>
-          void actions.open({
-            id: match.other.id,
-            name: match.other.name,
-            age: match.other.age,
-            matchId: match.id,
-          })
-        }
-        style={[styles.more, { top: top - 12 }]}
-      />
-      {actions.element}
-      <ThemedText type="kicker" style={styles.kicker}>
-        {t('match.lastBalloon')}
-      </ThemedText>
-
-      <View
-        style={[
-          styles.stage,
-          { marginLeft: -Gutter, width: stageWidth, height: stageHeight, marginTop: compact ? 0 : roomyGap },
-        ]}>
-        {left ? (
-          <Animated.View
-            entering={animate ? chooserIn : undefined}
-            style={[
-              styles.slot,
-              {
-                left: shift + card(CHOOSER_CARD.left),
-                top: card(CHOOSER_CARD.top),
-                transform: [{ rotate: `${CHOOSER_CARD.tilt}deg` }],
-              },
-            ]}>
-            <PhotoCard
-              uri={left.uri}
-              label={left.label}
-              seat={left.seat}
-              width={card(CHOOSER_CARD.width)}
-              height={card(CHOOSER_CARD.height)}
-              radius={CHOOSER_CARD.radius}
-              accessibilityLabel={left.a11y}
+          <View style={styles.recap}>
+            <TextLink
+              title={t('match.recap')}
+              color={Velvet.cream}
+              onPress={() => router.push(`/recap/${match.roomId}` as Href)}
             />
-          </Animated.View>
-        ) : null}
-        {right ? (
-          <Animated.View
-            entering={animate ? winnerIn : undefined}
-            style={[
-              styles.slot,
-              {
-                left: shift + card(WINNER_CARD.left),
-                top: card(WINNER_CARD.top),
-                transform: [{ rotate: `${WINNER_CARD.tilt}deg` }],
-              },
-            ]}>
-            <PhotoCard
-              uri={right.uri}
-              label={right.label}
-              seat={right.seat}
-              width={card(WINNER_CARD.width)}
-              height={card(WINNER_CARD.height)}
-              radius={WINNER_CARD.radius}
-              accessibilityLabel={right.a11y}
-            />
-          </Animated.View>
-        ) : null}
+          </View>
+        </Animated.View>
       </View>
-
-      <Animated.View entering={animate ? titleIn : undefined} style={styles.title}>
-        <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.4}>
-          {hero}
-        </ThemedText>
-        <ThemedText themeColor="textSecondary" style={styles.sub}>
-          {t('match.outOf', { people, rounds })}
-        </ThemedText>
-      </Animated.View>
-    </Screen>
+    </View>
   );
 }
 
@@ -362,50 +299,77 @@ const styles = StyleSheet.create({
   centeredText: {
     textAlign: 'center',
   },
-  content: {
-    flexGrow: 1,
+  root: {
+    flex: 1,
   },
-  compactContent: {
-    paddingBottom: Space.sm,
-  },
-  auras: {
+  balloon: {
     position: 'absolute',
-    top: 0,
+    zIndex: 1,
+  },
+  photo: {
+    position: 'absolute',
+    overflow: 'hidden',
+  },
+  blend: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
     bottom: 0,
+    height: BLEND,
   },
-  kicker: {
-    textAlign: 'center',
-  },
-  more: {
+  top: {
     position: 'absolute',
-    right: Gutter - 12,
-    zIndex: 2,
+    left: Gutter - 4,
+    right: Gutter - 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  close: {
-    position: 'absolute',
-    left: Gutter - 12,
+  round: {
     width: MinTouch,
     height: MinTouch,
+    borderRadius: MinTouch / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
   },
   pressed: {
     opacity: 0.6,
   },
-  stage: {
-    position: 'relative',
+  kicker: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: 600,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: Velvet.cream,
   },
-  slot: {
+  foot: {
     position: 'absolute',
+    left: Gutter,
+    right: Gutter,
+    bottom: 0,
   },
-  title: {
-    gap: 10,
-    marginTop: Space.xs,
+  // The words wrap like a sentence; each is its own piece so it can land on its own.
+  words: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 11,
   },
-  // Body 16/22 in the handoff.
+  word: {
+    color: Velvet.cream,
+    fontSize: 50,
+    lineHeight: 52,
+    letterSpacing: -1.4,
+  },
+  rest: {
+    marginTop: Space.sm,
+    gap: Space.md,
+  },
   sub: {
-    fontSize: 16,
-    lineHeight: 22,
+    color: Velvet.cream,
+  },
+  recap: {
+    alignItems: 'center',
+    marginTop: -Space.xxs,
   },
 });

@@ -52,7 +52,7 @@ export function ReportSheet({ visible, name, sending, onCancel, onReport }: Repo
   }
 
   return (
-    <Sheet visible={visible} onClose={close}>
+    <Sheet visible={visible} onClose={close} locked={sending}>
       <View style={styles.header}>
         <ThemedText type="questionSmall" accessibilityRole="header" style={styles.title}>
           {t('chat.reportSheetTitle', { name })}

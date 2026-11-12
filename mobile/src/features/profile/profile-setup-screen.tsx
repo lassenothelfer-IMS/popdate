@@ -365,31 +365,6 @@ function ReadyStep({ profile }: { profile: Profile }) {
             ) : null}
           </View>
         </View>
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={[styles.count, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <Text style={[styles.countNumber, { color: theme.text }]} maxFontSizeMultiplier={1.2}>
-            {profile.photos.length}
-          </Text>
-          <ThemedText
-            type="caption"
-            themeColor="textSecondary"
-            maxFontSizeMultiplier={1.2}
-            numberOfLines={2}
-            adjustsFontSizeToFit
-            style={styles.countLabel}>
-            {t('onboarding.photosReady')}
-          </ThemedText>
-        </View>
-      </Rise>
-      <Rise index={3}>
-        <View style={[styles.next, { backgroundColor: theme.field, borderColor: theme.border }]}>
-          <ThemedText type="headline">{t('onboarding.readyRoomTitle')}</ThemedText>
-          <ThemedText type="footnote" themeColor="textSecondary">
-            {t('onboarding.readyRoomBody', { city: profile.city })}
-          </ThemedText>
-        </View>
       </Rise>
     </Screen>
   );

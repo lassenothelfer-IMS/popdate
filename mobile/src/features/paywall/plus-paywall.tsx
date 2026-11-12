@@ -312,7 +312,7 @@ export function PlusPaywall() {
               }
             />
           )}
-          <ThemedText type="caption" themeColor="textTertiary" style={[styles.center, styles.fine]}>
+          <ThemedText type="caption" themeColor="textSecondary" style={[styles.center, styles.fine]}>
             {plan ? `${t(RENEWS[plan.plan], { price: money(plan.price, plan.currency) })} ` : ''}
             <Text
               accessibilityRole="link"

@@ -1,7 +1,4 @@
-/**
- * On phones the tabs layout draws Home inside its pager, next to the other tabs,
- * so the route itself renders nothing. The web renders the screen here (home.web.tsx).
- */
-export default function HomeRoute() {
-  return null;
-}
+import { HomeScreen } from '@/features/home/home-screen';
+
+/** Play. With the system tab bar each tab is its own route, on the phone as on the web. */
+export default HomeScreen;

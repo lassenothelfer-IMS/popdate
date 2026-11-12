@@ -80,7 +80,7 @@ export function SettingsSection({
 }) {
   return (
     <View style={styles.section}>
-      <ThemedText type="kicker" accessibilityRole="header" style={styles.sectionTitle}>
+      <ThemedText type="headline" accessibilityRole="header" style={styles.sectionTitle}>
         {title}
       </ThemedText>
       <View>{children}</View>
@@ -123,13 +123,13 @@ export function NavRow({
         {label}
       </ThemedText>
       {value ? (
-        <ThemedText type="callout" themeColor={valueColor} style={styles.value} numberOfLines={1}>
+        <ThemedText type="body" themeColor={valueColor} style={styles.value} numberOfLines={1}>
           {value}
         </ThemedText>
       ) : null}
       {chevron ? (
         <View style={styles.chevron}>
-          <Icon name="chevronRight" size={14} color={theme.textTertiary} />
+          <Icon name="chevronRight" size={14} color={theme.textSecondary} />
         </View>
       ) : null}
     </PressableHighlight>
@@ -147,7 +147,7 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
       <ThemedText type="body" style={styles.label}>
         {label}
       </ThemedText>
-      <ThemedText type="callout" themeColor="textSecondary" style={styles.value}>
+      <ThemedText type="body" themeColor="textSecondary" style={styles.value}>
         {value}
       </ThemedText>
     </View>
@@ -181,11 +181,11 @@ export function SwitchRow({ label, description, value, onValueChange, disabled }
         style={styles.label}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
-        <ThemedText type="body" themeColor={disabled ? 'textTertiary' : 'text'}>
+        <ThemedText type="body" themeColor={disabled ? 'textSecondary' : 'text'}>
           {label}
         </ThemedText>
         {description ? (
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.description}>
+          <ThemedText type="callout" themeColor="textSecondary" style={styles.description}>
             {description}
           </ThemedText>
         ) : null}
@@ -232,7 +232,7 @@ export function ChoiceRow<T extends string>({ label, options, value, onChange }:
 
 const styles = StyleSheet.create({
   section: {
-    marginTop: 22,
+    marginTop: 30,
   },
   sectionTitle: {
     paddingBottom: Space.xs,

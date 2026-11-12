@@ -33,7 +33,7 @@ export function PopperPresence({ popper }: { popper: RoomPlayer }) {
       {/* "Alina, 32" over "is choosing", like the contestants' "Sam, 28". */}
       <View style={styles.copy}>
         <ThemedText type="task">{t('common.nameAge', { name: popper.name, age: popper.age })}</ThemedText>
-        <ThemedText type="footnote" themeColor="textTertiary">
+        <ThemedText type="footnote" themeColor="textSecondary">
           {t('game.isChoosingLine')}
         </ThemedText>
       </View>

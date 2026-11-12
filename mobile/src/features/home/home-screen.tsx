@@ -1,13 +1,15 @@
 import { Redirect, router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import {
@@ -20,7 +22,7 @@ import {
 } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
-import { Balloon } from '@/components/balloon';
+import { Balloon, balloonHeight } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { Chip } from '@/components/chip';
 import { ErrorLine } from '@/components/error-line';
@@ -31,7 +33,7 @@ import { Screen } from '@/components/screen';
 import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { BrandBalloon, Radius, Space } from '@/constants/theme';
+import { BrandBalloon, Fonts, Space } from '@/constants/theme';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { BalloonLine } from '@/features/balloons/balloon-line';
 import { useJoinQueue } from '@/features/home/use-join-queue';
@@ -55,11 +57,14 @@ const LIVE_REFRESH_MS = 20_000;
 const HOW_TO_PLAY_ROOMS = 5;
 /** One float up and back down of the balloon. */
 const BOB_MS = 2800;
+/** The balloon's flight off the top of the screen, once you are in the line. */
+const FLIGHT_MS = 620;
 
 /**
- * Home is one page that doesn't scroll: the wordmark, the play card filling the
- * screen with the brand balloon floating in it, your balloons, and, when a match
- * has written back, one row that says so.
+ * Play is one page that doesn't scroll, and mostly air: the headline, then the
+ * brand balloon, which is the button. "Get in line" hangs on its string. Press
+ * it and it gives a little; once you are in the line it flies up and out while
+ * the page falls away, and the line opens with the same balloon rising into it.
  */
 export function HomeScreen() {
   const { profile } = useSession();
@@ -79,9 +84,31 @@ export function HomeScreen() {
   // Waits for your rooms, so it doesn't flash and go for someone who has played
   // plenty. If they can't load, it shows.
   const showHowToPlay = stats ? stats.played < HOW_TO_PLAY_ROOMS : historyFailed;
-  // The balloon is as big as the phone's height allows: about 220 pt on a 844 pt phone.
+  // The balloon is as big as the phone's height allows: about 170 pt wide on a 844 pt phone.
   const { height } = useWindowDimensions();
-  const balloonSize = Math.round(Math.min(230, Math.max(120, (height - 480) * 0.6)));
+  const balloonSize = Math.round(Math.min(184, Math.max(110, (height - 500) * 0.5)));
+  const reduced = useReduceMotion();
+  /** 0 at rest, 1 once the balloon has flown off and the page has fallen away. */
+  const flight = useSharedValue(0);
+
+  // Back on Play, everything is where it was.
+  useTabFocus(
+    useCallback(() => {
+      flight.set(0);
+    }, [flight]),
+  );
+
+  /** Played between joining the line and opening it. */
+  function takeOff() {
+    if (reduced) return Promise.resolve();
+    flight.set(withTiming(1, { duration: FLIGHT_MS, easing: Easing.bezier(0.5, 0, 0.8, 0.5) }));
+    // The line opens just before the balloon is gone, so the two overlap.
+    return new Promise<void>((resolve) => setTimeout(resolve, FLIGHT_MS - 140));
+  }
+  const falling = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(1, flight.get() * 2.2),
+    transform: [{ translateY: 26 * flight.get() }],
+  }));
 
   const loadLive = useCallback(
     (isCurrent: () => boolean = () => true) =>
@@ -141,50 +168,46 @@ export function HomeScreen() {
     <TabSwipe tab="home">
       <View style={styles.flex}>
         <Screen contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
-          <Rise index={0} style={styles.top}>
-            <Wordmark />
-            {/* Only for your first few rooms; after that it lives in Settings. */}
-            {showHowToPlay ? (
-              <Button
-                title={t('home.howToPlay')}
-                variant="plain"
-                fullWidth={false}
-                onPress={() => router.push('/how-to-play')}
-              />
-            ) : null}
-          </Rise>
-
-          <Rise index={1} style={styles.flex}>
-            <View style={[styles.card, { backgroundColor: theme.field, borderColor: theme.border }]}>
-              <View style={styles.liveRow}>
-                {/* The green dot means live numbers; the city fallback goes without. */}
-                {live ? <View style={[styles.liveDot, { backgroundColor: theme.success }]} /> : null}
-                <ThemedText type="kicker">
-                  {live
-                    ? t('home.liveQueue', { count: live.waiting, city: profile.city })
-                    : t('home.cardLabel', { city: profile.city })}
-                </ThemedText>
-              </View>
-              <FloatingBalloon size={balloonSize} />
-              <View style={styles.cardFoot}>
-                <ThemedText
-                  type="title"
-                  accessibilityRole="header"
-                  maxFontSizeMultiplier={1.2}
-                  style={styles.cardTitle}>
-                  {t('home.cardTitle')}
-                </ThemedText>
+          <Animated.View style={[styles.flex, falling]}>
+            <Rise index={0} style={styles.top}>
+              <Wordmark />
+              {/* Only for your first few rooms; after that it lives in Settings. */}
+              {showHowToPlay ? (
                 <Button
-                  title={t('home.play')}
-                  loading={joining}
-                  onPress={join}
-                  accessibilityHint={t('home.playHint')}
+                  title={t('home.howToPlay')}
+                  variant="plain"
+                  fullWidth={false}
+                  onPress={() => router.push('/how-to-play')}
                 />
-              </View>
-            </View>
+              ) : null}
+            </Rise>
+
+            <Rise index={1} style={styles.head}>
+              <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.2}>
+                {t('home.cardTitle')}
+              </ThemedText>
+              <ThemedText type="body">
+                {live
+                  ? t('home.liveQueue', { count: live.waiting, city: profile.city })
+                  : t('home.cardLabel', { city: profile.city })}
+              </ThemedText>
+            </Rise>
+          </Animated.View>
+
+          <Rise index={2} style={styles.stage}>
+            <PlayBalloon
+              size={balloonSize}
+              label={t('home.play')}
+              hint={t('home.playHint')}
+              busy={joining}
+              empty={balloons.count === 0}
+              flight={flight}
+              height={height}
+              onPress={() => void join(takeOff)}
+            />
           </Rise>
 
-          <Rise index={2} style={styles.under}>
+          <Animated.View style={[styles.under, falling]}>
             {error ? <ErrorLine message={error} /> : null}
             <BalloonLine balloons={balloons} />
             {reply ? (
@@ -195,8 +218,8 @@ export function HomeScreen() {
                 onPress={() =>
                   router.push({ pathname: '/chat/[id]', params: { id: reply.match.id } })
                 }
-                background={theme.field}
-                style={[styles.reply, { borderColor: theme.border }]}>
+                background={theme.page}
+                style={[styles.reply, { borderTopColor: theme.border }]}>
                 <View>
                   <Avatar
                     name={reply.match.other.name}
@@ -205,18 +228,18 @@ export function HomeScreen() {
                     size={40}
                   />
                   <View
-                    style={[styles.replyDot, { backgroundColor: theme.brand, borderColor: theme.field }]}
+                    style={[styles.replyDot, { backgroundColor: theme.brand, borderColor: theme.page }]}
                   />
                 </View>
                 <View style={styles.replyText}>
                   <ThemedText type="headline" numberOfLines={1}>
                     {t('home.textedBack', { name: reply.match.other.name })}
                   </ThemedText>
-                  <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+                  <ThemedText type="callout" themeColor="textSecondary" numberOfLines={1}>
                     {previewLine(t, filter, reply, myId)}
                   </ThemedText>
                 </View>
-                <Icon name="chevronRight" size={13} color={theme.textTertiary} />
+                <Icon name="chevronRight" size={13} color={theme.textSecondary} />
               </PressableHighlight>
             ) : null}
             {/* Only in development: a store build never shows the bots' test controls. */}
@@ -235,21 +258,38 @@ export function HomeScreen() {
                 ))}
               </View>
             ) : null}
-          </Rise>
+          </Animated.View>
         </Screen>
       </View>
     </TabSwipe>
   );
 }
 
+type PlayBalloonProps = {
+  size: number;
+  label: string;
+  hint: string;
+  /** Joining the line: no second press, and the tag shows it is working. */
+  busy: boolean;
+  /** No balloons left: drawn in dashes. The press then opens the balloon shop. */
+  empty: boolean;
+  flight: SharedValue<number>;
+  /** The window's height: how far up the flight goes. */
+  height: number;
+  onPress: () => void;
+};
+
 /**
- * The brand balloon in the play card, slowly floating up and down. Holds still
- * under Reduce Motion and while Home is off screen.
+ * The brand balloon, and the way into a room: it floats, gives under your
+ * finger, and carries its label as a tag on its string. Holds still under
+ * Reduce Motion and while Play is off screen.
  */
-function FloatingBalloon({ size }: { size: number }) {
+function PlayBalloon({ size, label, hint, busy, empty, flight, height, onPress }: PlayBalloonProps) {
+  const theme = useTheme();
   const reduced = useReduceMotion();
   const showing = useTabActive();
   const bob = useSharedValue(0);
+  const press = useSharedValue(0);
   useEffect(() => {
     if (reduced || !showing) {
       cancelAnimation(bob);
@@ -258,19 +298,40 @@ function FloatingBalloon({ size }: { size: number }) {
     }
     bob.set(withRepeat(withTiming(1, { duration: BOB_MS, easing: Easing.inOut(Easing.sin) }), -1, true));
   }, [reduced, showing, bob]);
-  const style = useAnimatedStyle(() => ({
-    transform: [{ translateY: -10 * bob.get() }, { rotate: `${-2 + 4 * bob.get()}deg` }],
-  }));
+  const style = useAnimatedStyle(() => {
+    const up = flight.get();
+    const squash = press.get();
+    return {
+      transform: [
+        { translateY: -10 * bob.get() * (1 - up) + 8 * squash - (height * 0.9 + size) * up },
+        { rotate: `${(-2 + 4 * bob.get()) * (1 - up) + 4 * up}deg` },
+        { scaleX: 1 + 0.05 * squash - 0.08 * up },
+        { scaleY: 1 - 0.07 * squash + 0.1 * up },
+      ],
+    };
+  });
+  // The tag lets go of the string as the balloon leaves.
+  const tag = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, flight.get() * 4) }));
   return (
-    <View
-      style={styles.cardBalloon}
-      pointerEvents="none"
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants">
-      <Animated.View style={style}>
-        <Balloon color={BrandBalloon.color} size={size} />
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={hint}
+      accessibilityState={{ busy, disabled: busy }}
+      disabled={busy}
+      onPressIn={() => press.set(withTiming(1, { duration: 120 }))}
+      onPressOut={() => press.set(withSequence(withTiming(-0.4, { duration: 140 }), withTiming(0, { duration: 220 })))}
+      onPress={onPress}
+      style={styles.play}>
+      <Animated.View style={[styles.playBalloon, style]}>
+        <Balloon color={BrandBalloon.color} size={size} ghost={empty} ghostInk={theme.brand} />
+        <Animated.View
+          style={[styles.tag, { backgroundColor: theme.inverse, top: balloonHeight(size) - 22 }, tag]}>
+          {busy ? <ActivityIndicator size="small" color={theme.onInverse} /> : null}
+          <Text style={[styles.tagText, { color: theme.onInverse }]}>{label}</Text>
+        </Animated.View>
       </Animated.View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -286,56 +347,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  // The play card fills the page: the live line on top, the balloon floating in
-  // the middle, the title and the button at its foot.
-  card: {
-    flex: 1,
-    marginTop: Space.sm,
-    padding: Space.md,
-    paddingTop: 18,
-    borderRadius: Radius.card,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+  head: {
+    marginTop: Space.lg,
+    gap: Space.sm,
   },
-  liveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.xs,
-    paddingHorizontal: 6,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  cardBalloon: {
+  // The balloon has the rest of the page to itself.
+  stage: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: Space.sm,
   },
-  cardFoot: {
-    gap: Space.md,
+  play: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 30,
   },
-  cardTitle: {
-    paddingHorizontal: 6,
+  playBalloon: {
+    alignItems: 'center',
+  },
+  // "Get in line", tied to the end of the string.
+  tag: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.xs,
+    minHeight: 48,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+    borderCurve: 'continuous',
+    boxShadow: '0 6px 16px rgba(25, 25, 25, 0.18)',
+  },
+  tagText: {
+    fontFamily: Fonts.sans,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: 600,
   },
   under: {
     gap: Space.sm,
-    marginTop: Space.sm,
     alignItems: 'center',
   },
+  // Someone wrote back: one row over a hairline, no box.
   reply: {
     alignSelf: 'stretch',
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.sm,
     paddingVertical: 10,
-    paddingHorizontal: Space.md,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
-    borderWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   replyDot: {
     position: 'absolute',

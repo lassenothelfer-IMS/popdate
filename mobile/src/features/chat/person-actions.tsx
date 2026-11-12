@@ -160,10 +160,12 @@ type MoreButtonProps = {
   disabled?: boolean;
   onPress: () => void;
   style?: StyleProp<ViewStyle>;
+  /** What the ellipsis stands on, when it sits over a photo. */
+  backdrop?: ReactNode;
 };
 
 /** The ellipsis in a header's corner that opens Report, Block and Unmatch. */
-export function MoreButton({ label, hint, disabled = false, onPress, style }: MoreButtonProps) {
+export function MoreButton({ label, hint, disabled = false, onPress, style, backdrop }: MoreButtonProps) {
   const theme = useTheme();
   return (
     <Pressable
@@ -175,6 +177,7 @@ export function MoreButton({ label, hint, disabled = false, onPress, style }: Mo
       onPress={onPress}
       pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
       style={({ pressed }) => [styles.more, (pressed || disabled) && styles.pressed, style]}>
+      {backdrop}
       <SymbolView
         name={{ ios: 'ellipsis', android: 'more_horiz', web: 'more_horiz' }}
         size={20}

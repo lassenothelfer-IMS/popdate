@@ -125,7 +125,7 @@ export function PackCard({
           <ThemedText type="headline" themeColor="textSecondary" style={styles.each}>
             {each}
           </ThemedText>
-          <ThemedText type="footnote" themeColor="textTertiary" style={styles.blurb}>
+          <ThemedText type="footnote" themeColor="textSecondary" style={styles.blurb}>
             {blurb}
           </ThemedText>
         </Pressable>

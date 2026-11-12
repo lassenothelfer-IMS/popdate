@@ -9,7 +9,7 @@ import { ErrorLine } from '@/components/error-line';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Motion, Space } from '@/constants/theme';
-import { BackButton } from '@/features/onboarding/back-button';
+import { PageBack } from '@/features/settings/page-back';
 import { confirmAction, goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
@@ -67,7 +67,7 @@ export function BlockedScreen() {
 
   return (
     <Screen scroll>
-      <BackButton onPress={() => goBackOr(SETTINGS_PAGE)} />
+      <PageBack onPress={() => goBackOr(SETTINGS_PAGE)} />
       <ThemedText type="display" accessibilityRole="header" style={styles.title}>
         {t('settings.blocked')}
       </ThemedText>

@@ -120,6 +120,7 @@ export const game = {
     reportSomeone: 'Report or block someone',
     roomSlowTitle: "Can't reach the room",
     roomSlowBody: 'Check your connection and try again. If the room has ended, you can head home.',
+    holdBalloon: 'Hold a balloon to pop it.',
   },
   de: {
     loadingRoom: 'Raum wird geladen',
@@ -239,6 +240,7 @@ export const game = {
     reportSomeone: 'Jemanden melden oder blockieren',
     roomSlowTitle: 'Raum nicht erreichbar',
     roomSlowBody: 'Prüf deine Verbindung und versuch es nochmals. Ist der Raum vorbei, geht es zurück nach Hause.',
+    holdBalloon: 'Halte einen Ballon, um ihn platzen zu lassen.',
   },
   fr: {
     loadingRoom: 'Chargement de la salle',
@@ -361,6 +363,7 @@ export const game = {
     reportSomeone: 'Signaler ou bloquer quelqu’un',
     roomSlowTitle: 'Salle injoignable',
     roomSlowBody: "Vérifie ta connexion et réessaie. Si la salle est terminée, tu peux revenir à l'accueil.",
+    holdBalloon: 'Maintiens un ballon pour l’éclater.',
   },
   it: {
     loadingRoom: 'Caricamento della stanza',
@@ -483,5 +486,6 @@ export const game = {
     reportSomeone: 'Segnala o blocca qualcuno',
     roomSlowTitle: 'Stanza non raggiungibile',
     roomSlowBody: 'Controlla la connessione e riprova. Se la stanza è finita, puoi tornare alla home.',
+    holdBalloon: 'Tieni premuto un palloncino per scoppiarlo.',
   },
 } satisfies Strings;

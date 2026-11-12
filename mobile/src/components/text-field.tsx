@@ -146,7 +146,7 @@ export function TextField({
         </View>
       ) : null}
       {counter ? (
-        <ThemedText type="footnote" themeColor="textTertiary" style={styles.counter}>
+        <ThemedText type="footnote" themeColor="textSecondary" style={styles.counter}>
           {counter}
         </ThemedText>
       ) : null}

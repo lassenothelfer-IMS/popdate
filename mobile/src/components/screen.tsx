@@ -126,6 +126,12 @@ type ScreenProps = {
    * (welcome, onboarding, the match, the popped screen).
    */
   footerStyle?: 'bar' | 'plain';
+  /**
+   * The height of a system navigation bar over this screen, when it has one. The
+   * bar already keeps the status bar clear, so the screen adds no top inset of its
+   * own, and the keyboard is told how far down the screen starts.
+   */
+  headerHeight?: number;
   /** Keeps the footer mounted but out of sight, so what was typed in it survives. */
   footerHidden?: boolean;
   scroll?: boolean;
@@ -141,6 +147,7 @@ export function Screen({
   footer,
   footerStyle = 'bar',
   footerHidden = false,
+  headerHeight = 0,
   scroll = false,
   contentStyle,
   background,
@@ -163,13 +170,13 @@ export function Screen({
   return (
     <View style={[styles.root, { backgroundColor: theme.page }]}>
       {background}
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={headerHeight > 0 ? ['left', 'right'] : ['top', 'left', 'right']}>
         <KeyboardAvoidingView
           style={styles.fill}
           // Android draws edge to edge, so the window no longer shrinks for the keyboard either.
           behavior={Platform.OS === 'web' ? undefined : 'padding'}
           // The keyboard covers the home-indicator inset, so the footer sits 12 above it, not 34.
-          keyboardVerticalOffset={footer ? -(bottom - Space.sm) : 0}>
+          keyboardVerticalOffset={headerHeight + (footer ? -(bottom - Space.sm) : 0)}>
           {scroll ? (
             <RevealContext value={reveal}>
             <RevealViewContext value={revealView}>

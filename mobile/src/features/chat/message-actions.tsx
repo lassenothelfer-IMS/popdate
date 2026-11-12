@@ -1,7 +1,9 @@
+import { GlassView } from 'expo-glass-effect';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Keyframe } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { photoGlass } from '@/components/photo-disc';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Space } from '@/constants/theme';
 import type { BubbleAnchor } from '@/features/chat/message-list';
@@ -63,7 +65,21 @@ export function MessageActions({ anchor, mine, current, onReact, onReply, onClos
         <Animated.View
           entering={reduced ? undefined : barIn}
           accessibilityViewIsModal
-          style={[styles.bar, { backgroundColor: theme.page, boxShadow: `0 8px 28px -8px ${theme.scrim}, inset 0 0 0 1px ${theme.border}` }]}>
+          style={[
+            styles.bar,
+            photoGlass
+              ? null
+              : { backgroundColor: theme.page, boxShadow: `0 8px 28px -8px ${theme.scrim}, inset 0 0 0 1px ${theme.border}` },
+          ]}>
+          {/* On iOS 26 the bar is Liquid Glass, like the system's own reaction bar. */}
+          {photoGlass ? (
+            <GlassView
+              glassEffectStyle="regular"
+              colorScheme="light"
+              tintColor="rgba(255, 253, 254, 0.6)"
+              style={[StyleSheet.absoluteFill, styles.barShape]}
+            />
+          ) : null}
           {REACTIONS.map((emoji) => {
             const selected = emoji === current;
             return (
@@ -75,7 +91,8 @@ export function MessageActions({ anchor, mine, current, onReact, onReply, onClos
                 onPress={() => onReact(selected ? null : emoji)}
                 style={({ pressed }) => [
                   styles.emojiButton,
-                  selected && { backgroundColor: theme.surface },
+                  // Your reaction sits on the brand's wash, not on a grey disc.
+                  selected && { backgroundColor: theme.brandWash },
                   pressed && styles.pressed,
                 ]}>
                 <Text allowFontScaling={false} style={styles.emoji}>
@@ -122,6 +139,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: BAR_HEIGHT / 2,
     borderCurve: 'continuous',
+  },
+  barShape: {
+    borderRadius: BAR_HEIGHT / 2,
   },
   emojiButton: {
     width: 40,

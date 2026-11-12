@@ -8,7 +8,6 @@ import { Button } from '@/components/button';
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/constants/theme';
 import { AnswerComposer, AnswerSent } from '@/features/game/answer-composer';
-import { HoldToPopButton } from '@/features/game/hold-to-pop';
 import { popButtonFade, popButtonIn } from '@/features/game/room-motion';
 import type { RoomFooterKind } from '@/features/game/room-phase';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
@@ -46,7 +45,7 @@ type RoomFooterProps = {
 export function RoomFooter(props: RoomFooterProps) {
   const t = useT();
   const reduced = useReduceMotion();
-  const { replaying, showHints } = props;
+  const { replaying } = props;
 
   switch (props.kind) {
     // When the chooser left, the room didn't count: you can get back in line right away.
@@ -101,33 +100,21 @@ export function RoomFooter(props: RoomFooterProps) {
           />
         </Animated.View>
       );
-    case 'hold': {
-      const { selected } = props;
-      // The final two pops like every round: the one you don't pop is your match.
-      const hint = props.up.length === 2 ? t('game.finalTwoHint') : showHints ? t('game.holdToPop') : null;
-      // The bar is there from the reveal on, so marking a card never moves the page.
-      // Held on the button itself: the pop only goes out once the fill is full.
-      // Keyed by the balloon, so marking someone else starts a fresh hold.
+    case 'hold':
+      // No button: you pop by holding a balloon at the top. The bar says so, and for
+      // the final two, what it means. The final two pops like every round.
       return (
         <Animated.View entering={reduced ? popButtonFade : popButtonIn} style={styles.popFooter}>
-          {hint ? (
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.centerText}>
-              {hint}
+          <ThemedText type="heading" style={styles.centerText}>
+            {t('game.holdBalloon')}
+          </ThemedText>
+          {props.up.length === 2 ? (
+            <ThemedText type="body" style={styles.centerText}>
+              {t('game.finalTwoHint')}
             </ThemedText>
           ) : null}
-          {selected && props.selectedColor ? (
-            <HoldToPopButton
-              key={selected.id}
-              name={selected.name}
-              balloonColor={props.selectedColor}
-              onPop={() => props.onPop(selected)}
-            />
-          ) : (
-            <Button title={t('game.pickToPop')} disabled />
-          )}
         </Animated.View>
       );
-    }
   }
 }
 

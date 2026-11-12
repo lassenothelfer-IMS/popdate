@@ -7,7 +7,7 @@ import { OptionRow } from '@/components/option-row';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/constants/theme';
-import { BackButton } from '@/features/onboarding/back-button';
+import { PageBack } from '@/features/settings/page-back';
 import { LANGUAGES, OTHER_REGION, REGIONS, regionName } from '@/features/settings/options';
 import { goBackOr, SETTINGS_PAGE } from '@/features/settings/settings-ui';
 import { deviceRegion, useT } from '@/i18n';
@@ -37,7 +37,7 @@ function PickerScreen({ title, options }: { title: string; options: Option[] }) 
 
   return (
     <Screen scroll>
-      <BackButton onPress={() => goBackOr(SETTINGS_PAGE)} />
+      <PageBack onPress={() => goBackOr(SETTINGS_PAGE)} />
       <ThemedText type="display" accessibilityRole="header" style={styles.title}>
         {title}
       </ThemedText>

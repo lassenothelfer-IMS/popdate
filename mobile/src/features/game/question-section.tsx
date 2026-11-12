@@ -9,6 +9,7 @@ import { QuestionBlock } from '@/features/game/room-blocks';
 import { questionIn } from '@/features/game/room-motion';
 import type { RoomPhase } from '@/features/game/room-phase';
 import { RoomStatusLine } from '@/features/game/room-status-line';
+import { ThemedText } from '@/components/themed-text';
 import { useT } from '@/i18n';
 
 type QuestionSectionProps = {
@@ -49,6 +50,16 @@ export function QuestionSection({
         </View>
       ) : null}
 
+      {/* The chooser waits for answers: how many are in, at a size you can read from across the table. */}
+      {isPopper && phase.answering ? (
+        <ThemedText type="display" style={styles.count}>
+          {t('game.answeredCount', {
+            count: phase.up.filter((contestant) => contestant.answered).length,
+            total: phase.up.length,
+          })}
+        </ThemedText>
+      ) : null}
+
       {myAnswer ? (
         <View style={styles.myAnswer}>
           <SentAnswerCard text={myAnswer} />
@@ -80,6 +91,9 @@ const styles = StyleSheet.create({
     marginTop: TIGHT_SPACING.question,
   },
   myAnswer: {
-    marginTop: Space.md,
+    marginTop: Space.lg,
+  },
+  count: {
+    marginTop: Space.lg,
   },
 });

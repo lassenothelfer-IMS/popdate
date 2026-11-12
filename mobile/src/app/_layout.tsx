@@ -11,11 +11,12 @@ import { DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'exp
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 import { ApiProvider } from '@/api/provider';
 import { ErrorScreen } from '@/components/error-screen';
 import { OfflineBanner } from '@/components/offline-banner';
-import { Colors, Fonts } from '@/constants/theme';
+import { Colors, Fonts, Radius } from '@/constants/theme';
 import { SessionProvider } from '@/state/session';
 import { SettingsProvider } from '@/state/settings';
 import { usePushRouting } from '@/utils/push-routing';
@@ -31,6 +32,34 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   }, []);
   return <ErrorScreen error={error} retry={() => void retry()} />;
 }
+
+/** The pushed pages of Settings. Their titles stay in the page, in the brand's serif. */
+const SETTINGS_PAGES = [
+  'settings/index',
+  'settings/language',
+  'settings/region',
+  'settings/blocked',
+  'settings/safety-tips',
+  'settings/terms',
+  'settings/privacy',
+];
+
+/**
+ * On iOS a pushed page gets the system's navigation bar with nothing in it but
+ * Back: clear, over the page, so iOS 26 draws the button in glass. Elsewhere the
+ * page draws its own back button (`PageBack`).
+ */
+const nativeBack =
+  Platform.OS === 'ios'
+    ? ({
+        headerShown: true,
+        title: '',
+        headerTransparent: true,
+        headerShadowVisible: false,
+        headerBackButtonDisplayMode: 'minimal',
+        headerTintColor: Colors.text,
+      } as const)
+    : {};
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts([
@@ -97,15 +126,30 @@ function ThemedStack() {
         {/* The room and the match arrive as moments, not as pages pushed on a stack. */}
         <Stack.Screen name="room/[id]" options={{ gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="match/[id]" options={{ gestureEnabled: false, animation: 'fade' }} />
+        {/* Settings and its pages: the system's navigation bar on iOS, for its back button only. */}
+        {SETTINGS_PAGES.map((name) => (
+          <Stack.Screen key={name} name={name} options={nativeBack} />
+        ))}
         {/* Taking the verification selfie is a task of its own: a sheet you finish or close. */}
         <Stack.Screen name="settings/verify" options={{ presentation: 'modal' }} />
         <Stack.Screen name="how-to-play" options={{ presentation: 'modal' }} />
         {/* Editing your profile is a task you finish or cancel: a sheet that asks before discarding. */}
         <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
-        {/* The balloon packs: a sheet over the screen you were on. It draws its own dim and motion. */}
+        {/* The balloon packs: a sheet over the screen you were on. On iOS the system's form
+            sheet, as tall as the packs; elsewhere it draws its own dim and motion. */}
         <Stack.Screen
           name="balloons"
-          options={{ presentation: 'transparentModal', animation: 'none', gestureEnabled: false }}
+          options={
+            Platform.OS === 'ios'
+              ? {
+                  presentation: 'formSheet',
+                  sheetAllowedDetents: 'fitToContents',
+                  sheetGrabberVisible: true,
+                  sheetCornerRadius: Radius.sheet,
+                  contentStyle: { backgroundColor: Colors.sheet },
+                }
+              : { presentation: 'transparentModal', animation: 'none', gestureEnabled: false }
+          }
         />
         <Stack.Screen name="plus" options={{ presentation: 'fullScreenModal' }} />
       </Stack>

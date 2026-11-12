@@ -3,7 +3,6 @@ import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Space } from '@/constants/theme';
-import { LockLine } from '@/features/game/room-blocks';
 import { questionIn } from '@/features/game/room-motion';
 import type { RoomStatusLine as Kind } from '@/features/game/room-phase';
 import { CANVAS_SPACING, TIGHT_SPACING } from '@/features/game/reveal-layout';
@@ -32,15 +31,8 @@ export function RoomStatusLine(props: RoomStatusLineProps) {
   const t = useT();
   const { kind, showHints } = props;
   if (kind === 'answering') {
-    // "Photos unlock one round at a time" is a first-rooms hint.
-    if (!showHints) return null;
-    return (
-      <Animated.View
-        entering={questionIn}
-        style={props.afterAnswer ? styles.afterAnswer : styles.afterQuestion}>
-        <LockLine />
-      </Animated.View>
-    );
+    // Nothing under the question while answers come in: the ticks on the balloons say it.
+    return null;
   }
   if (kind === 'choose') {
     return (
@@ -52,7 +44,7 @@ export function RoomStatusLine(props: RoomStatusLineProps) {
             {props.popReminder ? t('game.waitingOnYou') : t('game.choosePop')}
           </ThemedText>
           {showHints && !props.popReminder && props.upCount > 2 ? (
-            <ThemedText type="footnote" themeColor="textTertiary">
+            <ThemedText type="footnote" themeColor="textSecondary">
               {t('game.swipeHint', { people: numberWord(t, props.upCount) })}
             </ThemedText>
           ) : null}
