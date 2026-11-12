@@ -1,6 +1,15 @@
 import { useEffect, useEffectEvent, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { FadeIn, Keyframe, ReduceMotion } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  interpolate,
+  Keyframe,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import type { Contestant } from '@/api';
 import { Balloon } from '@/components/balloon';
@@ -26,6 +35,9 @@ const cardFade = FadeIn.duration(REVEAL_CARD_IN_MS).easing(Ease.out).reduceMotio
 /** The photo's largest share of the screen's height. */
 const PHOTO_MAX_HEIGHT = 0.4;
 const photoIn = FadeIn.duration(REVEAL_PHOTO_IN_MS).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+/** The plum cover over a photo not yet shown lifts straight up off it, like a cloth. */
+const LIFT_MS = 700;
+const lift = Easing.bezier(0.7, 0, 0.2, 1);
 
 /** What a reveal turn says: "2 of 5. Mia, 27: …", for VoiceOver and TalkBack. */
 export function revealLine(t: Translate, contestant: Contestant, index: number, total: number) {
@@ -81,6 +93,16 @@ export function RevealSpotlight({
     }, photoAt - Date.now());
     return () => clearTimeout(timer);
   }, [photoAt, photoShown, photo]);
+  // 0 while the cover is on, 1 once it has lifted off. A turn joined late starts uncovered.
+  const uncovered = useSharedValue(photoShown ? 1 : 0);
+  useEffect(() => {
+    if (!photoShown) return;
+    uncovered.set(reduced ? 1 : withTiming(1, { duration: LIFT_MS, easing: lift }));
+  }, [photoShown, reduced, uncovered]);
+  const cover = useAnimatedStyle(() => ({
+    opacity: interpolate(uncovered.get(), [0, 0.7, 1], [1, 1, 0]),
+    transform: [{ translateY: `${-105 * uncovered.get()}%` }],
+  }));
   const shown = useEffectEvent(() => onPhotoShown?.());
   useEffect(() => {
     if (photoShown) shown();
@@ -120,20 +142,28 @@ export function RevealSpotlight({
               boxShadow: `inset 0 0 0 2px ${seat.color}`,
             },
           ]}>
-          {photoShown ? (
-            <Animated.View entering={photoIn}>
-              <Photo
-                uri={photo}
-                name={contestant.name}
-                tone={seat}
-                style={styles.photo}
-                accessibilityLabel={t('game.photoN', { n: position })}
-              />
-              <PhotoBadge label={t('game.photoN', { n: position })} />
+          {/* The photo loads under the cover, so it is there the moment the cover lifts. */}
+          <View style={styles.window}>
+            <Photo
+              uri={photo}
+              name={contestant.name}
+              tone={seat}
+              style={styles.photo}
+              accessibilityLabel={photoShown ? t('game.photoN', { n: position }) : undefined}
+            />
+            {photoShown ? (
+              <Animated.View entering={photoIn} style={StyleSheet.absoluteFill} pointerEvents="none">
+                <PhotoBadge label={t('game.photoN', { n: position })} />
+              </Animated.View>
+            ) : null}
+            <Animated.View
+              style={[styles.cover, { backgroundColor: theme.brand }, cover]}
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants">
+              <Balloon color={seat.color} size={34} string={false} />
             </Animated.View>
-          ) : (
-            <View style={[styles.photo, { backgroundColor: theme.field }]} />
-          )}
+          </View>
         </View>
       ) : null}
     </Animated.View>
@@ -164,9 +194,24 @@ const styles = StyleSheet.create({
     borderRadius: Radius.card,
     borderCurve: 'continuous',
   },
+  // The cover lifts out through the top of this, so it clips to the photo's corners.
+  window: {
+    borderRadius: Radius.card - MY_PHOTO_FRAME,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+  },
   photo: {
     width: '100%',
     aspectRatio: PhotoAspect,
     borderRadius: Radius.card - MY_PHOTO_FRAME,
+  },
+  cover: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

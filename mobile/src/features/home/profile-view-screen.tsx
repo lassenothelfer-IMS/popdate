@@ -28,6 +28,7 @@ import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-b
 import { Button } from '@/components/button';
 import { api, type PinnedAnswer, type VerificationStatus } from '@/api';
 import { Icon, type IconName } from '@/components/icon';
+import { PageDots } from '@/components/page-dots';
 import { Photo } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
@@ -215,11 +216,13 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
           {/* Touches fall through to the photos, so a swipe over the name still pages them. */}
           <View style={styles.heroText} pointerEvents="none">
             <HeroScrim />
-            <View style={styles.dots} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-              {profile.photos.map((uri, index) => (
-                <View key={`${uri}-${index}`} style={[styles.dot, index === photoIndex ? styles.dotActive : styles.dotRest]} />
-              ))}
-            </View>
+            <PageDots
+              count={profile.photos.length}
+              index={photoIndex}
+              color={Velvet.cream}
+              restColor={PhotoGlass.dot}
+              style={styles.dots}
+            />
             <View
               style={styles.nameRow}
               accessible
@@ -638,21 +641,7 @@ const styles = StyleSheet.create({
     color: Velvet.faint,
   },
   dots: {
-    flexDirection: 'row',
-    gap: 5,
     marginBottom: Space.md,
-  },
-  dot: {
-    height: 3,
-    borderRadius: 2,
-  },
-  dotActive: {
-    width: 22,
-    backgroundColor: Velvet.cream,
-  },
-  dotRest: {
-    width: 8,
-    backgroundColor: PhotoGlass.dot,
   },
   heroText: {
     gap: 6,

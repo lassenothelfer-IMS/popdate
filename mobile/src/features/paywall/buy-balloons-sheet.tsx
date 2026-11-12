@@ -24,6 +24,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
+import { PageDots } from '@/components/page-dots';
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Fonts, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
@@ -267,23 +268,13 @@ export function BuyBalloonsSheet() {
               )}
             </View>
 
-            <View
+            <PageDots
+              count={packs.length}
+              index={selected}
+              color={theme.text}
+              restColor={theme.borderStrong}
               style={styles.dots}
-              importantForAccessibility="no-hide-descendants"
-              accessibilityElementsHidden>
-              {packs.map((item, index) => (
-                <View
-                  key={item.id}
-                  style={[
-                    styles.dot,
-                    {
-                      backgroundColor: theme.text,
-                      opacity: index === selected ? 1 : 0.25,
-                    },
-                  ]}
-                />
-              ))}
-            </View>
+            />
 
             <View style={styles.footer}>
               {error ? <ErrorLine message={error} /> : null}
@@ -513,16 +504,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   dots: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
     height: 6,
     marginTop: 18,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
   footer: {
     marginTop: 9,

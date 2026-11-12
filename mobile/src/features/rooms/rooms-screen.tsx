@@ -1,7 +1,8 @@
 import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, LinearTransition, ReduceMotion } from 'react-native-reanimated';
+import Animated, { FadeIn,
+  FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { MAX_PINNED_ANSWERS, type PinnedAnswer, type RoomSummary } from '@/api/types';
 import { Balloon } from '@/components/balloon';
@@ -34,8 +35,9 @@ import { nativeOnly } from '@/utils/web-motion';
  * Reduce Motion, and on web, where it would stretch a card that changes size.
  */
 const cardMove = nativeOnly(LinearTransition.duration(Motion.enter).easing(Ease.inOut));
-/** An opened room's questions and answers fade in. */
+/** An opened room's questions and answers fade in, and fade out again as it folds. */
 const detailsIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+const detailsOut = FadeOut.duration(Motion.exit).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 
 /** How a room ended for you, in a few words. */
 export function outcomeLine(t: Translate, room: RoomSummary) {
@@ -281,7 +283,10 @@ function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCa
       </PressableHighlight>
 
       {open ? (
-        <Animated.View entering={fadeIn ? detailsIn : undefined} style={styles.cardBody}>
+        <Animated.View
+          entering={fadeIn ? detailsIn : undefined}
+          exiting={fadeIn ? detailsOut : undefined}
+          style={styles.cardBody}>
           <ThemedText type="body">
             {room.role === 'popper' ? t('rooms.youChose') : t('rooms.theyChose', { name: room.popperName })}
           </ThemedText>
