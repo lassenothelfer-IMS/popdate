@@ -327,10 +327,6 @@ export function OnboardingScreen() {
                 </ThemedText>
               </View>
             </Rise>
-            <Rise index={2}>
-              {/* The text color, not secondary: it has to read over the video. */}
-              <ThemedText style={styles.welcomeBody}>{t('onboarding.welcomeBody')}</ThemedText>
-            </Rise>
           </View>
         </ScrollView>
       </Screen>
@@ -580,10 +576,6 @@ const styles = StyleSheet.create({
   },
   heroLine: {
     maxWidth: 260,
-  },
-  welcomeBody: {
-    lineHeight: 23,
-    maxWidth: 330,
   },
   welcomeActions: {
     gap: 6,
