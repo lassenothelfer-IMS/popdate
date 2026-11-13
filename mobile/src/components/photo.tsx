@@ -100,6 +100,8 @@ export function Photo({
         source={{ uri }}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
+        // Portraits are cropped from the top, so a face keeps its forehead and hair.
+        contentPosition="top"
         transition={Motion.state}
         onError={() => setFailedUri(uri)}
       />

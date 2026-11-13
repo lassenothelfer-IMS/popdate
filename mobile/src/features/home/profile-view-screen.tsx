@@ -1,43 +1,22 @@
 import { Redirect, router, type Href } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type NativeScrollEvent,
-  type ScrollViewInstance,
-  type NativeSyntheticEvent,
-} from 'react-native';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
+import { useCallback, useState } from 'react';
+import { Platform, RefreshControl, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-bar';
+import { TAB_BAR_CLEARANCE, useTabFocus } from '@/components/tab-bar';
 import { Button } from '@/components/button';
 import { api, type PinnedAnswer, type VerificationStatus } from '@/api';
 import { Icon, type IconName } from '@/components/icon';
-import { PageDots } from '@/components/page-dots';
 import { Photo } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
+import { Prompt } from '@/components/prompt';
 import { Rise } from '@/components/rise';
 import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
 import { VerifiedCheck } from '@/components/verified-check';
-import { Gutter, MinTouch, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
-import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { Gutter, MinTouch, Radius, Space } from '@/constants/theme';
 import { useSeats, useTheme, youSeat } from '@/hooks/use-theme';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { asSexuality, identityLabel, identityOf, sexualityLabel } from '@/features/profile/identity';
@@ -50,24 +29,18 @@ import { ageFromBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
 import { formatHeight } from '@/utils/units';
 
-/** The hero photo's height on a 844 pt phone. It grows when the name and lines under it need more. */
-const HERO = 460;
+/** Every photo is a 4:5 portrait, as wide as the screen. */
+const PHOTO_RATIO = 4 / 5;
 
 /** The narrowest a stat tile gets in the single row; below it the tiles go two by two. */
 const STAT_MIN_WIDTH = 80;
 
-/** The space under the name block, to the photo's foot. */
-const HERO_FOOT = 24;
-
-/** How far above the name the photo scrim fades in. */
-const SCRIM_FADE = 120;
-
 /**
- * Your profile as others meet it: photo 1 big at the top with your name and
- * city over it, your bio, everything else you filled in, the answers you
- * pinned, and your verification. The photo pages sideways through all your photos. Edit opens the editor. As
- * the You tab it also shows your numbers, and a gear for Settings takes the
- * place of Back.
+ * Your profile as others meet it, the way Hinge lays one out: photo 1 as wide
+ * as the screen, your name under it, your bio and what you filled in, then
+ * your other photos down the page with your pinned answers between them, and
+ * your verification. Edit opens the editor. As the You tab it also shows your
+ * numbers, and a gear for Settings takes the place of Back.
  */
 export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const { profile, updateProfile } = useSession();
@@ -86,8 +59,6 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   // text), they go two by two.
   const { width, fontScale } = useWindowDimensions();
   const statGrid = (width - 2 * Gutter - 3 * Space.xs) / 4 / fontScale < STAT_MIN_WIDTH;
-  /** The photo showing in the hero, which the dashes over the name follow. */
-  const [photoIndex, setPhotoIndex] = useState(0);
 
   const loadVerification = useCallback(
     (isCurrent: () => boolean = () => true) =>
@@ -141,6 +112,10 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
   const verified = verification === 'verified';
   const name = t('common.nameAge', { name: profile.name, age: ageFromBirthDate(profile.birthDate) });
   const sexuality = asSexuality(profile.sexuality);
+  const photos = profile.photos.length ? profile.photos : ['mock://'];
+  const pins = profile.pinnedAnswers ?? [];
+  // After the first photo: a photo, then a pinned answer, for as long as either lasts.
+  const turns = Math.max(photos.length - 1, pins.length);
   /** What you filled in about yourself, under the photo: only what's there. Gender is always set. */
   const about = [
     { label: t('profile.jobOrSchool'), value: profile.job.trim() },
@@ -190,17 +165,9 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             />
           ) : undefined
         }>
-        {/* The name and its lines sit in the flow under the buttons, so a long city or
-            a large text size grows the hero instead of climbing over the photo dots. */}
-        <View style={[styles.hero, { paddingTop: insets.top + Space.xs + MinTouch + Space.lg }]}>
-          <HeroPhotos
-            photos={profile.photos.length ? profile.photos : ['mock://']}
-            name={profile.name}
-            width={width}
-            index={photoIndex}
-            onIndex={setPhotoIndex}
-            label={(position) => t('profile.photoMenuTitle', { position })}
-          />
+        {/* Photo 1, as wide as the screen; the buttons float over its top. */}
+        <View>
+          <YouPhoto uri={photos[0]} name={profile.name} width={width} label={t('profile.photoMenuTitle', { position: 1 })} />
           <View style={[styles.heroTop, { top: insets.top + Space.xs }]}>
             {asTab ? (
               <GlassButton
@@ -214,35 +181,24 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             )}
             <GlassButton label={t('home.profileEdit')} onPress={() => router.push('/profile')} />
           </View>
-          {/* Touches fall through to the photos, so a swipe over the name still pages them. */}
-          <View style={styles.heroText} pointerEvents="none">
-            <HeroScrim />
-            <PageDots
-              count={profile.photos.length}
-              index={photoIndex}
-              color={Velvet.cream}
-              restColor={PhotoGlass.dot}
-              style={styles.dots}
-            />
+        </View>
+
+        <View style={styles.body}>
+          {/* Your name under your face, large; no shade over the photo. */}
+          <Rise index={0} style={styles.who}>
             <View
               style={styles.nameRow}
               accessible
               accessibilityRole="header"
               accessibilityLabel={verified ? `${name}, ${t('home.verifiedLabel')}` : name}>
-              <ThemedText type="title" maxFontSizeMultiplier={1.3} style={styles.onPhoto}>
+              <ThemedText type="title" maxFontSizeMultiplier={1.3}>
                 {name}
               </ThemedText>
               {verified ? <VerifiedCheck /> : null}
             </View>
-            {profile.city ? (
-              <ThemedText type="callout" style={styles.onPhotoFaint}>
-                {profile.city}
-              </ThemedText>
-            ) : null}
-          </View>
-        </View>
+            {profile.city ? <ThemedText type="body">{profile.city}</ThemedText> : null}
+          </Rise>
 
-        <View style={styles.body}>
           {/* Setup only asks for a name and photos: here, after you've played, is where the rest is asked for. */}
           {asTab && !profile.bio && !profile.job ? (
             <Rise index={0} style={styles.nudge}>
@@ -262,7 +218,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
           ) : null}
 
           <Rise index={1} style={styles.pins}>
-            <ThemedText type="kicker" accessibilityRole="header">
+            <ThemedText type="headline" accessibilityRole="header">
               {t('profile.aboutYou')}
             </ThemedText>
             <View style={styles.about}>
@@ -294,19 +250,23 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
             </Rise>
           ) : null}
 
-          {profile.pinnedAnswers?.length ? (
-            <Rise index={1} style={styles.pins}>
-              <ThemedText type="kicker" accessibilityRole="header">
-                {t('you.pinnedTitle')}
-              </ThemedText>
-              {profile.pinnedAnswers.map((pin) => (
-                <View
-                  key={`${pin.question}|${pin.answer}`}
-                  style={[styles.pin, { borderTopColor: theme.border }]}>
-                  <View style={styles.pinTop}>
-                    <ThemedText type="headline" style={styles.pinQuestion}>
-                      {pin.question}
-                    </ThemedText>
+          {Array.from({ length: turns }, (_, index) => {
+            const uri = photos[index + 1];
+            const pin = pins[index];
+            return (
+              <View key={`turn-${index}`} style={styles.turn}>
+                {uri ? (
+                  <YouPhoto
+                    uri={uri}
+                    name={profile.name}
+                    width={width}
+                    label={t('profile.photoMenuTitle', { position: index + 2 })}
+                    bleed
+                  />
+                ) : null}
+                {pin ? (
+                  <View style={styles.pin}>
+                    <Prompt question={pin.question} answer={pin.answer} size="large" />
                     {asTab ? (
                       <Button
                         title={t('home.unpin')}
@@ -320,13 +280,14 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
                       />
                     ) : null}
                   </View>
-                  <ThemedText type="questionRow">{pin.answer}</ThemedText>
-                </View>
-              ))}
-            </Rise>
-          ) : asTab ? (
+                ) : null}
+              </View>
+            );
+          })}
+
+          {asTab && pins.length === 0 ? (
             <Rise index={1} style={styles.pins}>
-              <ThemedText type="kicker" accessibilityRole="header">
+              <ThemedText type="headline" accessibilityRole="header">
                 {t('you.pinnedTitle')}
               </ThemedText>
               <ThemedText type="body">{t('you.pinnedEmpty')}</ThemedText>
@@ -349,7 +310,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
                   <ThemedText type="headline">
                     {verified ? t('home.verifiedTitle') : t('home.unverifiedTitle')}
                   </ThemedText>
-                  <ThemedText type="callout" themeColor="textSecondary">
+                  <ThemedText type="body">
                     {verified ? t('home.verifiedNote') : t('home.unverifiedNote')}
                   </ThemedText>
                 </View>
@@ -384,152 +345,39 @@ function Stat({ value, label, half }: { value: number; label: string; half: bool
   );
 }
 
-/** One drift in or out. */
-const DRIFT_MS = 14000;
-
-type HeroPhotosProps = {
-  photos: string[];
+/**
+ * One of your photos: a 4:5 portrait as wide as the screen, cropped from the
+ * top so a face keeps its forehead. `bleed` pulls it out of the page's side
+ * margins, for a photo further down the page.
+ */
+function YouPhoto({
+  uri,
+  name,
+  width,
+  label,
+  bleed = false,
+}: {
+  uri: string;
   name: string;
-  /** The window's width: each photo is one page of it. */
   width: number;
-  index: number;
-  onIndex: (index: number) => void;
-  /** What VoiceOver calls a photo, by its position from 1. */
-  label: (position: number) => string;
-};
-
-/**
- * Your photos behind the name, one page each: swipe sideways, or tap the right
- * or left half, to move through them.
- */
-function HeroPhotos({ photos, name, width, index, onIndex, label }: HeroPhotosProps) {
-  const ref = useRef<ScrollViewInstance>(null);
-  const reduced = useReduceMotion();
-  const [height, setHeight] = useState(0);
-
-  function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const page = Math.round(event.nativeEvent.contentOffset.x / width);
-    const next = Math.min(photos.length - 1, Math.max(0, page));
-    if (next !== index) onIndex(next);
-  }
-  function step(by: number) {
-    const next = index + by;
-    if (next < 0 || next >= photos.length) return;
-    haptics.selection();
-    ref.current?.scrollTo({ x: next * width, animated: !reduced });
-  }
-
-  return (
-    <ScrollView
-      ref={ref}
-      horizontal
-      pagingEnabled
-      bounces={false}
-      overScrollMode="never"
-      showsHorizontalScrollIndicator={false}
-      scrollEventThrottle={16}
-      onScroll={onScroll}
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
-      style={StyleSheet.absoluteFill}>
-      {photos.map((uri, i) => (
-        <Pressable
-          key={`${uri}-${i}`}
-          accessibilityRole="image"
-          accessibilityLabel={label(i + 1)}
-          // pageX, not locationX: the web reports no locationX, and each page spans the window.
-          onPress={(event) => step(event.nativeEvent.pageX > width / 2 ? 1 : -1)}
-          style={[styles.heroPage, { width, height }]}>
-          <HeroPhoto uri={uri} name={name} active={i === index} />
-        </Pressable>
-      ))}
-    </ScrollView>
-  );
-}
-
-/**
- * One photo, slowly drifting in while it is the one showing (Ken Burns, 1 to
- * 1.08 over 14 s). A placeholder is your tint tile with two soft circles of your
- * balloon color. Holds still under Reduce Motion, and while the You page is off screen.
- */
-function HeroPhoto({ uri, name, active }: { uri: string; name: string; active: boolean }) {
+  label: string;
+  bleed?: boolean;
+}) {
   const seats = useSeats();
-  const you = youSeat(seats);
-  const { width } = useWindowDimensions();
-  const reduced = useReduceMotion();
-  const showing = useTabActive() && active;
-  const drift = useSharedValue(0);
-  useEffect(() => {
-    if (reduced) {
-      cancelAnimation(drift);
-      drift.set(0);
-      return;
-    }
-    if (!showing) {
-      cancelAnimation(drift);
-      return;
-    }
-    // Drifts on from wherever it paused, so the photo doesn't jump when you page back.
-    const easing = Easing.inOut(Easing.ease);
-    const from = drift.get();
-    drift.set(
-      withSequence(
-        withTiming(1, { duration: DRIFT_MS * (1 - from), easing }),
-        withRepeat(withTiming(0, { duration: DRIFT_MS, easing }), -1, true),
-      ),
-    );
-  }, [reduced, showing, drift]);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.08 * drift.get() }] }));
-
-  if (!uri.startsWith('mock://')) {
-    return (
-      <Animated.View style={[StyleSheet.absoluteFill, style]}>
-        <Photo uri={uri} name={name} hairline={false} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-    );
-  }
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: you.tint }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, style]}>
-        <Svg width={width} height="100%">
-          <Defs>
-            <RadialGradient id="heroBlobA" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={you.hi} stopOpacity={0.7} />
-              <Stop offset="1" stopColor={you.hi} stopOpacity={0} />
-            </RadialGradient>
-            <RadialGradient id="heroBlobB" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={you.color} stopOpacity={0.6} />
-              <Stop offset="1" stopColor={you.color} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect x={-100} y={0} width={400} height={400} fill="url(#heroBlobA)" />
-          <Rect x={width - 300} y={140} width={440} height={440} fill="url(#heroBlobB)" />
-        </Svg>
-      </Animated.View>
-    </View>
-  );
-}
-
-/**
- * The photo scrim: the deep ink behind the name, the photo dots and the city, at
- * .75 to the photo's foot, fading out over 120 pt above them. It sits behind the
- * text, so it covers it at any text size, and the cream name reads on any
- * photo, light or dark. The photo then ends in a clean edge on the page.
- */
-function HeroScrim() {
-  return (
-    <View style={styles.scrim} pointerEvents="none">
-      <Svg width="100%" height="100%">
-        <Defs>
-          {/* In points from the top: clear at 0, full at SCRIM_FADE, and full on down from there. */}
-          <LinearGradient id="heroScrim" x1="0" y1="0" x2="0" y2={SCRIM_FADE} gradientUnits="userSpaceOnUse">
-            <Stop offset="0" stopColor={Velvet.deep} stopOpacity={0} />
-            <Stop offset="0.3" stopColor={Velvet.deep} stopOpacity={0.12} />
-            <Stop offset="0.65" stopColor={Velvet.deep} stopOpacity={0.5} />
-            <Stop offset="1" stopColor={Velvet.deep} stopOpacity={0.75} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#heroScrim)" />
-      </Svg>
+    <View
+      style={[
+        { width, height: width / PHOTO_RATIO },
+        bleed && styles.bleed,
+      ]}>
+      <Photo
+        uri={uri}
+        name={name}
+        tone={youSeat(seats)}
+        hairline={false}
+        accessibilityLabel={label}
+        style={StyleSheet.absoluteFill}
+      />
     </View>
   );
 }
@@ -621,16 +469,15 @@ const styles = StyleSheet.create({
     marginVertical: -Space.sm,
     marginRight: -Space.xs,
   },
-  hero: {
-    minHeight: HERO,
-    justifyContent: 'flex-end',
-    paddingHorizontal: Gutter,
-    paddingBottom: HERO_FOOT,
-    overflow: 'hidden',
+  // A photo further down the page reaches past the page's side margins to the screen's edges.
+  bleed: {
+    marginHorizontal: -Gutter,
   },
-  // Above the scrim, which can reach up to the buttons at large text sizes.
-  heroPage: {
-    overflow: 'hidden',
+  who: {
+    gap: Space.xxs,
+  },
+  turn: {
+    gap: Space.xl,
   },
   heroTop: {
     position: 'absolute',
@@ -640,26 +487,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     zIndex: 1,
-  },
-  // From SCRIM_FADE above the name block to the photo's foot and edges (the hero's padding).
-  scrim: {
-    position: 'absolute',
-    top: -SCRIM_FADE,
-    bottom: -HERO_FOOT,
-    left: -Gutter,
-    right: -Gutter,
-  },
-  onPhoto: {
-    color: Velvet.cream,
-  },
-  onPhotoFaint: {
-    color: Velvet.faint,
-  },
-  dots: {
-    marginBottom: Space.md,
-  },
-  heroText: {
-    gap: 6,
   },
   nameRow: {
     flexDirection: 'row',
