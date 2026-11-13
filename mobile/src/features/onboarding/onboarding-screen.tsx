@@ -24,6 +24,7 @@ import { ErrorIcon, errorEnter } from '@/components/error-line';
 import { ProgressSegments } from '@/components/progress-segments';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
+import { Sheet } from '@/components/sheet';
 import { VideoBackground } from '@/components/video-background';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
@@ -118,6 +119,8 @@ export function OnboardingScreen() {
   const [from, setFrom] = useState<Step | null>(null);
   const headingRef = useRef<ViewInstance>(null);
   const [firstName, setFirstName] = useState(onboarding?.firstName ?? '');
+  /** The web's "You're 27. Right?", asked in a sheet. Null while nothing is asked. */
+  const [askingAge, setAskingAge] = useState<number | null>(null);
   const [birth, setBirth] = useState<BirthEntry>({ day: '', month: '', year: '' });
   const [identity, setIdentity] = useState<IdentityChoice>({ identity: null, side: null });
   const gender = resolvedSide(identity);
@@ -185,9 +188,9 @@ export function OnboardingScreen() {
   function confirmAge(age: number) {
     const title = t('onboarding.ageConfirmTitle', { age });
     const message = t('onboarding.ageConfirmBody');
-    // Alert does nothing on the web, so the web asks with the browser's own confirm.
+    // Alert does nothing on the web, and browsers can block their own confirm: the web asks in a sheet.
     if (Platform.OS === 'web') {
-      if (window.confirm(`${title}\n\n${message}`)) goTo('gender');
+      setAskingAge(age);
       return;
     }
     Alert.alert(title, message, [
@@ -423,6 +426,24 @@ export function OnboardingScreen() {
       ) : (
         body
       )}
+      <Sheet visible={askingAge !== null} onClose={() => setAskingAge(null)}>
+        <View style={styles.ageAsk}>
+          <ThemedText type="title" accessibilityRole="header">
+            {t('onboarding.ageConfirmTitle', { age: askingAge ?? 0 })}
+          </ThemedText>
+          <ThemedText type="body">{t('onboarding.ageConfirmBody')}</ThemedText>
+        </View>
+        <View style={styles.ageAskActions}>
+          <Button
+            title={t('onboarding.ageConfirmYes')}
+            onPress={() => {
+              setAskingAge(null);
+              goTo('gender');
+            }}
+          />
+          <Button title={t('onboarding.ageConfirmChange')} variant="plain" onPress={() => setAskingAge(null)} />
+        </View>
+      </Sheet>
     </Screen>
   );
 }
@@ -630,6 +651,13 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  ageAsk: {
+    gap: Space.xs,
+    marginTop: Space.xs,
+  },
+  ageAskActions: {
+    gap: 6,
   },
   /** The Screen's own padding moves inside the gender step's scroll view. */
   bare: {
