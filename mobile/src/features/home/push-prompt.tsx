@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 
+import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { Sheet } from '@/components/sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Space } from '@/constants/theme';
+import { Space, Velvet } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { readJson, writeJson } from '@/utils/device-store';
 import { haptics } from '@/utils/haptics';
@@ -80,16 +82,31 @@ export function PushPrimer({ moment, name, active = true, delayMs = 2500 }: Push
     setDue(false);
   }
 
+  const previews =
+    moment === 'queue'
+      ? [
+          { title: t('home.pushPreviewFullTitle'), body: t('home.pushPreviewFullBody') },
+          { title: t('home.pushPreviewMatchTitle'), body: t('home.pushPreviewMatchBody') },
+        ]
+      : [
+          { title: name ?? '', body: t('home.pushPreviewReplyBody', { name: name ?? '' }) },
+          { title: t('home.pushPreviewFullTitle'), body: t('home.pushPreviewFullBody') },
+        ];
+
   return (
     <Sheet visible={due && active} onClose={done} locked={asking}>
       <View style={styles.words}>
         <ThemedText type="title" accessibilityRole="header">
           {moment === 'queue' ? t('home.pushQueueTitle') : t('home.pushMatchTitle', { name: name ?? '' })}
         </ThemedText>
-        <ThemedText type="body">
-          {moment === 'queue' ? t('home.pushQueueBody') : t('home.pushMatchBody', { name: name ?? '' })}
-        </ThemedText>
       </View>
+      {/* What would arrive, drawn like the real thing: the reason to say yes, before iOS asks. */}
+      <View style={styles.previews} accessible accessibilityLabel={previews.map((p) => `${p.title}. ${p.body}`).join(' ')}>
+        {previews.map((preview, index) => (
+          <NotificationPreview key={preview.title} {...preview} when={index === 0 ? t('home.pushNow') : t('home.pushEarlier')} />
+        ))}
+      </View>
+      <ThemedText type="body">{t('home.pushLater')}</ThemedText>
       <View style={styles.actions}>
         <Button title={t('home.pushYes')} loading={asking} onPress={() => void yes()} />
         <Button
@@ -106,7 +123,63 @@ export function PushPrimer({ moment, name, active = true, delayMs = 2500 }: Push
   );
 }
 
+/** One notification as iOS shows it on the lock screen: the app, when, a bold title and a line. */
+function NotificationPreview({ title, body, when }: { title: string; body: string; when: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={[styles.preview, { backgroundColor: theme.page, boxShadow: `0 6px 20px -8px ${theme.scrim}` }]}
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden>
+      <View style={[styles.appIcon, { backgroundColor: theme.brand }]}>
+        <Balloon color={Velvet.cream} size={13} string={false} />
+      </View>
+      <View style={styles.previewText}>
+        <View style={styles.previewTop}>
+          <ThemedText type="headline" numberOfLines={1} style={styles.previewTitle}>
+            {title}
+          </ThemedText>
+          <ThemedText type="callout">{when}</ThemedText>
+        </View>
+        <ThemedText type="callout" numberOfLines={2}>
+          {body}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  previews: {
+    gap: Space.xs,
+  },
+  preview: {
+    flexDirection: 'row',
+    gap: Space.sm,
+    padding: Space.sm,
+    borderRadius: 22,
+    borderCurve: 'continuous',
+  },
+  appIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 9,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewText: {
+    flex: 1,
+    gap: 1,
+  },
+  previewTop: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Space.xs,
+  },
+  previewTitle: {
+    flex: 1,
+  },
   words: {
     gap: Space.xs,
     marginTop: Space.xs,

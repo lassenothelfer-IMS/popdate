@@ -285,6 +285,16 @@ function ReadyStep({ profile }: { profile: Profile }) {
         <ThemedText type="title" accessibilityRole="header">
           {t('onboarding.readyTitle', { name: profile.name })}
         </ThemedText>
+        {/* What setup did with your answers: the rooms you'll be in, and the photo they see first. */}
+        <ThemedText type="body">
+          {t(
+            profile.wantsToMeet === 'man'
+              ? 'onboarding.readyRoomsMen'
+              : profile.wantsToMeet === 'woman'
+                ? 'onboarding.readyRoomsWomen'
+                : 'onboarding.readyRoomsEveryone',
+          )}
+        </ThemedText>
       </Rise>
       <Rise index={2} style={styles.stage}>
         <View
