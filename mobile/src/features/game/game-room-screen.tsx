@@ -157,7 +157,6 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
     if (!spotlightNow && room) photos.keepShown(room);
   }
   /** The round whose reveal was already brought into view. */
-  const spotlightScrolled = useRef<number | null>(null);
   // Who the spotlight is on, and what VoiceOver says for their turn.
   const spotlightOn =
     phase?.spotlight && revealTurn
@@ -511,6 +510,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
                 styles.scroll,
                 // While everyone writes, the question stands in the middle of the page, not at its top.
                 phase.answering && !curtain && styles.centered,
+                // The live reveal fills the page exactly: its photo takes what's left, so nothing scrolls.
+                spotlightOn && revealTurn ? styles.fit : null,
                 {
                   // The chooser's cards are sized to end just above the pop bar: no spare page under them.
                   paddingBottom: revealing ? Space.xs : hasFooter ? Space.xl : insets.bottom + Space.xl,
@@ -595,17 +596,8 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
 
               {spotlightOn && revealTurn ? (
                 // One live region for the whole reveal, so Android reads each new turn.
-                // As the reveal starts it comes up under the room bar, so each photo
-                // lands in view without anyone scrolling.
-                <View
-                  accessibilityLiveRegion="polite"
-                  onLayout={(event) => {
-                    if (spotlightScrolled.current === room.round) return;
-                    spotlightScrolled.current = room.round;
-                    const y = Math.max(0, event.nativeEvent.layout.y - Space.md);
-                    scrollYRef.current = y;
-                    scrollRef.current?.scrollTo({ y, animated: !reduced });
-                  }}>
+                // It takes the rest of the page, and the photo inside it sizes to fit.
+                <View accessibilityLiveRegion="polite" style={styles.flex}>
                   <RevealSpotlight
                     key={`${room.round}:${spotlightOn.id}`}
                     contestant={spotlightOn}
@@ -688,6 +680,9 @@ const styles = StyleSheet.create({
   centered: {
     flexGrow: 1,
     justifyContent: 'center',
+  },
+  fit: {
+    flexGrow: 1,
   },
   result: {
     paddingTop: Space.xl,

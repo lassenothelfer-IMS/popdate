@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -32,8 +32,12 @@ const cardIn = webSafeKeyframe(
   }).duration(REVEAL_CARD_IN_MS),
 );
 const cardFade = FadeIn.duration(REVEAL_CARD_IN_MS).easing(Ease.out).reduceMotion(ReduceMotion.Never);
-/** The photo's largest share of the screen's height. */
-const PHOTO_MAX_HEIGHT = 0.4;
+/** The photo's largest share of the page's width. */
+const PHOTO_WIDTH = 0.78;
+/** Below this the photo is too small to be worth it: the page scrolls instead. */
+const PHOTO_MIN_HEIGHT = 180;
+/** The space above and below the photo inside its area. */
+const AREA_SPACING = Space.xs + Space.sm;
 const photoIn = FadeIn.duration(REVEAL_PHOTO_IN_MS).easing(Ease.out).reduceMotion(ReduceMotion.Never);
 /** The plum cover over a photo not yet shown lifts straight up off it, like a cloth. */
 const LIFT_MS = 700;
@@ -75,9 +79,11 @@ export function RevealSpotlight({
   const theme = useTheme();
   const reduced = useReduceMotion();
   const t = useT();
-  const window = useWindowDimensions();
-  // The photo stays within 40% of the screen's height, so it lands in view with the answer.
-  const photoMaxWidth = window.height * PHOTO_MAX_HEIGHT * PhotoAspect + 2 * MY_PHOTO_FRAME;
+  // The room left under the answer. The photo fills as much of it as its shape allows.
+  const [area, setArea] = useState<{ width: number; height: number } | null>(null);
+  const frameWidth = area
+    ? Math.min(area.width * PHOTO_WIDTH, (area.height - AREA_SPACING - 2 * MY_PHOTO_FRAME) * PhotoAspect + 2 * MY_PHOTO_FRAME)
+    : 0;
   const photo = contestant.photos[contestant.photos.length - 1];
   const position = contestant.photos.length;
 
@@ -134,10 +140,17 @@ export function RevealSpotlight({
 
       {photo ? (
         <View
+          style={styles.area}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            if (area?.width !== width || area.height !== height) setArea({ width, height });
+          }}>
+        {area ? (
+        <View
           style={[
             styles.frame,
             {
-              maxWidth: photoMaxWidth,
+              width: frameWidth,
               backgroundColor: seat.tint,
               boxShadow: `inset 0 0 0 2px ${seat.color}`,
             },
@@ -165,6 +178,8 @@ export function RevealSpotlight({
             </Animated.View>
           </View>
         </View>
+        ) : null}
+        </View>
       ) : null}
     </Animated.View>
   );
@@ -172,8 +187,16 @@ export function RevealSpotlight({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     marginTop: Space.lg,
     gap: Space.sm,
+  },
+  // Whatever height is left under the answer, down to the bottom of the page.
+  area: {
+    flex: 1,
+    minHeight: PHOTO_MIN_HEIGHT,
+    alignItems: 'center',
+    paddingBottom: Space.sm,
   },
   who: {
     flexDirection: 'row',
@@ -188,8 +211,6 @@ const styles = StyleSheet.create({
   },
   frame: {
     marginTop: Space.xs,
-    width: '78%',
-    alignSelf: 'center',
     padding: MY_PHOTO_FRAME,
     borderRadius: Radius.card,
     borderCurve: 'continuous',

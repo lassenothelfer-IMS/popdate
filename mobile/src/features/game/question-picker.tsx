@@ -40,11 +40,6 @@ export function QuestionPicker({
       <ThemedText type="headline" accessibilityRole="header">
         {t('game.askSomething')}
       </ThemedText>
-      <ThemedText type="callout" themeColor="textSecondary" style={styles.hint}>
-        {answering === 2
-          ? t('game.pickHintBoth')
-          : t('game.pickHintAll', { count: answering })}
-      </ThemedText>
 
       <View accessibilityRole="radiogroup" style={styles.list}>
         {options.map((question) => (
@@ -110,18 +105,15 @@ function Option({ question, selected, anySelected, locked, onSelect }: OptionPro
 }
 
 const styles = StyleSheet.create({
-  hint: {
-    marginTop: 2,
-  },
   list: {
     marginTop: Space.sm,
-    gap: Space.xs,
+    gap: 6,
   },
   /** A question card: New York 19/24 on the card surface, black once picked. */
   card: {
-    minHeight: 60,
+    minHeight: 52,
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: Space.md,
     borderRadius: Radius.xl,
     borderCurve: 'continuous',
