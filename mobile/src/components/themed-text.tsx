@@ -82,7 +82,7 @@ const sans = { fontFamily: Fonts.sans } as const;
 const styles = StyleSheet.create({
   count: {
     ...serif,
-    fontWeight: 300,
+    fontWeight: 400,
     fontSize: 112,
     // Room for New York's ascent: at 100 iOS cut off the top of the digits.
     lineHeight: 128,
@@ -91,20 +91,22 @@ const styles = StyleSheet.create({
   },
   countdown: {
     ...serif,
-    fontWeight: 300,
+    fontWeight: 400,
     fontSize: 56,
-    lineHeight: 56,
+    lineHeight: 60,
     fontVariant: ['lining-nums', 'tabular-nums'],
   },
-  hero: { ...serif, fontWeight: 500, fontSize: 44, lineHeight: 46, letterSpacing: -0.88 },
-  title: { ...serif, fontWeight: 500, fontSize: 40, lineHeight: 42, letterSpacing: -0.8 },
-  display: { ...serif, fontWeight: 500, fontSize: 30, lineHeight: 34, letterSpacing: -0.45 },
-  heading: { ...serif, fontWeight: 500, fontSize: 24, lineHeight: 28 },
-  question: { ...serif, fontWeight: 400, fontSize: 32, lineHeight: 38 },
-  questionSmall: { ...serif, fontWeight: 400, fontSize: 26, lineHeight: 32 },
-  questionRow: { ...serif, fontWeight: 400, fontSize: 19, lineHeight: 24 },
-  quote: { ...serif, fontStyle: 'italic', fontWeight: 400, fontSize: 20, lineHeight: 26, fontVariant: ['lining-nums'] },
-  quoteLong: { ...serif, fontStyle: 'italic', fontWeight: 400, fontSize: 18, lineHeight: 24 },
+  // Instrument Serif has one weight and runs narrow, so headings are set large:
+  // three to four times the 17 pt body, the size contrast doing the work weight can't.
+  hero: { ...serif, fontWeight: 400, fontSize: 62, lineHeight: 64, letterSpacing: -0.6 },
+  title: { ...serif, fontWeight: 400, fontSize: 52, lineHeight: 54, letterSpacing: -0.5 },
+  display: { ...serif, fontWeight: 400, fontSize: 40, lineHeight: 44, letterSpacing: -0.3 },
+  heading: { ...serif, fontWeight: 400, fontSize: 30, lineHeight: 34 },
+  question: { ...serif, fontWeight: 400, fontSize: 40, lineHeight: 44 },
+  questionSmall: { ...serif, fontWeight: 400, fontSize: 32, lineHeight: 36 },
+  questionRow: { ...serif, fontWeight: 400, fontSize: 24, lineHeight: 28 },
+  quote: { ...serif, fontStyle: 'italic', fontWeight: 400, fontSize: 24, lineHeight: 30, fontVariant: ['lining-nums'] },
+  quoteLong: { ...serif, fontStyle: 'italic', fontWeight: 400, fontSize: 22, lineHeight: 28 },
   task: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 600 },
   headline: { ...sans, fontSize: 15, lineHeight: 20, fontWeight: 600 },
   body: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 400 },

@@ -13,9 +13,9 @@ type PromptProps = {
 };
 
 const ANSWER = {
-  small: { fontSize: 20, lineHeight: 25 },
-  regular: { fontSize: 26, lineHeight: 31 },
-  large: { fontSize: 32, lineHeight: 37 },
+  small: { fontSize: 24, lineHeight: 29 },
+  regular: { fontSize: 30, lineHeight: 35 },
+  large: { fontSize: 38, lineHeight: 43 },
 } as const;
 
 /**

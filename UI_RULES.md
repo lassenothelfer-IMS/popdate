@@ -12,6 +12,7 @@ Every rule is meant to be testable: look at a screenshot and answer yes or no. W
 3. **Text is never cut off.** No fixed heights on text containers. `lineHeight` is always larger than `fontSize`. Numbers are never truncated. Large Dynamic Type sizes are capped with `maxFontSizeMultiplier`, never clipped. *(11 Nov 2026: the seat count was cut off)*
 4. **Question and answer are the same colour.** They differ only, and strongly, in size and typeface: a small sans question and a large serif answer. Use `src/components/prompt.tsx`, the same style everywhere. *(11 Nov 2026)*
 5. **Strong hierarchy.** One clear focal point per screen. Headings are dramatically larger than body text. *(Nov 2026)*
+   Headings are **Instrument Serif** (one weight plus italic), set large: 62 pt for a hero line, 52 pt for a screen title, 40 pt for a question, against 17 pt body text in the system sans. No other heading font. *(13 Nov 2026)*
 6. **No "tonight" or "evening" copy, no fake urgency, no fake social proof.** *(standing rule)*
 7. **Legal lines say exactly what they mean.** For example "By continuing, you agree to the terms and the privacy policy." Never a sentence that bundles unrelated claims. *(13 Nov 2026)*
 

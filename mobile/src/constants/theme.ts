@@ -171,12 +171,12 @@ export function lacquerFor(color: string): Seat | undefined {
 }
 
 /**
- * Display is New York, the iOS system serif (the mockups' Fraunces is a
- * stand-in). Text is SF Pro, the system font. Gloock is the wordmark only.
- * Android falls back to its system serif and sans; the web to the same stacks.
+ * Display is Instrument Serif (Lasse's pick, 13 Nov 2026): tall, narrow and
+ * elegant, in one weight with an italic, loaded in the root layout. Text is
+ * the system sans. Gloock is the wordmark only.
  */
 export const Fonts = {
-  serif: Platform.select({ ios: 'ui-serif', android: 'serif', default: 'ui-serif, "New York", Georgia, serif' }),
+  serif: 'InstrumentSerif',
   sans: Platform.select({
     ios: 'System',
     android: 'sans-serif',

@@ -1,5 +1,5 @@
 import { Fraunces_400Regular_Italic } from '@expo-google-fonts/fraunces';
-import { Gloock_400Regular } from '@expo-google-fonts/gloock';
+import { InstrumentSerif_400Regular, InstrumentSerif_400Regular_Italic } from '@expo-google-fonts/instrument-serif';
 import {
   HankenGrotesk_400Regular,
   HankenGrotesk_500Medium,
@@ -64,7 +64,13 @@ const nativeBack =
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts([
-    { fontFamily: Fonts.serif, fontDefinitions: [{ path: Gloock_400Regular, weight: 400 }] },
+    {
+      fontFamily: Fonts.serif,
+      fontDefinitions: [
+        { path: InstrumentSerif_400Regular, weight: 400 },
+        { path: InstrumentSerif_400Regular_Italic, weight: 400, style: 'italic' },
+      ],
+    },
     {
       fontFamily: Fonts.sans,
       fontDefinitions: [
