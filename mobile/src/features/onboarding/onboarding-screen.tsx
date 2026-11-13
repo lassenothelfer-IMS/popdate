@@ -47,12 +47,12 @@ import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
 
 /**
- * The welcome, Sign in with Apple, then one question per screen: your first
+ * The welcome with Sign in with Apple on it, then one question per screen: your first
  * name, birthday, gender and who you want to meet. Photos and the house rules
  * follow on the profile setup route. How the game works is taught in the
  * first room, next to each action, not on slides up front.
  */
-const STEPS = ['welcome', 'signin', 'name', 'birthday', 'gender', 'meet'] as const;
+const STEPS = ['welcome', 'name', 'birthday', 'gender', 'meet'] as const;
 type Step = (typeof STEPS)[number];
 type Question = 'name' | 'birthday' | 'gender' | 'meet';
 
@@ -134,9 +134,8 @@ export function OnboardingScreen() {
     setStep(next);
   }
 
-  /** The step Back goes to. Signed in, the name goes back to the welcome, not to Sign in again. */
+  /** The step Back goes to. */
   function previousOf(current: Step): Step {
-    if (current === 'name' && signedIn) return 'welcome';
     return STEPS[Math.max(0, STEPS.indexOf(current) - 1)];
   }
 
@@ -280,8 +279,8 @@ export function OnboardingScreen() {
             <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
               <Defs>
                 <LinearGradient id="welcomeWash" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0.3" stopColor={theme.page} stopOpacity={0} />
-                  <Stop offset="0.5" stopColor={theme.page} stopOpacity={0.6} />
+                  <Stop offset="0.42" stopColor={theme.page} stopOpacity={0} />
+                  <Stop offset="0.68" stopColor={theme.page} stopOpacity={0.35} />
                 </LinearGradient>
               </Defs>
               <Rect width="100%" height="100%" fill="url(#welcomeWash)" />
@@ -290,13 +289,18 @@ export function OnboardingScreen() {
         }
         footer={
           <Rise index={3} style={styles.welcomeActions}>
-            <Button
-              title={t('onboarding.getStarted')}
-              onPress={() => {
-                haptics.light();
-                goTo(signedIn ? 'name' : 'signin');
-              }}
-            />
+            {/* Signing in is the first step, right here. Already signed in (back mid-setup): carry on. */}
+            {signedIn ? (
+              <Button
+                title={t('onboarding.getStarted')}
+                onPress={() => {
+                  haptics.light();
+                  goTo('name');
+                }}
+              />
+            ) : (
+              <AppleSignIn onSignedIn={signedInNow} />
+            )}
             {__DEV__ ? (
               <Button title={t('onboarding.skipTest')} variant="plain" onPress={handleTestProfile} />
             ) : null}
@@ -329,23 +333,6 @@ export function OnboardingScreen() {
             </Rise>
           </View>
         </ScrollView>
-      </Screen>
-    );
-  }
-
-  if (step === 'signin') {
-    return (
-      <Screen key="signin" footerStyle="plain" footer={<AppleSignIn onSignedIn={signedInNow} />}>
-        <Rise index={0}>
-          <View style={styles.progress} />
-          <BackButton onPress={() => goTo('welcome')} />
-        </Rise>
-        <Rise index={1} style={styles.heading}>
-          <View ref={headingRef} accessible accessibilityRole="header">
-            <ThemedText type="display">{t('onboarding.titleSignIn')}</ThemedText>
-          </View>
-          <ThemedText type="body">{t('onboarding.subtitleSignIn')}</ThemedText>
-        </Rise>
       </Screen>
     );
   }
