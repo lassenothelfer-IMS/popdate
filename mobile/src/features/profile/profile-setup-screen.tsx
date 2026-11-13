@@ -7,7 +7,6 @@ import { MIN_PHOTOS } from '@/api/types';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
-import { Icon } from '@/components/icon';
 import { Photo } from '@/components/photo';
 import { ProgressSegments } from '@/components/progress-segments';
 import { Rise } from '@/components/rise';
@@ -144,7 +143,6 @@ function StepHeading({ title, intro }: { title: string; intro: string }) {
 /** S12 and S13: six photos, one per round, the lead two by two. */
 function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }) {
   const t = useT();
-  const theme = useTheme();
   // Four to play; the last two slots are optional.
   const left = Math.max(0, MIN_PHOTOS - form.photos.length);
   const enough = left === 0;
@@ -179,19 +177,6 @@ function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }
       />
       <Rise index={2} style={styles.body}>
         <PhotoSection form={form} bare />
-        {full ? (
-          <View style={styles.done} accessibilityLiveRegion="polite">
-            <Icon name="checkCircle" size={16} color={theme.success} />
-            <ThemedText type="callout" themeColor="success" style={styles.doneText}>
-              {t('profile.photosDone', { count: PHOTO_COUNT })}
-            </ThemedText>
-          </View>
-        ) : (
-          <View style={styles.tips}>
-            <ThemedText type="headline">{t('profile.whatWorks')}</ThemedText>
-            <ThemedText type="body">{t('profile.whatWorksBody')}</ThemedText>
-          </View>
-        )}
       </Rise>
     </Screen>
   );

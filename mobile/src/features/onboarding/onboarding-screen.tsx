@@ -66,11 +66,10 @@ const TITLES: Record<Question, TranslationKey> = {
   gender: 'onboarding.titleGender',
   meet: 'onboarding.titleMeet',
 };
-const SUBTITLES: Record<Question, TranslationKey> = {
+/** Only where the line says something the title can't: the gender and meet steps have none. */
+const SUBTITLES: Partial<Record<Question, TranslationKey>> = {
   name: 'onboarding.subtitleName',
   birthday: 'onboarding.subtitleBirthday',
-  gender: 'onboarding.subtitleGender',
-  meet: 'onboarding.subtitleMeet',
 };
 
 /** Read by VoiceOver on Continue while the step isn't answered yet (translation keys). */
@@ -366,7 +365,7 @@ export function OnboardingScreen() {
         <View ref={headingRef} accessible accessibilityRole="header" accessibilityLabel={`${title}, ${stepLabel}`}>
           <ThemedText type="display">{title}</ThemedText>
         </View>
-        <ThemedText type="body">{t(SUBTITLES[question])}</ThemedText>
+        {SUBTITLES[question] ? <ThemedText type="body">{t(SUBTITLES[question])}</ThemedText> : null}
       </Rise>
 
       <Rise index={2} style={styles.answer}>
