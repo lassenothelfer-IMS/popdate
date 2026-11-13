@@ -34,6 +34,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 /** What onboarding collects before the profile screen. */
 export type OnboardingAnswers = {
+  /** Your first name, asked first. It goes on the profile as its name. */
+  firstName?: string;
   birthDate: string;
   gender: Gender;
   wantsToMeet: Interest;
@@ -50,6 +52,12 @@ type Session = {
   failed: boolean;
   /** Tries signing in again after a failure. */
   retry: () => void;
+  /** Whether this phone is signed in to an account. False until Sign in with Apple. */
+  signedIn: boolean;
+  /** Signs in with the identity token Apple gave the phone. Resolves with whether a profile already exists. */
+  signInWithApple: (identityToken: string) => Promise<boolean>;
+  /** A throwaway test account, for development builds and the web preview. */
+  signInAsGuest: () => Promise<boolean>;
   profile: Profile | null;
   onboarding: OnboardingAnswers | null;
   setOnboarding: (answers: OnboardingAnswers | null) => void;
@@ -70,6 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Bumped by retry, which runs the sign-in again.
   const [attempt, setAttempt] = useState(0);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
   const [onboarding, setOnboardingState] = useState<OnboardingAnswers | null>(null);
 
   function setOnboarding(answers: OnboardingAnswers | null) {
@@ -82,9 +91,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const { existing, saved } = await withTimeout(
+        const { userId, existing, saved } = await withTimeout(
           (async () => {
-            const userId = await api.signIn();
+            // Nobody signed in: the welcome screen, and Sign in with Apple from there.
+            const userId = await api.resume();
+            if (!userId) return { userId, existing: null, saved: null };
             // Events from here on belong to this account. Only its id, nothing personal.
             identify(userId);
             // So does Popdate+: bought on this account, it follows the account.
@@ -92,16 +103,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             const existing = await api.getMyProfile();
             // Still mid-sign-up: pick up where you left off.
             const saved = existing ? null : await readJson<OnboardingAnswers>(ONBOARDING_KEY);
-            return { existing, saved };
+            return { userId, existing, saved };
           })(),
           SIGN_IN_TIMEOUT,
         );
         if (cancelled) return;
+        setSignedIn(userId !== null);
         setProfile(existing);
         if (saved) setOnboardingState(saved);
         setReady(true);
         // Push already allowed: make sure this account gets them.
-        void registerPushIfAllowed();
+        if (userId) void registerPushIfAllowed();
       } catch {
         if (!cancelled) setFailed(true);
       }
@@ -117,10 +129,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setAttempt((count) => count + 1);
   }
 
+  /** After any sign-in: the account's id goes to analytics and purchases, then its profile is read. */
+  async function signedInAs(userId: string) {
+    identify(userId);
+    setPurchasesUser(userId);
+    const existing = await api.getMyProfile();
+    setProfile(existing);
+    setSignedIn(true);
+    void registerPushIfAllowed();
+    return existing !== null;
+  }
+
+  async function signInWithApple(identityToken: string) {
+    return signedInAs(await withTimeout(api.signInWithApple(identityToken), SIGN_IN_TIMEOUT));
+  }
+
+  async function signInAsGuest() {
+    return signedInAs(await withTimeout(api.signIn(), SIGN_IN_TIMEOUT));
+  }
+
   async function saveProfile(details: ProfileDetails, answers = onboarding) {
     if (!answers) throw new Error('Finish onboarding first.');
+    // The first name rides with onboarding's answers but is saved as the profile's name.
+    const { firstName: _firstName, ...rest } = answers;
     // Pinned answers live on the profile, not in the form: keep them through an edit.
-    const saved = await api.saveProfile({ pinnedAnswers: profile?.pinnedAnswers, ...answers, ...details });
+    const saved = await api.saveProfile({ pinnedAnswers: profile?.pinnedAnswers, ...rest, ...details });
     setProfile(saved);
     // Signed up: nothing left to pick up after a relaunch.
     void removeJson(ONBOARDING_KEY);
@@ -146,17 +179,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setOnboarding(null);
     // Hints such as "Swipe through the five" belong to the account, not the phone.
     void resetRoomsPlayed();
-    // Start a fresh session, so the welcome screen works as on a first launch.
-    try {
-      const userId = await withTimeout(api.signIn(), SIGN_IN_TIMEOUT);
-      identify(userId);
-      setPurchasesUser(userId);
-      void registerPushIfAllowed();
-    } catch {
-      // Signed out, but no new session: the app offers to try again.
-      setReady(false);
-      setFailed(true);
-    }
+    // Back to the welcome screen, signed out, as on a first launch.
+    setSignedIn(false);
   }
 
   const signOut = () => endSession(() => api.signOut());
@@ -168,6 +192,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ready,
         failed,
         retry,
+        signedIn,
+        signInWithApple,
+        signInAsGuest,
         profile,
         onboarding,
         setOnboarding,

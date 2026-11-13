@@ -1,4 +1,4 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
 
@@ -16,11 +16,9 @@ import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
 import { BrandBalloon, Fonts, PhotoGlass, Radius, Space, Velvet } from '@/constants/theme';
 import { BackButton } from '@/features/onboarding/back-button';
-import { GenderSection } from '@/features/profile/gender-section';
-import { TagsSection } from '@/features/profile/tags-section';
+import { useJoinQueue } from '@/features/home/use-join-queue';
 import { SETUP_STEPS, setupStepLabel } from '@/features/onboarding/setup-steps';
 import {
-  DetailsSection,
   PHOTO_COUNT,
   PhotoSection,
   saveFailedMessage,
@@ -34,15 +32,21 @@ import { ageFromBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
 
 /**
- * The profile, after onboarding's questions: photos (S12, S13), a few lines
- * about you (S14), then two short pages that are yours to skip: interests and
- * languages, and gender and sexuality. The last one saves, then "You're in"
- * (S18). Small pages, because a long one gets abandoned.
+ * After onboarding's questions: your photos, the house rules, then "You're in"
+ * and straight to a room. Everything else on a profile (city, job, a bio,
+ * interests, languages, sexuality) waits until after the first game, when the
+ * You tab asks for it: before then nobody knows yet why it's worth writing.
  */
-type Phase = 'photos' | 'about' | 'interests' | 'identity' | 'ready';
+type Phase = 'photos' | 'rules' | 'ready';
 
 /** Where each phase sits on the setup's progress bar (onboarding has steps 1 to 4). */
-const STEP: Record<Exclude<Phase, 'ready'>, number> = { photos: 5, about: 6, interests: 7, identity: 8 };
+const STEP: Record<Exclude<Phase, 'ready'>, number> = { photos: 5, rules: 6 };
+
+/** The four house rules: a title and a line each (translation keys). */
+const RULES = ([1, 2, 3, 4] as const).map((n) => ({
+  title: `onboarding.rule${n}Title` as const,
+  body: `onboarding.rule${n}Body` as const,
+}));
 
 export function ProfileSetupScreen() {
   const t = useT();
@@ -56,13 +60,26 @@ export function ProfileSetupScreen() {
   // Saving clears the onboarding answers, so only the steps before it need them.
   if (!onboarding && !saved) return <Redirect href="/onboarding" />;
 
-  async function handleSave() {
-    if (!form.details) return;
+  /** Agreeing to the house rules makes the profile: your name, photos and onboarding's answers. */
+  async function handleAgree() {
+    if (!onboarding?.firstName || form.photos.length < MIN_PHOTOS) return;
     haptics.light();
     setSaving(true);
     setError(null);
     try {
-      const profile = await saveProfile(form.details);
+      const profile = await saveProfile(
+        {
+          name: onboarding.firstName,
+          city: '',
+          heightCm: null,
+          job: '',
+          bio: '',
+          interests: [],
+          languages: [],
+          photos: form.photos,
+        },
+        { ...onboarding, termsAcceptedAt: new Date().toISOString() },
+      );
       setSaved(profile);
       setPhase('ready');
     } catch (failure) {
@@ -75,28 +92,17 @@ export function ProfileSetupScreen() {
     }
   }
 
-  if (phase === 'photos') return <PhotosStep form={form} onContinue={() => setPhase('about')} />;
-  if (phase === 'about') {
+  if (phase === 'photos') return <PhotosStep form={form} onContinue={() => setPhase('rules')} />;
+  if (phase === 'rules') {
     return (
-      <AboutStep form={form} onBack={() => setPhase('photos')} onContinue={() => setPhase('interests')} />
-    );
-  }
-  if (phase === 'interests') {
-    return (
-      <InterestsStep form={form} onBack={() => setPhase('about')} onContinue={() => setPhase('identity')} />
-    );
-  }
-  if (phase === 'identity') {
-    return (
-      <IdentityStep
-        form={form}
+      <RulesStep
         saving={saving}
         error={error}
         // Going back mid-save would leave the save's outcome on a step you can't see.
         onBack={() => {
-          if (!saving) setPhase('interests');
+          if (!saving) setPhase('photos');
         }}
-        onSave={handleSave}
+        onAgree={() => void handleAgree()}
       />
     );
   }
@@ -130,9 +136,7 @@ function StepHeading({ title, intro }: { title: string; intro: string }) {
       <ThemedText type="display" accessibilityRole="header">
         {title}
       </ThemedText>
-      <ThemedText type="callout" themeColor="textSecondary">
-        {intro}
-      </ThemedText>
+      <ThemedText type="body">{intro}</ThemedText>
     </Rise>
   );
 }
@@ -183,13 +187,9 @@ function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }
             </ThemedText>
           </View>
         ) : (
-          <View style={[styles.tips, { backgroundColor: theme.field, borderColor: theme.border }]}>
-            <ThemedText type="headline" style={styles.tipsTitle}>
-              {t('profile.whatWorks')}
-            </ThemedText>
-            <ThemedText type="callout" themeColor="textSecondary" style={styles.tipsBody}>
-              {t('profile.whatWorksBody')}
-            </ThemedText>
+          <View style={styles.tips}>
+            <ThemedText type="headline">{t('profile.whatWorks')}</ThemedText>
+            <ThemedText type="body">{t('profile.whatWorksBody')}</ThemedText>
           </View>
         )}
       </Rise>
@@ -197,101 +197,75 @@ function PhotosStep({ form, onContinue }: { form: Form; onContinue: () => void }
   );
 }
 
-type StepProps = { form: Form; onBack: () => void; onContinue: () => void };
-
-/** S14: a few lines about you. Your name and city are the only things setup insists on here. */
-function AboutStep({ form, onBack, onContinue }: StepProps) {
-  const t = useT();
-  const missing = form.missing('start');
-  return (
-    <Screen
-      scroll
-      footerStyle="plain"
-      footer={
-        <>
-          {missing ? (
-            <ThemedText type="footnote" themeColor="textSecondary" style={styles.footerNote}>
-              {missing}
-            </ThemedText>
-          ) : null}
-          <Button
-            title={t('common.continue')}
-            disabled={!form.complete}
-            onPress={() => {
-              haptics.light();
-              onContinue();
-            }}
-            accessibilityHint={form.complete ? undefined : (missing ?? undefined)}
-          />
-        </>
-      }>
-      <StepTop step={STEP.about} onBack={onBack} />
-      <StepHeading title={t('profile.aboutTitle')} intro={t('profile.aboutIntro')} />
-      <Rise index={2} style={styles.body}>
-        <DetailsSection form={form} bare />
-      </Rise>
-    </Screen>
-  );
-}
-
-/** What you like and the languages you speak. All optional: with nothing picked, the button skips. */
-function InterestsStep({ form, onBack, onContinue }: StepProps) {
-  const t = useT();
-  const picked = form.interests.length + form.languages.length > 0;
-  return (
-    <Screen
-      scroll
-      footerStyle="plain"
-      footer={
-        <Button
-          title={picked ? t('common.continue') : t('profile.skipStep')}
-          variant={picked ? 'prominent' : 'tinted'}
-          onPress={() => {
-            haptics.light();
-            onContinue();
-          }}
-        />
-      }>
-      <StepTop step={STEP.interests} onBack={onBack} />
-      <StepHeading title={t('profile.interestsTitle')} intro={t('profile.interestsIntro')} />
-      <Rise index={2} style={styles.body}>
-        <TagsSection form={form} />
-      </Rise>
-    </Screen>
-  );
-}
-
-type IdentityStepProps = {
-  form: Form;
+type RulesStepProps = {
   saving: boolean;
   error: string | null;
   onBack: () => void;
-  onSave: () => void;
+  onAgree: () => void;
 };
 
-/** Your gender in your own words and your sexuality, both optional. Saving here makes the profile. */
-function IdentityStep({ form, saving, error, onBack, onSave }: IdentityStepProps) {
+/**
+ * The house rules, just before you play: each one lands in turn, large, on the
+ * page. "I'm in" agrees to them and to the terms, which the line above it says
+ * in full, at the size of everything else.
+ */
+function RulesStep({ saving, error, onBack, onAgree }: RulesStepProps) {
   const t = useT();
+  const theme = useTheme();
   return (
     <Screen
       scroll
       footerStyle="plain"
       footer={
-        <>
+        <View style={styles.actions}>
           {error ? <ErrorLine message={error} /> : null}
-          <Button
-            title={t('profile.startPlaying')}
-            disabled={!form.complete}
-            loading={saving}
-            onPress={onSave}
-          />
-        </>
+          <ThemedText type="callout" style={styles.agreeLine}>
+            {t('onboarding.agreeBefore')}
+            <ThemedText
+              type="callout"
+              accessibilityRole="link"
+              style={styles.link}
+              onPress={() => router.push('/settings/terms' as Href)}>
+              {t('onboarding.terms')}
+            </ThemedText>
+            {t('onboarding.termsAnd')}
+            <ThemedText
+              type="callout"
+              accessibilityRole="link"
+              style={styles.link}
+              onPress={() => router.push('/settings/privacy' as Href)}>
+              {t('onboarding.privacy')}
+            </ThemedText>
+            {t('onboarding.termsAfter')}
+          </ThemedText>
+          <Button title={t('onboarding.imIn')} loading={saving} onPress={onAgree} />
+        </View>
       }>
-      <StepTop step={STEP.identity} onBack={onBack} />
-      <StepHeading title={t('profile.genderAndSexuality')} intro={t('profile.identityIntro')} />
-      <Rise index={2} style={styles.body}>
-        <GenderSection form={form} bare />
+      <StepTop step={STEP.rules} onBack={onBack} />
+      <Rise index={1} style={styles.heading}>
+        <ThemedText type="display" accessibilityRole="header">
+          {t('onboarding.titleTerms')}
+        </ThemedText>
       </Rise>
+      <View style={styles.rules}>
+        {RULES.map((rule, i) => (
+          <Rise
+            key={rule.title}
+            index={i + 2}
+            style={[
+              styles.rule,
+              i < RULES.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
+            ]}>
+            <View accessible style={styles.ruleRow}>
+              <Text style={[styles.ruleNumber, { color: theme.brand }]}>{i + 1}</Text>
+              <View style={styles.ruleText}>
+                <ThemedText type="task">{t(rule.title)}</ThemedText>
+                <ThemedText type="body">{t(rule.body)}</ThemedText>
+              </View>
+            </View>
+          </Rise>
+        ))}
+      </View>
     </Screen>
   );
 }
@@ -302,25 +276,27 @@ function ReadyStep({ profile }: { profile: Profile }) {
   const theme = useTheme();
   const seats = useSeats();
   const age = ageFromBirthDate(profile.birthDate);
+  const { join, joining, error } = useJoinQueue();
 
   return (
     <Screen
       scroll
       footerStyle="plain"
       footer={
-        <Button
-          title={t('common.continue')}
-          onPress={() => {
-            haptics.light();
-            router.replace('/home');
-          }}
-        />
+        <View style={styles.actions}>
+          {error ? <ErrorLine message={error} /> : null}
+          {/* Straight into your first room: Home goes under the line, so leaving it lands there. */}
+          <Button
+            title={t('onboarding.findRoom')}
+            loading={joining}
+            onPress={() => void join(() => router.replace('/home'))}
+          />
+        </View>
       }>
       <Rise index={0}>
         <Wordmark />
       </Rise>
       <Rise index={1} style={styles.readyHeading}>
-        <ThemedText type="kicker">{t('onboarding.readyKicker')}</ThemedText>
         <ThemedText type="title" accessibilityRole="header">
           {t('onboarding.readyTitle', { name: profile.name })}
         </ThemedText>
@@ -354,7 +330,7 @@ function ReadyStep({ profile }: { profile: Profile }) {
               {/* The card keeps its size: its text grows a little with Dynamic Type, then stops. */}
               <Text style={styles.cardNameText} maxFontSizeMultiplier={1.3} numberOfLines={2}>
                 {t('common.nameAge', { name: profile.name, age })}
-                <Text style={styles.cardCity}>{`  ${profile.city}`}</Text>
+                {profile.city ? <Text style={styles.cardCity}>{`  ${profile.city}`}</Text> : null}
               </Text>
             </View>
             {/* The bio is optional: without one, the panel is just your name. */}
@@ -406,19 +382,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 500,
   },
+  // What makes a good photo, on the page: no box around it.
   tips: {
-    gap: Space.xs,
-    paddingVertical: 14,
-    paddingHorizontal: Space.md,
-    borderRadius: Radius.md,
-    borderWidth: 1,
+    gap: Space.xxs,
   },
-  tipsTitle: {
-    fontSize: 14,
+  agreeLine: {
+    textAlign: 'center',
+    marginBottom: Space.xs,
   },
-  tipsBody: {
-    fontSize: 14,
-    lineHeight: 19,
+  link: {
+    textDecorationLine: 'underline',
+  },
+  rules: {
+    marginTop: Space.md,
+  },
+  rule: {
+    paddingVertical: Space.md,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    gap: Space.md,
+  },
+  ruleNumber: {
+    width: 28,
+    fontFamily: Fonts.serif,
+    fontSize: 28,
+    lineHeight: 32,
+  },
+  ruleText: {
+    flex: 1,
+    gap: 4,
   },
   preview: {
     flexDirection: 'row',

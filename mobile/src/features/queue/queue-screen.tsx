@@ -8,6 +8,7 @@ import { Button } from '@/components/button';
 import { Screen } from '@/components/screen';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Motion } from '@/constants/theme';
+import { PushPrimer } from '@/features/home/push-prompt';
 import { lineClockStart, secondsSince } from '@/features/queue/line-clock';
 import { QueueStage, RoomReadyStage } from '@/features/queue/queue-stages';
 import { useHardwareBack } from '@/hooks/use-hardware-back';
@@ -356,6 +357,8 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           onLeave={() => void handleCancel()}
         />
       )}
+      {/* While you wait is when a nudge makes sense: "tell me when the room fills". */}
+      <PushPrimer moment="queue" active={!matched} />
     </>
   );
 }

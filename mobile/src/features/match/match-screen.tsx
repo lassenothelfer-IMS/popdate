@@ -25,6 +25,7 @@ import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
 import { Ease, Gutter, MinTouch, Space, Velvet } from '@/constants/theme';
 import { MoreButton, usePersonActions } from '@/features/chat/person-actions';
+import { PushPrimer } from '@/features/home/push-prompt';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatAt, seatFor, useSeats, useTheme } from '@/hooks/use-theme';
@@ -256,6 +257,8 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
         />
       </Animated.View>
       {actions.element}
+      {/* Once the words have landed: worth a nudge when they reply. Asked only if the line's question was declined. */}
+      <PushPrimer moment="match" name={name} delayMs={3200} />
 
       <View style={[styles.foot, { paddingBottom: Math.max(insets.bottom, Space.md) + Space.xs }]}>
         <View accessible accessibilityRole="header" accessibilityLabel={hero} style={styles.words}>

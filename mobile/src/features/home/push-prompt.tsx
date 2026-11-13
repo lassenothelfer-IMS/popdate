@@ -1,113 +1,117 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import {
-  Platform,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
-import Animated, { FadeIn, ReduceMotion } from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { Sheet } from '@/components/sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Motion, Radius, Space } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Space } from '@/constants/theme';
 import { useT } from '@/i18n';
+import { readJson, writeJson } from '@/utils/device-store';
 import { haptics } from '@/utils/haptics';
 import { enablePush, getPushPermission } from '@/utils/push';
 
-/** "Not now" holds until the app restarts, even when Home mounts again after a room. */
-let dismissedThisSession = false;
+/** Where the app asks: while you wait for your first room, then once more at your first match. */
+export type PushMoment = 'queue' | 'match';
 
-const cardIn = FadeIn.duration(Motion.state).easing(Ease.out).reduceMotion(ReduceMotion.Never);
+/** Each moment asks once per phone; after both, only Settings turns pushes on. */
+const ASKED_KEY: Record<PushMoment, string> = {
+  queue: 'popdate.pushAsked.queue',
+  match: 'popdate.pushAsked.match',
+};
 
+type PushPrimerProps = {
+  moment: PushMoment;
+  /** Who you matched with, for the match's version of the question. */
+  name?: string;
+  /** While false (the room just filled, say) it stays closed. */
+  active?: boolean;
+  /** How long to wait before asking, so it never lands on top of what just happened. */
+  delayMs?: number;
+};
 
 /**
- * A calm card under Play, only while push permission hasn't been asked yet:
- * "Turn on" asks (iOS shows its prompt once), "Not now" hides it for this session.
+ * The app's own question before iOS's: a sheet that says what pushes are for
+ * right now ("a nudge when your room fills"), and only "Yes" shows the
+ * system's prompt, which iOS shows once in an app's life. "Not now" leaves it
+ * for the next moment. Never asked at launch, and never when it's been answered.
  */
-export function PushPrompt({ style }: { style?: StyleProp<ViewStyle> }) {
-  const theme = useTheme();
+export function PushPrimer({ moment, name, active = true, delayMs = 2500 }: PushPrimerProps) {
   const t = useT();
-  const [visible, setVisible] = useState(false);
+  const [due, setDue] = useState(false);
   const [asking, setAsking] = useState(false);
 
-  // Checked on every visit, so turning notifications on in Settings hides the card too.
-  useFocusEffect(
-    useCallback(() => {
-      if (Platform.OS === 'web' || dismissedThisSession) return;
-      let active = true;
-      getPushPermission()
-        .then((permission) => {
-          if (active) setVisible(permission === 'undetermined');
-        })
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let live = true;
+    const timer = setTimeout(async () => {
+      try {
+        const [permission, asked] = await Promise.all([
+          getPushPermission(),
+          readJson<boolean>(ASKED_KEY[moment]),
+        ]);
+        if (live && permission === 'undetermined' && !asked) setDue(true);
+      } catch {
         // Can't tell: stay quiet rather than ask at the wrong time.
-        .catch(() => {});
-      return () => {
-        active = false;
-      };
-    }, []),
-  );
+      }
+    }, delayMs);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [moment, delayMs]);
 
-  if (!visible) return null;
+  function done() {
+    void writeJson(ASKED_KEY[moment], true);
+    setDue(false);
+  }
 
-  async function turnOn() {
+  async function yes() {
     haptics.selection();
     setAsking(true);
     try {
       await enablePush();
     } catch {
-      // Whatever the system answered, the question has been asked: the card's job is done.
+      // Whatever iOS answered, the question has been asked.
     }
-    dismissedThisSession = true;
-    setVisible(false);
-  }
-
-  function notNow() {
-    haptics.selection();
-    dismissedThisSession = true;
-    setVisible(false);
+    // Answered for good: neither moment asks again.
+    void writeJson(ASKED_KEY.queue, true);
+    void writeJson(ASKED_KEY.match, true);
+    setAsking(false);
+    setDue(false);
   }
 
   return (
-    <Animated.View
-      entering={cardIn}
-      style={[styles.card, { backgroundColor: theme.field, borderColor: theme.outline }, style]}>
-      <ThemedText type="callout">{t('home.pushPrompt')}</ThemedText>
+    <Sheet visible={due && active} onClose={done} locked={asking}>
+      <View style={styles.words}>
+        <ThemedText type="title" accessibilityRole="header">
+          {moment === 'queue' ? t('home.pushQueueTitle') : t('home.pushMatchTitle', { name: name ?? '' })}
+        </ThemedText>
+        <ThemedText type="body">
+          {moment === 'queue' ? t('home.pushQueueBody') : t('home.pushMatchBody', { name: name ?? '' })}
+        </ThemedText>
+      </View>
       <View style={styles.actions}>
-        <Button
-          title={t('common.turnOn')}
-          size="small"
-          fullWidth={false}
-          loading={asking}
-          accessibilityHint={t('home.pushTurnOnHint')}
-          onPress={() => void turnOn()}
-        />
+        <Button title={t('home.pushYes')} loading={asking} onPress={() => void yes()} />
         <Button
           title={t('common.notNow')}
           variant="plain"
-          fullWidth={false}
           disabled={asking}
-          onPress={notNow}
+          onPress={() => {
+            haptics.selection();
+            done();
+          }}
         />
       </View>
-    </Animated.View>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    gap: Space.sm,
-    padding: Space.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.lg,
-    borderCurve: 'continuous',
+  words: {
+    gap: Space.xs,
+    marginTop: Space.xs,
   },
   actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: Space.xs,
+    gap: 6,
   },
 });

@@ -1,12 +1,11 @@
 import type { Translate } from '@/i18n';
 
 /**
- * The setup before the first game, as the progress bar counts it: birthday,
- * I'm a, I want to meet and the house rules (onboarding), then photos, about
- * you, interests and languages, gender and sexuality (profile setup). The
- * welcome and the three intro cards come before and aren't steps.
+ * The setup before the first game, as the progress bar counts it: first name,
+ * birthday, I'm a and I want to meet (onboarding), then photos and the house
+ * rules (profile setup). The welcome and Sign in come before and aren't steps.
  */
-export const SETUP_STEPS = 8;
+export const SETUP_STEPS = 6;
 
 /**
  * For VoiceOver, with `step` counted from 1. Pass the screen's `t` so it's read

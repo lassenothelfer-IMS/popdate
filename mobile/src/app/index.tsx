@@ -11,7 +11,7 @@ import { useT } from '@/i18n';
 import { useSession } from '@/state/session';
 
 export default function Index() {
-  const { ready, failed, retry, profile, onboarding } = useSession();
+  const { ready, failed, retry, signedIn, profile, onboarding } = useSession();
   // Reopened mid-room: go straight back in. Undefined while still asking.
   const [activeRoom, setActiveRoom] = useState<string | null | undefined>(undefined);
 
@@ -35,7 +35,8 @@ export default function Index() {
     if (activeRoom === undefined) return null;
     return <Redirect href={activeRoom ? (`/room/${activeRoom}` as Href) : '/home'} />;
   }
-  return <Redirect href={onboarding ? '/profile-setup' : '/onboarding'} />;
+  // Signed in with onboarding's answers saved: on to the photos. Anything else starts at the welcome.
+  return <Redirect href={signedIn && onboarding ? '/profile-setup' : '/onboarding'} />;
 }
 
 /** Signing in failed or hung: say so plainly, with a way to try again. */

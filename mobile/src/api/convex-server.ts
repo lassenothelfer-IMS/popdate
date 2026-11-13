@@ -23,7 +23,7 @@ import type {
 
 /** What `ConvexAuthProvider` hands over through `useAuthActions()`. */
 type AuthActions = {
-  signIn: (provider: string) => Promise<unknown>;
+  signIn: (provider: string, params?: Record<string, string>) => Promise<unknown>;
   signOut: () => Promise<void>;
 };
 
@@ -190,6 +190,26 @@ export class ConvexServer implements PopdateApi {
   }
 
   // Account
+
+  async resume() {
+    await this.waitForAuth((auth) => !auth.loading);
+    if (!this.auth.authenticated) return null;
+    const id = await this.query(api.users.me, {});
+    if (id) return id;
+    // The saved session belongs to a deleted account: nobody is signed in.
+    await this.actions!.signOut();
+    await this.waitForAuth((auth) => !auth.loading && !auth.authenticated);
+    return null;
+  }
+
+  async signInWithApple(identityToken: string) {
+    await this.waitForAuth((auth) => !auth.loading);
+    await this.actions!.signIn('apple', { identityToken });
+    await this.waitForAuth((auth) => !auth.loading && auth.authenticated);
+    const id = await this.query(api.users.me, {});
+    if (!id) throw new Error("Couldn't sign in. Try again.");
+    return id;
+  }
 
   async signIn() {
     await this.waitForAuth((auth) => !auth.loading);

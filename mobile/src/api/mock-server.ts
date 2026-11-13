@@ -505,6 +505,16 @@ class MockServer implements PopdateApi {
     this.timers.add(timer);
   }
 
+  async resume() {
+    await this.restore();
+    return this.userId ?? null;
+  }
+
+  async signInWithApple(_identityToken: string) {
+    // The mock trusts the phone: one Apple ID per phone, the same account each time.
+    return this.signIn();
+  }
+
   async signIn() {
     await this.restore();
     this.userId ??= `user-${randomId()}`;
@@ -992,7 +1002,7 @@ class MockServer implements PopdateApi {
   // Account
 
   async signOut() {
-    // A test account is anonymous: signing out ends it. Sign in with Apple will let people come back.
+    // On the mock, signing out ends the account: there is no server to come back to.
     this.reset();
   }
 

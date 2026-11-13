@@ -54,7 +54,8 @@ export function OptionRow({ label, selected, onPress, shape = 'radio' }: OptionR
       // react-native-web reads the aria prop, not accessibilityState.
       aria-checked={selected}
       accessibilityLabel={label}
-      background={theme.field}
+      // An outline on the page, not a grey box: the choice fills in once it's yours.
+      background={theme.page}
       onPress={() => {
         haptics.selection();
         onPress();

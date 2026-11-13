@@ -136,7 +136,8 @@ export const saveProfile = mutation({
         question: optionalText(pin.question, 'question', 200),
         answer: optionalText(pin.answer, 'answer', 300),
       })),
-      city: text(args.city, 'city', 80),
+      // Optional: setup no longer asks for it before the first game.
+      city: optionalText(args.city, 'city', 80),
       heightCm,
       job: optionalText(args.job, 'job or school', 80),
       bio: optionalText(args.bio, 'bio', 500),

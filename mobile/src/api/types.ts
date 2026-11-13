@@ -271,6 +271,14 @@ export type Message = {
 
 /** One method per server function in the root README. */
 export interface PopdateApi {
+  /** The account this phone is still signed in to, or null when nobody is. Never creates one. */
+  resume(): Promise<string | null>;
+  /**
+   * Sign in with Apple: the identity token Apple gave the phone. The same Apple ID
+   * always comes back to the same account, so this both signs up and logs in.
+   */
+  signInWithApple(identityToken: string): Promise<string>;
+  /** A throwaway test account. Development builds and the web preview only. */
   signIn(): Promise<string>;
   getMyProfile(): Promise<Profile | null>;
   saveProfile(draft: ProfileDraft): Promise<Profile>;

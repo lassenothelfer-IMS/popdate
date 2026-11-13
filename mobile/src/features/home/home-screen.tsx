@@ -187,9 +187,14 @@ export function HomeScreen() {
                 {t('home.cardTitle')}
               </ThemedText>
               <ThemedText type="body">
-                {live
-                  ? t('home.liveQueue', { count: live.waiting, city: profile.city })
-                  : t('home.cardLabel', { city: profile.city })}
+                {/* A city is optional now: without one, the line just says how many are waiting. */}
+                {profile.city
+                  ? live
+                    ? t('home.liveQueue', { count: live.waiting, city: profile.city })
+                    : t('home.cardLabel', { city: profile.city })
+                  : live
+                    ? t('home.liveQueueAnywhere', { count: live.waiting })
+                    : t('home.cardLabelAnywhere')}
               </ThemedText>
             </Rise>
           </Animated.View>

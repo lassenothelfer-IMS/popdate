@@ -32,6 +32,7 @@ import { PageDots } from '@/components/page-dots';
 import { Photo } from '@/components/photo';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
+import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
 import { VerifiedCheck } from '@/components/verified-check';
@@ -242,6 +243,16 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
         </View>
 
         <View style={styles.body}>
+          {/* Setup only asks for a name and photos: here, after you've played, is where the rest is asked for. */}
+          {asTab && !profile.bio && !profile.job ? (
+            <Rise index={0} style={styles.nudge}>
+              <ThemedText type="heading" accessibilityRole="header">
+                {t('profile.nudgeTitle')}
+              </ThemedText>
+              <ThemedText type="body">{t('profile.nudgeBody')}</ThemedText>
+              <TextLink title={t('profile.nudgeAction')} onPress={() => router.push('/profile')} />
+            </Rise>
+          ) : null}
           {profile.bio ? (
             <Rise index={0}>
               <ThemedText type="quote" style={styles.bio}>
@@ -584,6 +595,10 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     lineHeight: 18,
+  },
+  nudge: {
+    gap: Space.xs,
+    alignItems: 'flex-start',
   },
   pins: {
     gap: Space.xs,
