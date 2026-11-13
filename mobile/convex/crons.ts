@@ -4,6 +4,9 @@ import { internal } from './_generated/api';
 
 const crons = cronJobs();
 
+// Waitlist signups nobody confirmed go after 30 days, as the waitlist's privacy policy says.
+crons.daily('delete unconfirmed waitlist signups', { hourUTC: 3, minuteUTC: 0 }, internal.waitlist.pruneUnconfirmed);
+
 // Places in line nobody checked in on for 10 minutes leave the queue.
 crons.interval('sweep stale queue rows', { minutes: 1 }, internal.queue.sweepStale, {});
 

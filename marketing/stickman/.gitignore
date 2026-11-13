@@ -1,0 +1,6 @@
+node_modules/
+out/stills/
+out/*.mp4
+out/*.wav
+out/voice-samples*
+voice/*.wav

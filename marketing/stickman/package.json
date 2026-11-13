@@ -1,0 +1,15 @@
+{
+  "name": "popdate-stickman",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sound": "node sound.mjs",
+    "video": "node sound.mjs && node render.mjs quiet-one",
+    "part1": "node voice.mjs && node sound.mjs --part 1 && node render.mjs quiet-one --part 1"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "5.2.0",
+    "kokoro-js": "1.2.1",
+    "playwright-core": "1.64.1"
+  }
+}
