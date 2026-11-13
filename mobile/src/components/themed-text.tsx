@@ -72,6 +72,11 @@ export function ThemedText({ style, type = 'body', themeColor, ...rest }: Themed
   return <Text style={[{ color }, styles[type], style]} {...rest} />;
 }
 
+/** A role's type style on its own, for an input that should read like that role. */
+export function textStyleOf(type: TextType) {
+  return styles[type];
+}
+
 const serif = { fontFamily: Fonts.serif } as const;
 const sans = { fontFamily: Fonts.sans } as const;
 

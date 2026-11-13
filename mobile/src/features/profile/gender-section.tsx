@@ -76,7 +76,7 @@ export function IdentityPicker({ value, onChange, label, onSideShown }: Identity
         ))}
       </View>
       <View style={styles.more}>
-        <ThemedText type="kicker">{t('profile.moreGenders')}</ThemedText>
+        <ThemedText type="headline">{t('profile.moreGenders')}</ThemedText>
         <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={t('profile.moreGenders')}>
           {more.map((identity) => (
             <Chip
@@ -84,6 +84,7 @@ export function IdentityPicker({ value, onChange, label, onSideShown }: Identity
               label={identityLabel(t, identity)}
               selected={value.identity === identity}
               onPress={() => pick(identity)}
+              outlined
             />
           ))}
         </View>

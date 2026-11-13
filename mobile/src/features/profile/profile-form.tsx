@@ -724,7 +724,7 @@ function PhotoSlot({
         accessibilityState={{ busy }}
         onPress={onAdd}
         disabled={busy}
-        background={theme.accentWash}
+        background={theme.page}
         style={[styles.slot, styles.addSlot, size, { boxShadow: `inset 0 0 0 1.5px ${theme.accent}` }]}>
         {busy ? (
           <ActivityIndicator color={theme.accentText} />
@@ -740,9 +740,6 @@ function PhotoSlot({
           style={[styles.addLabel, styles.addTitle]}>
           {t('profile.facePhoto')}
         </ThemedText>
-        <ThemedText type="caption" themeColor="accentText" style={[styles.addLabel, styles.addNote]}>
-          {t('profile.roundSees', { round: 1 })}
-        </ThemedText>
       </PressableHighlight>
     );
   }
@@ -756,8 +753,8 @@ function PhotoSlot({
         accessibilityState={{ busy }}
         onPress={onAdd}
         disabled={busy}
-        background={theme.surface}
-        style={[styles.slot, styles.addSlot, size]}>
+        background={theme.page}
+        style={[styles.slot, styles.addSlot, styles.openSlot, { borderColor: theme.borderStrong }, size]}>
         {busy ? (
           <ActivityIndicator color={theme.textSecondary} />
         ) : (
@@ -771,7 +768,7 @@ function PhotoSlot({
     <View
       accessible
       accessibilityLabel={t('profile.emptySlot', { position })}
-      style={[styles.slot, size, { backgroundColor: theme.surface }]}>
+      style={[styles.slot, styles.openSlot, size, { borderColor: theme.border }]}>
       <Text style={[styles.emptyNumber, { color: theme.textSecondary }]} maxFontSizeMultiplier={1.2}>
         {position}
       </Text>
@@ -970,6 +967,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // A slot still to fill: a dashed outline on the page, not a grey box.
+  openSlot: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
   },
   // The next slot to fill: the place to tap.
   addSlot: {

@@ -28,7 +28,7 @@ import { swiftUI } from '@/components/native-ui';
 import { Screen } from '@/components/screen';
 import { Sheet } from '@/components/sheet';
 import { VideoBackground } from '@/components/video-background';
-import { TextField } from '@/components/text-field';
+import { LineField } from '@/components/line-field';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
 import { Fonts, Gutter, Motion, Space } from '@/constants/theme';
@@ -353,6 +353,8 @@ export function OnboardingScreen() {
 
   // The gender step scrolls in a view of its own, which revealSide can move.
   const ownScroll = question === 'gender';
+  // A typed answer: the question and the field sit centred in the space above the keyboard.
+  const typing = question === 'name' || question === 'birthday';
   const body = (
     <>
       {/* The bar and Back stay put from question to question: they only rise in from the intro. */}
@@ -363,6 +365,7 @@ export function OnboardingScreen() {
         <BackButton onPress={() => goTo(previous)} />
       </Rise>
 
+      <View style={typing ? styles.centred : undefined}>
       <Rise index={1} style={styles.heading}>
         <View ref={headingRef} accessible accessibilityRole="header" accessibilityLabel={`${title}, ${stepLabel}`}>
           <ThemedText type="display">{title}</ThemedText>
@@ -372,7 +375,7 @@ export function OnboardingScreen() {
 
       <Rise index={2} style={styles.answer}>
         {question === 'name' ? (
-          <TextField
+          <LineField
             value={firstName}
             onChangeText={(text) => setFirstName(text.slice(0, NAME_MAX))}
             placeholder={t('onboarding.namePlaceholder')}
@@ -383,7 +386,6 @@ export function OnboardingScreen() {
             textContentType="givenName"
             returnKeyType="next"
             onSubmitEditing={handleContinue}
-            style={styles.nameInput}
           />
         ) : null}
 
@@ -398,13 +400,14 @@ export function OnboardingScreen() {
         {question === 'meet' ? <MeetPicker value={wantsToMeet} onChange={setWantsToMeet} label={title} /> : null}
 
       </Rise>
+      </View>
     </>
   );
 
   return (
     <Screen
       key={question}
-      scroll={!ownScroll}
+      scroll={!ownScroll && !typing}
       contentStyle={ownScroll ? styles.bare : undefined}
       footerStyle="plain"
       footer={
@@ -574,9 +577,9 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
       <View style={styles.birthRow}>
         {parts.map((part, index) => (
           <View key={part.key} style={styles.flex}>
-            <TextField
+            <LineField
               ref={part.ref}
-              label={part.label}
+              accessibilityLabel={part.label}
               value={birth[part.key]}
               onChangeText={(text) => change(index, text)}
               onKeyPress={({ nativeEvent }) => {
@@ -591,6 +594,7 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
               error={error !== null}
               accessibilityHint={error ?? undefined}
               style={styles.birthInput}
+              maxLength={part.max}
             />
           </View>
         ))}
@@ -663,7 +667,6 @@ const styles = StyleSheet.create({
     height: 216,
   },
   birthInput: {
-    fontSize: 20,
     fontVariant: ['tabular-nums'],
   },
   error: {
@@ -681,9 +684,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Space.sm,
   },
-  nameInput: {
-    fontFamily: Fonts.serif,
-    fontSize: 24,
+  // The question and its field, in the middle of the room the keyboard leaves.
+  centred: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingBottom: Space.xl,
   },
   age: {
     fontFamily: Fonts.serif,
