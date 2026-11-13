@@ -63,7 +63,6 @@ export type ThemedTextProps = TextProps & {
 
 /** Roles that come with their own color unless told otherwise. */
 const DEFAULT_COLOR: Partial<Record<TextType, ThemeColor>> = {
-  kicker: 'textSecondary',
 };
 
 export function ThemedText({ style, type = 'body', themeColor, ...rest }: ThemedTextProps) {
@@ -114,7 +113,8 @@ const styles = StyleSheet.create({
   row: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 500 },
   timer: { ...sans, fontSize: 13, lineHeight: 18, fontWeight: 500, fontVariant: ['tabular-nums'] },
   footnote: { ...sans, fontSize: 13, lineHeight: 18, fontWeight: 400 },
-  kicker: { ...sans, fontSize: 13, lineHeight: 18, fontWeight: 600 },
+  // A section's label, like "Your turn": as large as body text, in the text color, set apart by weight.
+  kicker: { ...sans, fontSize: 17, lineHeight: 22, fontWeight: 600 },
   railName: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 500 },
   caption: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 400 },
   captionStrong: { ...sans, fontSize: 12, lineHeight: 16, fontWeight: 600 },

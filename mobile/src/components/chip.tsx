@@ -44,8 +44,9 @@ export function Chip({ label, selected, onPress, role = 'radio', disabled = fals
       }}
       style={[
         styles.chip,
-        { backgroundColor: selected ? theme.inverse : outlined ? theme.page : theme.surface },
-        outlined && { boxShadow: `inset 0 0 0 1px ${theme.borderStrong}` },
+        // Unpicked: an outline on the page, never a grey pill. (`outlined` is now how every chip looks.)
+        { backgroundColor: selected ? theme.inverse : theme.page },
+        !selected && { boxShadow: `inset 0 0 0 1px ${theme.borderStrong}` },
         disabled && styles.disabled,
       ]}>
       <Text style={[styles.label, { color: selected ? theme.onInverse : theme.text }]}>

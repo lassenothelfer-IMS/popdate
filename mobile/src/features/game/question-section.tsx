@@ -42,7 +42,7 @@ export function QuestionSection({
         <View style={tight ? styles.questionTight : styles.question} onLayout={onQuestionLayout}>
           <Animated.View entering={questionIn}>
             <QuestionBlock
-              kicker={isPopper ? t('game.youAsked') : t('game.asks', { name: room.popper.name })}
+              kicker={isPopper ? undefined : t('game.asks', { name: room.popper.name })}
               text={room.question.text}
               size={phase.finalTwo ? 'final' : phase.answering ? 'round' : 'waiting'}
             />

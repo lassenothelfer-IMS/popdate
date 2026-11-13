@@ -20,9 +20,6 @@ export function SafetyTipsScreen() {
       <ThemedText type="display" accessibilityRole="header" style={styles.title}>
         {t('settings.safetyTips')}
       </ThemedText>
-      <ThemedText type="callout" themeColor="textSecondary" style={styles.intro}>
-        {t('settings.tipsIntro')}
-      </ThemedText>
 
       <View style={styles.list}>
         {TIPS.map((n, index) => (

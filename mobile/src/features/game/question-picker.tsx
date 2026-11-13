@@ -84,8 +84,10 @@ function Option({ question, selected, anySelected, locked, onSelect }: OptionPro
             style={[
               styles.card,
               {
-                backgroundColor: selected ? theme.inverse : down ? theme.surfacePressed : theme.field,
-                opacity: rest,
+                // An outline on the page, black once picked; a press dims it, no grey fill.
+                backgroundColor: selected ? theme.inverse : theme.page,
+                boxShadow: selected ? undefined : `inset 0 0 0 1px ${theme.borderStrong}`,
+                opacity: down ? 0.6 : rest,
                 transform: [{ scale: reduced ? 1 : down ? 0.97 : selected || !anySelected ? 1 : 0.985 }],
                 transitionProperty: ['backgroundColor', 'opacity', 'transform'],
                 transitionDuration: down ? Motion.press : Motion.state,

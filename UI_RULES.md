@@ -8,6 +8,7 @@ Every rule is meant to be testable: look at a screenshot and answer yes or no. W
 
 1. **No grey filler text.** Every line must say something new and useful. A line that repeats a heading, a button label or something obvious is deleted. *(Nov 2026)*
 2. **No small grey text.** Helper captions are removed. Any text that stays is at least body size (15 pt and up) and readable. *(11 Nov 2026, repeated several times)*
+   The only things that may stay smaller: message times and send status in chat, names under the balloons in a room, tags on photos (like "Round 1"), tab bar labels, and the legal small print under a price. *(13 Nov 2026)*
 3. **Text is never cut off.** No fixed heights on text containers. `lineHeight` is always larger than `fontSize`. Numbers are never truncated. Large Dynamic Type sizes are capped with `maxFontSizeMultiplier`, never clipped. *(11 Nov 2026: the seat count was cut off)*
 4. **Question and answer are the same colour.** They differ only, and strongly, in size and typeface: a small sans question and a large serif answer. Use `src/components/prompt.tsx`, the same style everywhere. *(11 Nov 2026)*
 5. **Strong hierarchy.** One clear focal point per screen. Headings are dramatically larger than body text. *(Nov 2026)*

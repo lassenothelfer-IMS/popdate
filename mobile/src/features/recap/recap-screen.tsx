@@ -193,12 +193,12 @@ function Recap({ room }: { room: Room }) {
           <Text style={[styles.meta, { color: paper.textSecondary }]}>{dateLine}</Text>
 
           <View style={styles.headline}>
-            <Text style={[styles.label, { color: paper.textSecondary }]}>{t('match.recapKicker')}</Text>
+            <Text style={[styles.label, { color: paper.text }]}>{t('match.recapKicker')}</Text>
             <Text style={[styles.hero, { color: paper.text }]}>{headline}</Text>
           </View>
 
           <Animated.View entering={reduced ? undefined : statIn(section++)} style={styles.section}>
-            <Text style={[styles.label, { color: paper.textSecondary }]}>{t('match.recapRoom')}</Text>
+            <Text style={[styles.label, { color: paper.text }]}>{t('match.recapRoom')}</Text>
             <View
               style={styles.seats}
               accessible
@@ -245,7 +245,7 @@ function Recap({ room }: { room: Room }) {
 
           {rounds.length > 0 ? (
             <Animated.View entering={reduced ? undefined : statIn(section++)} style={styles.section}>
-              <Text style={[styles.label, { color: paper.textSecondary }]}>{t('match.recapHowItWent')}</Text>
+              <Text style={[styles.label, { color: paper.text }]}>{t('match.recapHowItWent')}</Text>
               {rounds.map((round, i) => (
                 <View
                   key={round.number}
@@ -381,11 +381,9 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: Fonts.sans,
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: 600,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
   },
   hero: {
     fontFamily: Fonts.serif,

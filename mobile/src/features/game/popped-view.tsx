@@ -163,11 +163,11 @@ export function PoppedView({
           onPress={onWatch}
           style={({ pressed }) => [
             styles.card,
-            { backgroundColor: theme.field, boxShadow: `inset 0 0 0 1px ${theme.border}` },
+            { backgroundColor: theme.page, boxShadow: `inset 0 0 0 1px ${theme.borderStrong}` },
             pressed && styles.pressed,
           ]}>
           <View style={styles.cardHead}>
-            <Text {...stageText} style={[stageType.sans, styles.cardLabel, { color: theme.textSecondary }]}>
+            <Text {...stageText} style={[stageType.sans, styles.cardLabel, { color: theme.text }]}>
               {t('game.stillFloating')}
             </Text>
             <View style={styles.cardCount}>
@@ -312,11 +312,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardLabel: {
-    fontSize: 12,
-    lineHeight: 15,
-    fontWeight: 700,
-    letterSpacing: 0.72,
-    textTransform: 'uppercase',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: 600,
   },
   cardCount: {
     flexDirection: 'row',

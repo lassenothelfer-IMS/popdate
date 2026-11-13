@@ -397,13 +397,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
-  // The one label style: small capitals in the text color.
+  // The day a room was played, at reading size.
   day: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: 600,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   cardBody: {
     paddingLeft: 26 + Space.sm,

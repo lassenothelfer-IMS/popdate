@@ -83,7 +83,8 @@ export function TextField({
         style={[
           styles.box,
           multiline && styles.multiline,
-          { backgroundColor: theme.field, borderColor: edge },
+          // An outline on the page, not a grey box.
+          { backgroundColor: theme.page, borderColor: edge },
           ring,
         ]}>
         <TextInput
@@ -140,13 +141,13 @@ export function TextField({
         </Animated.View>
       ) : hint ? (
         <View key="hint" style={styles.hint}>
-          <ThemedText type="footnote" themeColor="textSecondary" style={styles.hintText}>
+          <ThemedText type="callout" themeColor="textSecondary" style={styles.hintText}>
             {hint}
           </ThemedText>
         </View>
       ) : null}
       {counter ? (
-        <ThemedText type="footnote" themeColor="textSecondary" style={styles.counter}>
+        <ThemedText type="callout" themeColor="textSecondary" style={styles.counter}>
           {counter}
         </ThemedText>
       ) : null}

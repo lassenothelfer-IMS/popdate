@@ -26,7 +26,7 @@ export function Quote({ text }: { text: string }) {
 }
 
 type QuestionBlockProps = {
-  kicker: string;
+  kicker?: string;
   text: string;
   /** 32/38 while it is being answered, 26/32 while waiting, 24/30 in the final. */
   size?: 'round' | 'waiting' | 'final';
@@ -36,7 +36,8 @@ type QuestionBlockProps = {
 export function QuestionBlock({ kicker, text, size = 'round' }: QuestionBlockProps) {
   return (
     <View>
-      <ThemedText type="kicker">{kicker}</ThemedText>
+      {/* Your own question needs no "You asked" over it. */}
+      {kicker ? <ThemedText type="kicker">{kicker}</ThemedText> : null}
       <ThemedText
         type={size === 'round' ? 'question' : 'questionSmall'}
         style={[styles.question, size === 'final' && styles.finalQuestion]}>

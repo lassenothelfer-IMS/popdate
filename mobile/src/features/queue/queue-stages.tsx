@@ -253,10 +253,10 @@ export function RoomReadyStage({ room, holdMs }: RoomReadyStageProps) {
   return (
     <Stage>
       <StageBlock index={0} style={styles.readyHeader}>
-        <Text {...stageText} style={[stageType.sans, styles.readyTitle, { color: theme.textSecondary }]}>
+        <Text {...stageText} style={[stageType.sans, styles.readyTitle, { color: theme.text }]}>
           {t('queue.roomReady')}
         </Text>
-        <View style={[styles.full, { backgroundColor: theme.field }]}>
+        <View style={[styles.full, { boxShadow: `inset 0 0 0 1px ${theme.borderStrong}` }]}>
           <View style={[styles.liveDot, { backgroundColor: theme.success }]} />
           <Text {...stageText} style={[stageType.sans, styles.fullText, { color: theme.text }]}>
             {t('queue.seatsFull', { found: total, needed: total })}
@@ -307,8 +307,8 @@ export function RoomReadyStage({ room, holdMs }: RoomReadyStageProps) {
           {
             top: choosing ? 578 : 556,
             height: choosing ? 124 : 132,
-            backgroundColor: theme.field,
-            boxShadow: `inset 0 0 0 1px ${theme.border}`,
+            backgroundColor: theme.page,
+            boxShadow: `inset 0 0 0 1px ${theme.borderStrong}`,
           },
         ]}>
         <View style={styles.chooser} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

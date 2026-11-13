@@ -501,7 +501,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
                     </ThemedText>
                     {verified ? <VerifiedCheck /> : null}
                   </View>
-                  <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+                  <ThemedText type="callout" numberOfLines={1}>
                     {matchedLine}
                   </ThemedText>
                 </View>
@@ -546,7 +546,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
                 </ThemedText>
                 {verified ? <VerifiedCheck /> : null}
               </View>
-              <ThemedText type="footnote" themeColor="textSecondary" numberOfLines={1}>
+              <ThemedText type="callout" numberOfLines={1}>
                 {matchedLine}
               </ThemedText>
             </View>

@@ -84,7 +84,7 @@ function TagPicker<T extends string>({ title, options, first, max, picked, label
       <View style={styles.titleRow}>
         <ThemedText type="kicker">{t('profile.optionalLabel', { label: title })}</ThemedText>
         {picked.length > 0 ? (
-          <ThemedText type="footnote" themeColor="textSecondary" accessibilityLiveRegion="polite">
+          <ThemedText type="callout" themeColor="textSecondary" accessibilityLiveRegion="polite">
             {t('profile.tagsCount', { count: picked.length, max })}
           </ThemedText>
         ) : null}

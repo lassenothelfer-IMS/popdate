@@ -564,11 +564,6 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
         {slot(4)}
         {slot(5)}
       </View>
-      {photos.length > 1 ? (
-        <ThemedText type="footnote" themeColor="textSecondary">
-          {t('profile.reorderHint')}
-        </ThemedText>
-      ) : null}
       {form.photoError ? <ErrorLine message={form.photoError} /> : null}
       {sheet}
     </View>
@@ -578,7 +573,6 @@ export function PhotoSection({ form, style, bare = false }: PhotoSectionProps) {
   return (
     <Section
       title={t('profile.photos')}
-      aside={t('profile.photosCount', { filled: photos.length, total: PHOTO_COUNT })}
       style={[styles.section, style]}>
       {grid}
     </Section>

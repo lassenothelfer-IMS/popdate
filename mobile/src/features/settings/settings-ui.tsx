@@ -125,7 +125,7 @@ export function NavRow({
         {label}
       </ThemedText>
       {value ? (
-        <ThemedText type="body" themeColor={valueColor} style={styles.value} numberOfLines={1}>
+        <ThemedText type="body" themeColor={valueColor} style={styles.value}>
           {value}
         </ThemedText>
       ) : null}

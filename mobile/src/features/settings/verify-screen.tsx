@@ -223,7 +223,7 @@ export function VerifyScreen() {
             <Rise index={2}>
               <View
                 accessible
-                style={[styles.status, { backgroundColor: theme.field, borderColor: theme.border }]}>
+                style={[styles.status, { backgroundColor: theme.page, borderColor: theme.borderStrong }]}>
                 <View style={styles.statusLine}>
                   <ThemedText type="callout" themeColor="textSecondary">
                     {t('settings.status')}
@@ -242,13 +242,13 @@ export function VerifyScreen() {
           ) : null}
 
           <Rise index={3}>
-            <View style={[styles.perk, { backgroundColor: theme.field, borderColor: theme.border }]}>
+            <View style={[styles.perk, { backgroundColor: theme.page, borderColor: theme.borderStrong }]}>
               <View style={[styles.perkMark, { backgroundColor: theme.inverse }]}>
                 <VerifiedCheck size={20} />
               </View>
               <View style={styles.flex}>
                 <ThemedText type="headline">{t('settings.verifyPerkTitle')}</ThemedText>
-                <ThemedText type="footnote" themeColor="textSecondary">
+                <ThemedText type="callout">
                   {t('settings.verifyPerkBody')}
                 </ThemedText>
               </View>
