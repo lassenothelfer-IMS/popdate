@@ -1,3 +1,4 @@
+import { MenuView } from '@expo/ui/community/menu';
 import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -5,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { api } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
 import { Avatar } from '@/components/avatar';
+import { swiftUI } from '@/components/native-ui';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
@@ -145,6 +147,7 @@ export function MatchesScreen() {
                     myId={myId}
                     highlighted
                     onMore={() => void people.open(personOf(thread))}
+                    onAction={(action) => people.act(personOf(thread), action)}
                   />
                 ))}
               </Rise>
@@ -160,6 +163,7 @@ export function MatchesScreen() {
                     thread={thread}
                     myId={myId}
                     onMore={() => void people.open(personOf(thread))}
+                    onAction={(action) => people.act(personOf(thread), action)}
                   />
                 ))}
               </Rise>
@@ -190,12 +194,15 @@ function ThreadRow({
   myId,
   highlighted = false,
   onMore,
+  onAction,
 }: {
   thread: Thread;
   myId: string | null;
   highlighted?: boolean;
   /** Report, block or unmatch: a long press, or the VoiceOver action. */
   onMore: () => void;
+  /** On iPhone a long press opens iOS's own menu, which acts straight away. */
+  onAction?: (action: 'report' | 'block' | 'unmatch') => void;
 }) {
   const theme = useTheme();
   const seats = useSeats();
@@ -209,13 +216,15 @@ function ThreadRow({
   const quiet = 'textSecondary' as const;
   /** They wrote last: the row says so with a plum dot and a darker preview. */
   const replied = !!last && last.senderId !== myId;
-  return (
+  const openChat = () => router.push({ pathname: '/chat/[id]', params: { id: match.id } });
+  const row = (
     <PressableHighlight
       accessibilityRole="button"
       accessibilityLabel={replied ? `${name}. ${t('home.newMessage')}. ${preview}` : `${name}. ${preview}`}
       accessibilityHint={t('home.openChatHint')}
-      onPress={() => router.push({ pathname: '/chat/[id]', params: { id: match.id } })}
-      onLongPress={onMore}
+      onPress={openChat}
+      // With iOS's menu the long press is the menu's.
+      onLongPress={swiftUI && onAction ? undefined : onMore}
       accessibilityActions={[{ name: 'more', label: t('chat.optionsHint', { name: match.other.name }) }]}
       onAccessibilityAction={(event) => {
         if (event.nativeEvent.actionName === 'more') onMore();
@@ -251,6 +260,26 @@ function ThreadRow({
         </View>
       </View>
     </PressableHighlight>
+  );
+  if (!swiftUI || !onAction) return row;
+  // iOS's own long-press menu: the row lifts, the rest blurs, and the choice acts at once.
+  return (
+    <MenuView
+      shouldOpenOnLongPress
+      title={name}
+      actions={[
+        { id: 'open', title: t('chat.openChat'), image: 'bubble.left' },
+        { id: 'report', title: t('chat.report'), image: 'exclamationmark.bubble' },
+        { id: 'block', title: t('chat.block'), image: 'hand.raised', attributes: { destructive: true } },
+        { id: 'unmatch', title: t('chat.unmatch'), image: 'person.crop.circle.badge.xmark', attributes: { destructive: true } },
+      ]}
+      onPressAction={({ nativeEvent }) => {
+        const action = nativeEvent.event;
+        if (action === 'open') openChat();
+        else if (action === 'report' || action === 'block' || action === 'unmatch') onAction(action);
+      }}>
+      {row}
+    </MenuView>
   );
 }
 

@@ -15,6 +15,7 @@ import {
   type TextInputInstance,
   type ViewInstance,
 } from 'react-native';
+import { DateTimePicker } from '@expo/ui/community/datetime-picker';
 import Animated from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -23,6 +24,7 @@ import { Button } from '@/components/button';
 import { ErrorIcon, errorEnter } from '@/components/error-line';
 import { ProgressSegments } from '@/components/progress-segments';
 import { Rise } from '@/components/rise';
+import { swiftUI } from '@/components/native-ui';
 import { Screen } from '@/components/screen';
 import { Sheet } from '@/components/sheet';
 import { VideoBackground } from '@/components/video-background';
@@ -42,7 +44,7 @@ import {
 import { testProfileDetails } from '@/features/profile/test-profile';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
-import { useT, type TranslationKey } from '@/i18n';
+import { useLocale, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
@@ -451,6 +453,41 @@ export function OnboardingScreen() {
 const WELCOME_VIDEO = require('../../../assets/video/popdate_welcome_loop.mp4');
 const WELCOME_POSTER = require('../../../assets/images/popdate_welcome_poster.jpg');
 
+/**
+ * Apple's own date wheel, the way iPhone asks for a birthday: it only turns as
+ * far as 18 years ago, so a too-young date can't be picked. It starts on a
+ * date nobody chose, and Continue waits until the wheel has been turned.
+ */
+function BirthdayWheel({ birth, onChange }: { birth: BirthEntry; onChange: (next: BirthEntry) => void }) {
+  const theme = useTheme();
+  const locale = useLocale();
+  const now = new Date();
+  const latest = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
+  const earliest = new Date(now.getFullYear() - MAX_AGE, now.getMonth(), now.getDate());
+  const chosen = birth.year ? new Date(Number(birth.year), Number(birth.month) - 1, Number(birth.day)) : null;
+  const start = new Date(now.getFullYear() - 25, 0, 1);
+  return (
+    <DateTimePicker
+      value={chosen ?? start}
+      mode="date"
+      display="spinner"
+      minimumDate={earliest}
+      maximumDate={latest}
+      locale={locale}
+      accentColor={theme.brand}
+      onValueChange={(_event, date) => {
+        haptics.selection();
+        onChange({
+          day: String(date.getDate()),
+          month: String(date.getMonth() + 1),
+          year: String(date.getFullYear()),
+        });
+      }}
+      style={styles.wheel}
+    />
+  );
+}
+
 type BirthdayProps = {
   birth: BirthEntry;
   onChange: (next: BirthEntry) => void;
@@ -531,6 +568,9 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
 
   return (
     <View style={styles.birthday}>
+      {swiftUI ? (
+        <BirthdayWheel birth={birth} onChange={onChange} />
+      ) : (
       <View style={styles.birthRow}>
         {parts.map((part, index) => (
           <View key={part.key} style={styles.flex}>
@@ -555,6 +595,7 @@ function Birthday({ birth, onChange, check, error }: BirthdayProps) {
           </View>
         ))}
       </View>
+      )}
       {/* Holds the age card's room from the start, so the page never grows or shrinks as the age or an error comes and goes. */}
       <View accessibilityLiveRegion="polite" style={styles.birthResult}>
         {error ? (
@@ -617,6 +658,9 @@ const styles = StyleSheet.create({
   birthRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  wheel: {
+    height: 216,
   },
   birthInput: {
     fontSize: 20,

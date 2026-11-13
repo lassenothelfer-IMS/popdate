@@ -1,3 +1,4 @@
+import { SegmentedControl } from '@expo/ui/community/segmented-control';
 import { router, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -5,6 +6,7 @@ import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Chip } from '@/components/chip';
 import { Icon } from '@/components/icon';
 import { PressableHighlight } from '@/components/pressable-highlight';
+import { swiftUI } from '@/components/native-ui';
 import { ThemedText } from '@/components/themed-text';
 import { Toggle } from '@/components/toggle';
 import { MinTouch, Space } from '@/constants/theme';
@@ -211,6 +213,27 @@ type ChoiceRowProps<T extends string> = {
 /** A short single choice inline: the label, then its options as chips. */
 export function ChoiceRow<T extends string>({ label, options, value, onChange }: ChoiceRowProps<T>) {
   const theme = useTheme();
+  // On iPhone: Apple's segmented control, the way iOS Settings picks one of a few.
+  if (swiftUI) {
+    return (
+      <View style={[styles.choice, { borderBottomColor: theme.border }]}>
+        <ThemedText type="body">{label}</ThemedText>
+        <SegmentedControl
+          accessibilityLabel={label}
+          values={options.map((option) => option.label)}
+          selectedIndex={Math.max(0, options.findIndex((option) => option.value === value))}
+          onChange={({ nativeEvent }) => {
+            const picked = options[nativeEvent.selectedSegmentIndex];
+            if (picked && picked.value !== value) {
+              haptics.selection();
+              onChange(picked.value);
+            }
+          }}
+          style={styles.segmented}
+        />
+      </View>
+    );
+  }
   return (
     <View style={[styles.choice, { borderBottomColor: theme.border }]}>
       <ThemedText type="body">{label}</ThemedText>
@@ -231,6 +254,9 @@ export function ChoiceRow<T extends string>({ label, options, value, onChange }:
 }
 
 const styles = StyleSheet.create({
+  segmented: {
+    height: 32,
+  },
   section: {
     marginTop: 30,
   },

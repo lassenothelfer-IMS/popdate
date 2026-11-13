@@ -31,6 +31,8 @@ export function usePersonActions({ onGone }: Options = {}): {
   open: (person: Person, extras?: Extra[]) => Promise<void>;
   /** For a screen with several people, like the room: asks who first. */
   openAmong: (people: Person[]) => Promise<void>;
+  /** One action straight away, as a native menu picks it: no action sheet first. */
+  act: (person: Person, action: 'report' | 'block' | 'unmatch') => void;
   element: ReactNode;
   busy: boolean;
 } {
@@ -151,7 +153,14 @@ export function usePersonActions({ onGone }: Options = {}): {
     </>
   );
 
-  return { open, openAmong, element, busy };
+  function act(person: Person, action: 'report' | 'block' | 'unmatch') {
+    if (busy) return;
+    if (action === 'report') setReporting(person);
+    else if (action === 'block') void block(person);
+    else void unmatch(person);
+  }
+
+  return { open, openAmong, act, element, busy };
 }
 
 type MoreButtonProps = {
