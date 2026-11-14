@@ -66,6 +66,8 @@ export class ConvexServer implements PopdateApi {
   private authListeners = new Set<() => void>();
   /** Photo URL to file id, so editing a profile resends kept photos instead of uploading them again. */
   private photoIds = new Map<string, string>();
+  /** The file the server's blurred copy of your first photo was made from. */
+  private faceBlurOf: string | null = null;
   /** Uploads started as photos were picked, by their local URI. */
   private pendingUploads = new Map<string, { upload: Promise<Id<'_storage'>>; cancel: () => void }>();
 
@@ -189,6 +191,27 @@ export class ConvexServer implements PopdateApi {
     return storageId;
   }
 
+  /** Uploads a copy of a photo `FACE_BLUR_WIDTH` px wide: blurred for good, since the detail is gone. */
+  private async uploadFaceBlur(uri: string): Promise<Id<'_storage'>> {
+    const image = await ImageManipulator.manipulate(uri, { maxWidth: FACE_BLUR_WIDTH }).renderAsync();
+    let tiny: string;
+    try {
+      tiny = (await image.saveAsync({ format: SaveFormat.JPEG, compress: 0.6 })).uri;
+    } finally {
+      image.release();
+    }
+    const blob = await (await fetch(tiny)).blob();
+    const uploadUrl = await this.mutation(api.profiles.generateUploadUrl, {});
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'image/jpeg' },
+      body: blob,
+    });
+    if (!response.ok) throw new Error('The blurred copy did not upload.');
+    const { storageId } = (await response.json()) as { storageId: Id<'_storage'> };
+    return storageId;
+  }
+
   // Account
 
   async resume() {
@@ -242,6 +265,7 @@ export class ConvexServer implements PopdateApi {
     await this.actions?.signOut().catch(() => {});
     await this.waitForAuth((auth) => !auth.loading && !auth.authenticated);
     this.photoIds.clear();
+    this.faceBlurOf = null;
     // Uploads still under way belonged to the old account: stop them.
     this.forgetPhotos([]);
   }
@@ -261,6 +285,12 @@ export class ConvexServer implements PopdateApi {
           this.upload(uri),
       ),
     );
+    // A new first photo gets a new tiny, blurred copy. If it can't be made, the
+    // profile still saves: you are then just not in Home's row of faces.
+    const faceBlur =
+      photos[0] !== this.faceBlurOf && !draft.photos[0].startsWith('mock://')
+        ? await this.uploadFaceBlur(draft.photos[0]).catch(() => undefined)
+        : undefined;
     const saved = await this.mutation(api.profiles.saveProfile, {
       name: draft.name,
       birthDate: draft.birthDate,
@@ -277,6 +307,7 @@ export class ConvexServer implements PopdateApi {
       languages: draft.languages,
       pinnedAnswers: draft.pinnedAnswers,
       photos,
+      faceBlur,
     }).catch((error: unknown) => {
       // An early upload left unsaved for a day is swept from storage: upload those again next time.
       for (const uri of draft.photos) this.pendingUploads.delete(uri);
@@ -285,7 +316,12 @@ export class ConvexServer implements PopdateApi {
     return this.keepPhotoIds(saved);
   }
 
-  private keepPhotoIds({ photoIds, ...profile }: Profile & { photoIds: string[] }): Profile {
+  private keepPhotoIds({
+    photoIds,
+    faceBlurOf,
+    ...profile
+  }: Profile & { photoIds: string[]; faceBlurOf: string | null }): Profile {
+    this.faceBlurOf = faceBlurOf;
     profile.photos.forEach((url, index) => this.photoIds.set(url, photoIds[index]));
     return profile;
   }
@@ -491,6 +527,8 @@ export class ConvexServer implements PopdateApi {
 
 /** Photos are shown at most this wide, so nothing wider is uploaded. */
 const PHOTO_MAX_WIDTH = 1440;
+/** The copy of your first photo that Home's row of people in line shows: too small to recognize anyone. */
+const FACE_BLUR_WIDTH = 12;
 /** Photos shrunk at the same time. Each decode of a 12 MP original is large, so six at once can run out of memory. */
 const SHRINK_AT_ONCE = 2;
 

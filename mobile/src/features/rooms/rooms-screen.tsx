@@ -5,6 +5,7 @@ import Animated, { FadeIn,
   FadeOut, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 import { MAX_PINNED_ANSWERS, type PinnedAnswer, type RoomSummary } from '@/api/types';
+import { SlotPhoto } from '@/components/backdrop';
 import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
@@ -19,6 +20,7 @@ import { TabSwipe } from '@/components/tab-swipe';
 import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
 import { useToast } from '@/components/toast';
+import { Imagery } from '@/constants/imagery';
 import { BrandBalloon, CssEase, Ease, Fonts, MinTouch, Motion, Radius, Space } from '@/constants/theme';
 import { acknowledge } from '@/features/chat/prompts';
 import { useJoinQueue } from '@/features/home/use-join-queue';
@@ -174,27 +176,13 @@ export function RoomsScreen() {
   );
 }
 
-const EMPTY_SEATS = ['a', 'b', 'c', 'a', 'c', 'b'] as const;
-/** How far down each empty seat hangs, so the six read as floating and not as a row of icons. */
-const SEAT_DROP = [26, 0, 40, 10, 34, 4];
-
-/** No rooms yet: six empty seats, which is what a room is, then the words and one quiet way in. */
+/** No rooms yet: a photo the width of the phone, then the words and one quiet way in. */
 function EmptyRooms({ joining, error, onJoin }: { joining: boolean; error: string | null; onJoin: () => void }) {
   const t = useT();
-  const theme = useTheme();
   return (
     <View style={styles.empty}>
       <Rise index={1}>
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={styles.seats}>
-          {EMPTY_SEATS.map((kind, i) => (
-            <Bob key={i} kind={kind} style={{ marginTop: SEAT_DROP[i] }}>
-              <Balloon color={BrandBalloon.color} size={40} ghost ghostInk={theme.brand} />
-            </Bob>
-          ))}
-        </View>
+        <SlotPhoto slot={Imagery.emptyRooms} />
       </Rise>
       <Rise index={2} style={styles.emptyWords}>
         <ThemedText type="display" accessibilityRole="header">
@@ -365,14 +353,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
   },
   empty: {
-    marginTop: Space.xl,
-    gap: 56,
-  },
-  seats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    minHeight: 110,
+    marginTop: Space.md,
+    gap: Space.xs,
   },
   emptyWords: {
     gap: Space.md,

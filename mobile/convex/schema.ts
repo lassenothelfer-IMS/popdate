@@ -55,6 +55,12 @@ export default defineSchema({
     languages: v.optional(v.array(v.string())),
     /** 4 to 6 files, in order (position 1 to 6). */
     photos: v.array(v.id('_storage')),
+    /**
+     * A copy of the first photo about 12 px wide: all that Home's row of people
+     * in line ever shows. `of` is the photo it was made from, so a new first
+     * photo never shows an old face.
+     */
+    faceBlur: v.optional(v.object({ of: v.id('_storage'), file: v.id('_storage') })),
     termsAcceptedAt: v.string(),
   }).index('by_user', ['userId']),
 

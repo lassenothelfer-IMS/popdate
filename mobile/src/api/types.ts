@@ -89,6 +89,11 @@ export type QueueStats = {
   waiting: number;
   /** Rooms that started in the last hour. */
   roomsLastHour: number;
+  /**
+   * Up to six of the people waiting, each as a tiny picture that is already
+   * blurred beyond recognition. Never a sharp photo: nobody is shown before a room.
+   */
+  faces: string[];
 };
 
 /**

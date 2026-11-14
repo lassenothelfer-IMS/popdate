@@ -21,6 +21,9 @@ import {
   type QueueStats,
 } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
+import { Backdrop } from '@/components/backdrop';
+import { Imagery } from '@/constants/imagery';
+import { QueueFaces } from '@/features/home/queue-faces';
 import { Avatar } from '@/components/avatar';
 import { Balloon, balloonHeight } from '@/components/balloon';
 import { Button } from '@/components/button';
@@ -167,7 +170,9 @@ export function HomeScreen() {
   return (
     <TabSwipe tab="home">
       <View style={styles.flex}>
-        <Screen contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
+        <Screen
+          background={<Backdrop slot={Imagery.play} />}
+          contentStyle={[styles.content, { paddingBottom: TAB_BAR_CLEARANCE }]}>
           <Animated.View style={[styles.flex, falling]}>
             <Rise index={0} style={styles.top}>
               <Wordmark />
@@ -186,6 +191,7 @@ export function HomeScreen() {
               <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.2}>
                 {t('home.cardTitle')}
               </ThemedText>
+              {live ? <QueueFaces faces={live.faces} /> : null}
               <ThemedText type="body">
                 {/* A city is optional now: without one, the line just says how many are waiting. */}
                 {profile.city

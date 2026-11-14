@@ -57,6 +57,12 @@ Every rule is meant to be testable: look at a screenshot and answer yes or no. W
 32. **Match profile follows Hinge's order:** photo, then who they are (one fact per line), then alternating photo and room answer. Chat and Profile are tabs you can also swipe between. *(11 Nov 2026)*
 33. **The Random / Popper / Balloon role picker on Play is for the test server only.** Don't redesign or feature it. *(Nov 2026)*
 
+## Imagery
+
+34. **Lifestyle photos and loops come from one file,** `mobile/src/constants/imagery.ts`, through `Backdrop` (behind a screen, washed with the page colour so text stays readable) or `SlotPhoto` (a full-width photo in an empty state). A video pauses off screen and is a still under Reduce Motion. *(14 Nov 2026)*
+35. **People in line are only ever shown blurred and without colour,** from a tiny copy the server sends, never a sharp photo. Only real people, never stand-ins, and no row at all for fewer than three. *(14 Nov 2026)*
+36. **A match is shown with a portrait photo** (4:5, cropped from the top), not a small circle. *(14 Nov 2026)*
+
 ## How to check
 
 - Screenshot every screen you touch in the browser at an iPhone 15 Pro viewport (393 × 852) and inspect it against these rules before saying it's done.

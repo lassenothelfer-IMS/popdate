@@ -433,6 +433,8 @@ class MockServer implements PopdateApi {
   private queueTimer: ReturnType<typeof setInterval> | null = null;
   /** Bots in line right now, besides you. Home shows it, and your queue starts from it. */
   private lineWaiting = randomInt(1, LOBBY_SIZE - 2);
+  /** The faces of the bots in line, picked once. */
+  private lineFaces: string[] | null = null;
   private rooms = new Map<string, ServerRoom>();
   private matches: Match[] = [];
   private usedBotNames = new Set<string>();
@@ -874,7 +876,16 @@ class MockServer implements PopdateApi {
     // The mock's line is made of bots: it drifts a little each time you look,
     // and stays short of a full room so joining still has a seat to fill.
     this.lineWaiting = Math.min(LOBBY_SIZE - 2, Math.max(1, this.lineWaiting + randomInt(-1, 1)));
-    return { waiting: this.lineWaiting, roomsLastHour: randomInt(2, 9) };
+    // The same bots keep their place: the row doesn't reshuffle on every look.
+    if (!this.lineFaces) {
+      const demo = demoPhotos();
+      this.lineFaces = demo ? [demo.woman[0], demo.man[0], demo.woman[1], demo.man[1], demo.woman[2], demo.man[2]] : [];
+    }
+    return {
+      waiting: this.lineWaiting,
+      roomsLastHour: randomInt(2, 9),
+      faces: this.lineFaces.filter(Boolean).slice(0, this.lineWaiting),
+    };
   }
 
   async listSecondChances() {

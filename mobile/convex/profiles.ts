@@ -35,6 +35,8 @@ async function profileView(ctx: QueryCtx, profile: Doc<'profiles'>) {
     languages: cleanLanguages(profile.languages),
     photos: await photoUrls(ctx, profile.photos),
     photoIds: profile.photos as string[],
+    /** The photo the blurred copy was made from; the app makes a new one when the first photo changes. */
+    faceBlurOf: (profile.faceBlur?.of ?? null) as string | null,
     termsAcceptedAt: profile.termsAcceptedAt,
   };
 }
@@ -57,6 +59,9 @@ export const generateUploadUrl = mutation({
     return await ctx.storage.generateUploadUrl();
   },
 });
+
+/** A 12 px JPEG is a few hundred bytes. Anything near a real photo's size is refused. */
+const MAX_FACE_BLUR_BYTES = 4000;
 
 function text(value: string, label: string, max: number) {
   const trimmed = value.trim();
@@ -101,6 +106,8 @@ export const saveProfile = mutation({
     interests: v.optional(v.array(v.string())),
     languages: v.optional(v.array(v.string())),
     photos: v.array(v.id('_storage')),
+    /** A new tiny, blurred copy of the first photo. Left out when the first photo hasn't changed. */
+    faceBlur: v.optional(v.id('_storage')),
   },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
@@ -118,11 +125,23 @@ export const saveProfile = mutation({
       fail(`A profile needs ${MIN_PHOTOS} to ${MAX_PHOTOS} photos.`);
     }
     for (const photo of args.photos) await claimImage(ctx, userId, photo);
+    if (args.faceBlur) {
+      await claimImage(ctx, userId, args.faceBlur);
+      // It is shown to strangers, so it must really be tiny: a sharp photo can't pass as one.
+      const file = await ctx.db.system.get(args.faceBlur);
+      if (!file || file.size > MAX_FACE_BLUR_BYTES) fail('A photo did not upload. Try again.');
+    }
 
     // Only tags from the lists are kept, five at most; nothing picked is stored as nothing.
     const interests = cleanInterests(args.interests);
     const languages = cleanLanguages(args.languages);
     const existing = await getProfile(ctx, userId);
+    // The blurred copy: the new one, or the old one while it still belongs to the first photo.
+    const faceBlur = args.faceBlur
+      ? { of: args.photos[0], file: args.faceBlur }
+      : existing?.faceBlur?.of === args.photos[0]
+        ? existing.faceBlur
+        : undefined;
     const fields = {
       userId,
       name: text(args.name, 'name', 50),
@@ -144,6 +163,7 @@ export const saveProfile = mutation({
       interests: interests.length ? interests : undefined,
       languages: languages.length ? languages : undefined,
       photos: args.photos,
+      faceBlur,
       // Recorded by the server the first time, so it can't be backdated.
       termsAcceptedAt: existing?.termsAcceptedAt ?? new Date().toISOString(),
     };
@@ -151,6 +171,9 @@ export const saveProfile = mutation({
     if (existing) {
       for (const old of existing.photos) {
         if (!args.photos.includes(old)) await deleteImage(ctx, old);
+      }
+      if (existing.faceBlur && existing.faceBlur.file !== faceBlur?.file) {
+        await deleteImage(ctx, existing.faceBlur.file);
       }
       await ctx.db.replace(existing._id, fields);
     } else {

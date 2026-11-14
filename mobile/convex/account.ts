@@ -54,6 +54,7 @@ export const deleteAccount = mutation({
     const profile = await getProfile(ctx, userId);
     if (profile) {
       for (const photo of profile.photos) await deleteImage(ctx, photo);
+      if (profile.faceBlur) await deleteImage(ctx, profile.faceBlur.file);
       await ctx.db.delete(profile._id);
     }
 

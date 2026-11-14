@@ -5,20 +5,20 @@ import { StyleSheet, View } from 'react-native';
 
 import { api } from '@/api';
 import { TabSwipe } from '@/components/tab-swipe';
-import { Avatar } from '@/components/avatar';
+import { SlotPhoto } from '@/components/backdrop';
+import { Photo } from '@/components/photo';
 import { swiftUI } from '@/components/native-ui';
-import { Balloon } from '@/components/balloon';
 import { Button } from '@/components/button';
 import { ErrorLine } from '@/components/error-line';
 import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
-import { Bob } from '@/components/stage';
 import { TAB_BAR_CLEARANCE, useTabFocus } from '@/components/tab-bar';
 import { TextLink } from '@/components/text-link';
 import { ThemedText } from '@/components/themed-text';
-import { BrandBalloon, Radius, Space } from '@/constants/theme';
+import { Imagery } from '@/constants/imagery';
+import { Radius, Space } from '@/constants/theme';
 import { usePersonActions, type Person } from '@/features/chat/person-actions';
 import { useJoinQueue } from '@/features/home/use-join-queue';
 import { SecondChances } from '@/features/matches/second-chances';
@@ -231,17 +231,22 @@ function ThreadRow({
       }}
       background="transparent"
       style={[styles.thread, styles.threadRow, { borderBottomColor: theme.border }]}>
-      <View style={highlighted ? [styles.ring, { borderColor: theme.accent }] : null}>
-        <Avatar
-          name={match.other.name}
+      <View>
+        <Photo
           uri={match.other.photo}
+          name={match.other.name}
           tone={seatFor(seats, match.other.id)}
-          size={56}
+          initialSize={34}
+          style={styles.portrait}
         />
+        {/* Your turn: a plum dot on the photo's corner. */}
+        {highlighted ? (
+          <View style={[styles.turnDot, { backgroundColor: theme.brand, borderColor: theme.page }]} />
+        ) : null}
       </View>
       <View style={styles.threadText}>
         <View style={styles.threadTop}>
-          <ThemedText type="row" style={styles.threadName} numberOfLines={1}>
+          <ThemedText type="questionRow" style={styles.threadName} numberOfLines={1}>
             {name}
           </ThemedText>
           <ThemedText type="footnote" themeColor={quiet}>
@@ -252,7 +257,7 @@ function ThreadRow({
           <ThemedText
             type="callout"
             themeColor={replied ? 'text' : quiet}
-            numberOfLines={1}
+            numberOfLines={2}
             style={[styles.preview, replied && styles.previewNew]}>
             {preview}
           </ThemedText>
@@ -307,26 +312,19 @@ function EmptyMatches({
   joining: boolean;
   error: string | null;
 }) {
-  const theme = useTheme();
   const t = useT();
   return (
     <View style={styles.empty}>
       <Rise index={1}>
-        <ThemedText type="hero" accessibilityRole="header" style={styles.emptyTitle}>
+        <SlotPhoto slot={Imagery.emptyMatches} />
+      </Rise>
+      <Rise index={2} style={styles.emptyWords}>
+        <ThemedText type="display" accessibilityRole="header">
           {t('home.emptyTitle')}
         </ThemedText>
-      </Rise>
-      <Rise index={2} style={styles.emptyRow}>
-        <View style={styles.emptyWords}>
-          <ThemedText type="body">{t('home.emptyBody')}</ThemedText>
-          <TextLink title={t('home.play')} loading={joining} onPress={onJoin} />
-          {error ? <ErrorLine message={error} /> : null}
-        </View>
-        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Bob>
-            <Balloon color={BrandBalloon.color} size={112} ghost ghostInk={theme.brand} />
-          </Bob>
-        </View>
+        <ThemedText type="body">{t('home.emptyBody')}</ThemedText>
+        <TextLink title={t('home.play')} loading={joining} onPress={onJoin} />
+        {error ? <ErrorLine message={error} /> : null}
       </Rise>
     </View>
   );
@@ -372,12 +370,21 @@ const styles = StyleSheet.create({
     paddingVertical: Space.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  // The coral ring: 2 pt of canvas, then 1.5 pt of coral.
-  ring: {
-    borderRadius: 32,
-    borderWidth: 1.5,
-    padding: 2,
-    margin: -3.5,
+  // Their first photo as a portrait, 4:5, cropped from the top.
+  portrait: {
+    width: 88,
+    height: 110,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+  },
+  turnDot: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
   },
   threadText: {
     flex: 1,
@@ -392,8 +399,6 @@ const styles = StyleSheet.create({
   },
   threadName: {
     flexShrink: 1,
-    fontSize: 16,
-    fontWeight: 600,
   },
   previewRow: {
     flexDirection: 'row',
@@ -402,7 +407,6 @@ const styles = StyleSheet.create({
   },
   preview: {
     flex: 1,
-    fontSize: 14,
   },
   previewNew: {
     fontWeight: 600,
@@ -417,23 +421,10 @@ const styles = StyleSheet.create({
     gap: Space.md,
   },
   empty: {
-    flexGrow: 1,
-    marginTop: 56,
-  },
-  emptyTitle: {
-    fontSize: 60,
-    lineHeight: 60,
-    letterSpacing: -1.8,
-    maxWidth: 260,
-  },
-  emptyRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Space.md,
-    marginTop: Space.xl,
+    marginTop: Space.md,
+    gap: Space.xs,
   },
   emptyWords: {
-    flex: 1,
-    gap: Space.lg,
+    gap: Space.md,
   },
 });

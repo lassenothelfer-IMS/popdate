@@ -19,6 +19,10 @@ const MAX_WAITING = 500;
 const BLOCK_LOOKUP_BUDGET = 2000;
 const BLOCK_LOOKUPS_PER_LOBBY = 100;
 
+/** Home shows at most this many blurred faces of people in line, and looks at this many rows to find them. */
+const MAX_FACES = 6;
+const FACES_LOOKED_AT = 12;
+
 /** Whether a waiting row's app checked in within `windowMs`. */
 function seenWithin(row: Doc<'queue'>, now: number, windowMs: number) {
   return (row.seenAt ?? row.joinedAt) >= now - windowMs;
@@ -51,7 +55,19 @@ export const stats = query({
     );
     const hourAgo = Date.now() - 60 * 60_000;
     const recent = await ctx.db.query('rooms').order('desc').take(200);
+    // Up to six of them, only ever as the tiny blurred copy of their first photo.
+    const faces: string[] = [];
+    for (const row of waiting.slice(0, FACES_LOOKED_AT)) {
+      if (faces.length >= MAX_FACES) break;
+      const theirs = await getProfile(ctx, row.userId);
+      const blur = theirs?.faceBlur;
+      if (!theirs || !blur || blur.of !== theirs.photos[0]) continue;
+      if (userId && (await isBlockedEitherWay(ctx, userId, row.userId))) continue;
+      const url = await ctx.storage.getUrl(blur.file);
+      if (url) faces.push(url);
+    }
     return {
+      faces,
       waiting: waiting.length,
       roomsLastHour: recent.filter((room) => room.createdAt > hourAgo).length,
     };
