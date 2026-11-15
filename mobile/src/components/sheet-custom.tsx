@@ -4,14 +4,18 @@ import Animated, { FadeIn, ReduceMotion, SlideInDown } from 'react-native-reanim
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { Ease, Gutter, MaxContentWidth, Motion, Radius, Space } from '@/constants/theme';
+import { Gutter, MaxContentWidth, Motion, Radius, Space, Spring } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 
 /** The dim fades in under the sheet. Opacity only, so it stays under Reduce Motion. */
 const dimIn = FadeIn.duration(Motion.state).reduceMotion(ReduceMotion.Never);
-/** The sheet slides up over 520 ms on cubic-bezier(.32, .72, 0, 1). */
-const sheetIn = SlideInDown.duration(520).easing(Ease.sheet).reduceMotion(ReduceMotion.System);
+/** The sheet slides up on a spring and settles without a bounce. */
+const sheetIn = SlideInDown.springify()
+  .damping(Spring.settle.damping)
+  .stiffness(Spring.settle.stiffness)
+  .mass(Spring.settle.mass)
+  .reduceMotion(ReduceMotion.System);
 
 export type SheetProps = {
   visible: boolean;

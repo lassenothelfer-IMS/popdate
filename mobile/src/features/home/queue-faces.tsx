@@ -65,6 +65,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   gray: {
-    filter: [{ grayscale: 1 }],
+    filter: 'grayscale(1)',
   },
 });

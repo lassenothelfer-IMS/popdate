@@ -4,6 +4,7 @@ import Animated from 'react-native-reanimated';
 
 import { CssEase, Motion } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { haptics } from '@/utils/haptics';
 
 type PressableHighlightProps = Omit<PressableProps, 'style' | 'children'> & {
   children: ReactNode;
@@ -12,12 +13,13 @@ type PressableHighlightProps = Omit<PressableProps, 'style' | 'children'> & {
   background?: string;
 };
 
-/** Press feedback for rows and cards: the row dims a little while pressed. No fill flashes in behind it. */
+/** Press feedback for rows and cards: the row dims a little while pressed and taps the phone lightly. No fill flashes in behind it. */
 export function PressableHighlight({
   children,
   style,
   background,
   disabled,
+  onPress,
   ...rest
 }: PressableHighlightProps) {
   const theme = useTheme();
@@ -26,7 +28,12 @@ export function PressableHighlight({
     <Pressable
       disabled={disabled}
       pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
-      {...rest}>
+      {...rest}
+      onPress={(event) => {
+        onPress?.(event);
+        // Quiet if the row's own handler already gave a haptic.
+        haptics.tap();
+      }}>
       {({ pressed }) => (
         <Animated.View
           style={[

@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import { StyleSheet, Text, View, type ViewInstance } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -25,6 +25,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { replyHangs, splitLinks, voiceTime, type LinkPreview, type VoiceNote } from '@/shared/chat';
 import { webSafeKeyframe } from '@/utils/web-motion';
+import { Tap } from '@/components/tap';
 
 /** Messages from one sender this close together share a group and one timestamp. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -460,7 +461,8 @@ export function MessageList({
               )}
             </View>
             {item.failed ? (
-              <Pressable
+              <Tap
+ scale={1}
                 accessibilityRole="button"
                 accessibilityLabel={t('chat.notSent')}
                 onPress={() => onRetry(item.localId)}
@@ -468,7 +470,7 @@ export function MessageList({
                 <ThemedText type="caption" themeColor="danger" style={styles.time}>
                   {t('chat.notSent')}
                 </ThemedText>
-              </Pressable>
+              </Tap>
             ) : (
               <ThemedText type="footnote" themeColor="textSecondary" style={styles.time}>
                 {t('chat.sending')}
@@ -511,7 +513,8 @@ function Bubble({ label, hint, style, onDoubleTap, onActivate, onOpen, children 
     node.measureInWindow((x, y, width, height) => onOpen({ x, y, width, height }));
   }
   return (
-    <Pressable
+    <Tap
+ scale={1}
       ref={ref}
       accessible
       accessibilityLabel={label}
@@ -526,7 +529,7 @@ function Bubble({ label, hint, style, onDoubleTap, onActivate, onOpen, children 
       delayLongPress={280}
       style={({ pressed }) => [style, pressed && styles.pressed]}>
       {children}
-    </Pressable>
+    </Tap>
   );
 }
 
@@ -534,7 +537,8 @@ function Bubble({ label, hint, style, onDoubleTap, onActivate, onOpen, children 
 function LinkCard({ link, mine, onOpen }: { link: LinkPreview; mine: boolean; onOpen: (url: string) => void }) {
   const theme = useTheme();
   return (
-    <Pressable
+    <Tap
+ scale={1}
       accessibilityRole="link"
       accessibilityLabel={`${link.title}, ${link.site}`}
       onPress={() => onOpen(link.url)}
@@ -556,7 +560,7 @@ function LinkCard({ link, mine, onOpen }: { link: LinkPreview; mine: boolean; on
           {link.site}
         </ThemedText>
       </View>
-    </Pressable>
+    </Tap>
   );
 }
 

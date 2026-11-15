@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -20,6 +19,7 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { webSafeKeyframe } from '@/utils/web-motion';
+import { Tap } from '@/components/tap';
 
 // "Not this time", drawn to design/four-screens on the 390 x 844 stage.
 
@@ -156,7 +156,8 @@ export function PoppedView({
       </StageBlock>
 
       <StageBlock index={2} style={styles.cardPlace}>
-        <Pressable
+        <Tap
+ scale={1}
           accessibilityRole="button"
           accessibilityLabel={`${t('game.stillFloating')}, ${t('game.floatingCount', { left: floating, total: seats.length })}. ${watch}`}
           disabled={replaying}
@@ -212,12 +213,12 @@ export function PoppedView({
             </Text>
             <Icon name="chevronRight" size={13} color={theme.brand} />
           </View>
-        </Pressable>
+        </Tap>
       </StageBlock>
 
       <StageBlock index={3} style={styles.exits}>
         {error ? <ErrorLine message={error} /> : null}
-        <Pressable
+        <Tap
           accessibilityRole="button"
           accessibilityLabel={t('game.playAnother')}
           accessibilityState={{ disabled: replaying, busy: replaying }}
@@ -231,8 +232,8 @@ export function PoppedView({
               {t('game.playAnother')}
             </Text>
           )}
-        </Pressable>
-        <Pressable
+        </Tap>
+        <Tap
           accessibilityRole="button"
           accessibilityLabel={t('game.leaveRoom')}
           disabled={replaying}
@@ -241,7 +242,7 @@ export function PoppedView({
           <Text {...stageText} style={[stageType.sans, styles.buttonText, { color: theme.text }]}>
             {t('game.leaveRoom')}
           </Text>
-        </Pressable>
+        </Tap>
       </StageBlock>
     </Stage>
   );

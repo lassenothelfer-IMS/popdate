@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, Linking, Platform, StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -26,6 +26,7 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useT, type TranslationKey } from '@/i18n';
 import { haptics } from '@/utils/haptics';
+import { Tap } from '@/components/tap';
 
 const POLL_MS = 2000;
 const SHUTTER = 72;
@@ -154,7 +155,7 @@ export function VerifyScreen() {
   const footer =
     mode === 'camera' ? (
       <View style={styles.shutterRow}>
-        <Pressable
+        <Tap
           accessibilityRole="button"
           accessibilityLabel={t('settings.shutter')}
           accessibilityState={{ disabled: !cameraReady || busy, busy }}
@@ -171,7 +172,7 @@ export function VerifyScreen() {
               { backgroundColor: cameraReady && !busy ? theme.inverse : theme.surfacePressed },
             ]}
           />
-        </Pressable>
+        </Tap>
       </View>
     ) : mode === 'preview' ? (
       <View style={styles.pair}>

@@ -1,6 +1,6 @@
 import { SymbolView } from 'expo-symbols';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { api, type ReportReason } from '@/api';
 import { MinTouch } from '@/constants/theme';
@@ -9,6 +9,7 @@ import { ReportSheet } from '@/features/chat/report-sheet';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { haptics } from '@/utils/haptics';
+import { Tap } from '@/components/tap';
 
 /** Someone you can report or block, and unmatch when you're matched. */
 export type Person = { id: string; name: string; age?: number; matchId?: string };
@@ -177,7 +178,7 @@ type MoreButtonProps = {
 export function MoreButton({ label, hint, disabled = false, onPress, style, backdrop }: MoreButtonProps) {
   const theme = useTheme();
   return (
-    <Pressable
+    <Tap
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
@@ -194,7 +195,7 @@ export function MoreButton({ label, hint, disabled = false, onPress, style, back
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
-    </Pressable>
+    </Tap>
   );
 }
 

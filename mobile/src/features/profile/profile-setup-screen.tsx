@@ -29,6 +29,7 @@ import { useT } from '@/i18n';
 import { SETUP_DRAFT_KEY, useSession } from '@/state/session';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
+import { EdgeBack } from '@/components/edge-back';
 
 /**
  * After onboarding's questions: your photos, the house rules, then "You're in"
@@ -198,6 +199,7 @@ function RulesStep({ saving, error, onBack, onAgree }: RulesStepProps) {
   const t = useT();
   const theme = useTheme();
   return (
+    <EdgeBack onBack={onBack}>
     <Screen
       scroll
       footerStyle="plain"
@@ -252,6 +254,7 @@ function RulesStep({ saving, error, onBack, onAgree }: RulesStepProps) {
         ))}
       </View>
     </Screen>
+    </EdgeBack>
   );
 }
 

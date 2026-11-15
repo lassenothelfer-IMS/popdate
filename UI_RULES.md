@@ -45,6 +45,7 @@ Every rule is meant to be testable: look at a screenshot and answer yes or no. W
 23. **Everything new gets a proper transition:** entering a screen, switching tabs or panes, things appearing and disappearing. Nothing pops in. *(11 Nov 2026)*
 24. **No grey flash when something is pressed, anywhere.** Press feedback is a dim or a scale, never a grey fill. *(11 Nov 2026)*
 25. **Every button has a pressed state, and every tap has a light haptic.** The pop gets a heavy haptic. Swipe-back works everywhere it makes sense. *(Nov 2026)*
+   Never a bare `Pressable` for something you tap: use `Button`, `PressableHighlight` (rows), `PressableScale` (chips, small controls) or `Tap` (everything else). They give the press and call `haptics.tap()`, which stays quiet when the handler already gave a haptic, so nothing buzzes twice. Motion you cause runs on the springs in `theme.ts` (`Spring`); motion you only watch stays on the eases. Steps inside one screen get `EdgeBack`. No swipe-back in the queue, a running room or the match moment. *(15 Nov 2026)*
 26. **Use Apple's own controls where they beat ours:** system sheets, the date wheel, segmented controls, long-press menus and native alerts. *(12–13 Nov 2026)*
 27. **No emoji as icons.** Use SF Symbols through `src/components/icon.tsx`. *(Nov 2026)*
 

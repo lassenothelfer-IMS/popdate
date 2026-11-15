@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { router, useFocusEffect, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { AccessibilityInfo, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, AppState, Linking, Platform, StyleSheet, View } from 'react-native';
 
 import { api, type Settings, type VerificationStatus } from '@/api';
 import { Button } from '@/components/button';
@@ -28,6 +28,7 @@ import { haptics } from '@/utils/haptics';
 import { openBalloonShop, openPlus } from '@/features/paywall/shop';
 import { manageSubscription, purchasesAvailable, restorePurchases, usePlus } from '@/utils/purchases';
 import { enablePush, getPushPermission, type PushPermission } from '@/utils/push';
+import { Tap } from '@/components/tap';
 
 const SUPPORT_EMAIL = 'support@popdate.app';
 
@@ -409,7 +410,7 @@ export function SettingsScreen() {
             disabled={ending !== null}
             onPress={handleSignOut}
           />
-          <Pressable
+          <Tap
             accessibilityRole="button"
             accessibilityLabel={t('settings.deleteAccount')}
             accessibilityState={{ disabled: ending !== null, busy: ending === 'delete' }}
@@ -420,7 +421,7 @@ export function SettingsScreen() {
             <ThemedText type="label" themeColor={ending === 'delete' ? 'textSecondary' : 'danger'}>
               {ending === 'delete' ? t('settings.deleting') : t('settings.deleteAccount')}
             </ThemedText>
-          </Pressable>
+          </Tap>
         </View>
       </Screen>
     </View>

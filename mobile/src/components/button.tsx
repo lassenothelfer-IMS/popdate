@@ -17,7 +17,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { MinTouch, type Palette } from '@/constants/theme';
+import { MinTouch, type Palette, Spring } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/utils/haptics';
@@ -123,7 +123,6 @@ function mix(from: string, to: string, amount: number) {
 }
 
 /** A press grows the button and settles back like a light bounce. */
-const SPRING = { damping: 14, stiffness: 220, mass: 0.6 };
 const HEIGHT = { large: 52, small: 44 };
 
 /** A hex or rgba color at another opacity. */
@@ -178,11 +177,12 @@ export function Button({
   const lift = useAnimatedStyle(() => ({ opacity: pressed.get() }));
 
   function pressIn() {
-    pressed.set(withSpring(1, SPRING));
-    if (variant === 'prominent' || variant === 'coral' || variant === 'brand') haptics.light();
+    pressed.set(withSpring(1, Spring.press));
+    // Every button answers the finger, the outlined and plain ones too.
+    haptics.light();
   }
   function pressOut() {
-    pressed.set(withSpring(0, SPRING));
+    pressed.set(withSpring(0, Spring.press));
   }
 
   return (

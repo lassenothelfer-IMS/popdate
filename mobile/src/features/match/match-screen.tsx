@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   Keyframe,
@@ -34,6 +34,7 @@ import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
+import { Tap } from '@/components/tap';
 
 /** How you ended up here. Null when the match was opened from Home. */
 type Role = 'popper' | 'winner' | null;
@@ -237,7 +238,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
 
       {/* Swipe-back is off on the match, so this is the way out besides chat and recap. */}
       <Animated.View style={[styles.top, { top: insets.top + Space.xs }, over]}>
-        <Pressable
+        <Tap
           accessibilityRole="button"
           accessibilityLabel={t('match.backHome')}
           onPress={goHome}
@@ -245,7 +246,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
           style={({ pressed }) => [styles.round, pressed && styles.pressed]}>
           <PhotoDisc radius={MinTouch / 2} />
           <Icon name="close" size={16} color={theme.text} />
-        </Pressable>
+        </Tap>
         <ThemedText style={styles.kicker}>{t('match.lastBalloon')}</ThemedText>
         <MoreButton
           label={t('chat.options')}

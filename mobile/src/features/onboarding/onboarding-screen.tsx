@@ -48,6 +48,7 @@ import { useLocale, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { MAX_AGE, ageFromBirthDate, parseBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
+import { EdgeBack } from '@/components/edge-back';
 
 /**
  * The welcome with Sign in with Apple on it, then one question per screen: your first
@@ -405,8 +406,8 @@ export function OnboardingScreen() {
   );
 
   return (
+    <EdgeBack key={question} onBack={() => goTo(previous)}>
     <Screen
-      key={question}
       scroll={!ownScroll && !typing}
       contentStyle={ownScroll ? styles.bare : undefined}
       footerStyle="plain"
@@ -449,6 +450,7 @@ export function OnboardingScreen() {
         </View>
       </Sheet>
     </Screen>
+    </EdgeBack>
   );
 }
 

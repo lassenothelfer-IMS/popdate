@@ -7,9 +7,9 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
   type SharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 
 import {
@@ -36,7 +36,7 @@ import { Screen } from '@/components/screen';
 import { TAB_BAR_CLEARANCE, useTabActive, useTabFocus } from '@/components/tab-bar';
 import { ThemedText } from '@/components/themed-text';
 import { Wordmark } from '@/components/wordmark';
-import { BrandBalloon, Fonts, Space } from '@/constants/theme';
+import { BrandBalloon, Fonts, Space, Spring } from '@/constants/theme';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { BalloonLine } from '@/features/balloons/balloon-line';
 import { useJoinQueue } from '@/features/home/use-join-queue';
@@ -330,8 +330,8 @@ function PlayBalloon({ size, label, hint, busy, empty, flight, height, onPress }
       accessibilityHint={hint}
       accessibilityState={{ busy, disabled: busy }}
       disabled={busy}
-      onPressIn={() => press.set(withTiming(1, { duration: 120 }))}
-      onPressOut={() => press.set(withSequence(withTiming(-0.4, { duration: 140 }), withTiming(0, { duration: 220 })))}
+      onPressIn={() => press.set(withSpring(1, Spring.press))}
+      onPressOut={() => press.set(withSpring(0, Spring.bouncy))}
       onPress={onPress}
       style={styles.play}>
       <Animated.View style={[styles.playBalloon, style]}>

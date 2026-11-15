@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
 import { REACTIONS } from '@/shared/chat';
 import { webSafeKeyframe } from '@/utils/web-motion';
+import { Tap } from '@/components/tap';
 
 /** The bar's height, and the gap it keeps from the bubble it belongs to. */
 const BAR_HEIGHT = 48;
@@ -83,7 +84,7 @@ export function MessageActions({ anchor, mine, current, onReact, onReply, onClos
           {REACTIONS.map((emoji) => {
             const selected = emoji === current;
             return (
-              <Pressable
+              <Tap
                 key={emoji}
                 accessibilityRole="button"
                 accessibilityLabel={t('chat.reactWith', { emoji })}
@@ -98,17 +99,17 @@ export function MessageActions({ anchor, mine, current, onReact, onReply, onClos
                 <Text allowFontScaling={false} style={styles.emoji}>
                   {emoji}
                 </Text>
-              </Pressable>
+              </Tap>
             );
           })}
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
-          <Pressable
+          <Tap
             accessibilityRole="button"
             accessibilityLabel={t('chat.reply')}
             onPress={onReply}
             style={({ pressed }) => [styles.replyButton, pressed && styles.pressed]}>
             <ThemedText type="headline">{t('chat.reply')}</ThemedText>
-          </Pressable>
+          </Tap>
         </Animated.View>
       </View>
     </Modal>

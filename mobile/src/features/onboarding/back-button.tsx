@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { MinTouch, Space } from '@/constants/theme';
 import { useT } from '@/i18n';
+import { Tap } from '@/components/tap';
 
 /**
  * A chevron and "Back" in the text color, 15/500, like the system back button. It's a text
@@ -14,7 +15,7 @@ export function BackButton({ onPress }: { onPress: () => void }) {
   const t = useT();
   const theme = useTheme();
   return (
-    <Pressable
+    <Tap
       accessibilityRole="button"
       accessibilityLabel={t('common.back')}
       onPress={onPress}
@@ -25,7 +26,7 @@ export function BackButton({ onPress }: { onPress: () => void }) {
       <ThemedText type="label">
         {t('common.back')}
       </ThemedText>
-    </Pressable>
+    </Tap>
   );
 }
 

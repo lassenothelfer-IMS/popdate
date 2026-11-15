@@ -239,6 +239,19 @@ export const Motion = {
   hold: 1200,
 } as const;
 
+/**
+ * Springs, for motion you cause yourself: a press, a pick, a sheet you opened.
+ * What you only watch (a round arriving, a photo fading in) stays on the eases below.
+ */
+export const Spring = {
+  /** A press giving under your finger and coming back with a small bounce. */
+  press: { damping: 14, stiffness: 220, mass: 0.6 },
+  /** Something sliding to its place: a sheet, the line under a tab. No bounce to speak of. */
+  settle: { damping: 22, stiffness: 240, mass: 0.9 },
+  /** A release with a clear bounce: the Play balloon let go. */
+  bouncy: { damping: 9, stiffness: 180, mass: 0.7 },
+} as const;
+
 /** Worklet easings for timing animations. Never ease-in on UI. */
 export const Ease = {
   out: Easing.bezier(0.23, 1, 0.32, 1),
@@ -254,6 +267,8 @@ export const CssEase = {
   out: cubicBezier(0.23, 1, 0.32, 1),
   inOut: cubicBezier(0.77, 0, 0.175, 1),
   rise: cubicBezier(0.22, 1, 0.36, 1),
+  /** A spring's overshoot for CSS transitions, which can't run a real spring. */
+  spring: cubicBezier(0.34, 1.45, 0.64, 1),
 } as const;
 
 /** Smallest comfortable touch target, in points. */

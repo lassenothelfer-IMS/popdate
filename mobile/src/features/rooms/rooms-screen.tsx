@@ -14,7 +14,6 @@ import { PressableHighlight } from '@/components/pressable-highlight';
 import { Rise } from '@/components/rise';
 import { Screen } from '@/components/screen';
 import { Skeleton } from '@/components/skeleton';
-import { Bob } from '@/components/stage';
 import { TAB_BAR_CLEARANCE } from '@/components/tab-bar';
 import { TabSwipe } from '@/components/tab-swipe';
 import { TextLink } from '@/components/text-link';

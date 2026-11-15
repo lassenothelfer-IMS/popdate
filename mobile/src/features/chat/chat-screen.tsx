@@ -5,7 +5,6 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -59,6 +58,7 @@ import { useSession } from '@/state/session';
 import { useFilterText, useSettings } from '@/state/settings';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
+import { Tap } from '@/components/tap';
 
 /**
  * The room's last round at the top of the chat: the question, and the answer
@@ -519,14 +519,14 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         />
       ) : (
         <View style={styles.header}>
-          <Pressable
+          <Tap
             accessibilityRole="button"
             accessibilityLabel={t('common.back')}
             onPress={leave}
             pressRetentionOffset={{ top: 16, bottom: 16, left: 16, right: 16 }}
             style={({ pressed }) => [styles.iconButton, styles.back, pressed && styles.pressed]}>
             <Icon name="back" size={20} color={theme.text} />
-          </Pressable>
+          </Tap>
           <View
             accessible
             accessibilityRole="header"
@@ -564,7 +564,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
         {(['chat', 'profile'] as const).map((side) => {
           const selected = tab === side;
           return (
-            <Pressable
+            <Tap
               key={side}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
@@ -574,7 +574,7 @@ function Conversation({ match, myId }: { match: Match; myId: string }) {
               <ThemedText style={[styles.tabLabel, selected ? styles.tabLabelOn : { color: theme.textSecondary }]}>
                 {t(side === 'chat' ? 'chat.tabChat' : 'chat.tabProfile')}
               </ThemedText>
-            </Pressable>
+            </Tap>
           );
         })}
         {/* One line, which travels to whichever side you are on. */}

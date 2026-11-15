@@ -38,8 +38,8 @@ export function PageDots({ count, index, color, restColor, style }: PageDotsProp
                 width: on ? 22 : 8,
                 backgroundColor: on ? color : restColor,
                 transitionProperty: ['width', 'backgroundColor'],
-                transitionDuration: reduced ? 0 : Motion.state,
-                transitionTimingFunction: CssEase.out,
+                transitionDuration: reduced ? 0 : Motion.enter,
+                transitionTimingFunction: CssEase.spring,
               },
             ]}
           />

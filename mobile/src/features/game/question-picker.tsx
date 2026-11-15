@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import type { Question } from '@/api';
@@ -7,6 +7,7 @@ import { CssEase, Motion, Radius, Space } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { useT } from '@/i18n';
+import { Tap } from '@/components/tap';
 
 type QuestionPickerProps = {
   options: Question[];
@@ -70,7 +71,8 @@ function Option({ question, selected, anySelected, locked, onSelect }: OptionPro
   const reduced = useReduceMotion();
   const rest = selected || !anySelected ? 1 : locked ? 0 : OTHERS_PICKED;
   return (
-    <Pressable
+    <Tap
+ scale={1}
       accessibilityRole="radio"
       accessibilityLabel={question.text}
       accessibilityState={{ checked: selected, disabled: locked }}
@@ -102,7 +104,7 @@ function Option({ question, selected, anySelected, locked, onSelect }: OptionPro
           </Animated.View>
         );
       }}
-    </Pressable>
+    </Tap>
   );
 }
 

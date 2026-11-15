@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -37,6 +37,7 @@ import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { seatAt, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { webSafeKeyframe } from '@/utils/web-motion';
+import { Tap } from '@/components/tap';
 
 // The queue and the two "room is ready" screens, drawn to design/four-screens on
 // the 390 x 844 stage. Positions are the design's own numbers.
@@ -124,7 +125,7 @@ export function QueueStage({ found, needed, waited, leaving, locked, error, onLe
   return (
     <Stage>
       <StageBlock index={0} style={styles.queueHeader}>
-        <Pressable
+        <Tap
           accessibilityRole="button"
           accessibilityLabel={t('queue.leaveLine')}
           accessibilityState={{ disabled: locked || leaving, busy: leaving }}
@@ -140,7 +141,7 @@ export function QueueStage({ found, needed, waited, leaving, locked, error, onLe
           <Text {...stageText} style={[stageType.sans, styles.leaveText, { color: theme.text }]}>
             {t('queue.leaveLine')}
           </Text>
-        </Pressable>
+        </Tap>
         <View style={styles.waited}>
           <Text {...stageText} style={[stageType.sans, styles.waitedText, { color: theme.text }]}>
             {t('queue.waited', { time: waited })}
