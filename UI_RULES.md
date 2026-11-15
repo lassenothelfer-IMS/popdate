@@ -64,6 +64,8 @@ Every rule is meant to be testable: look at a screenshot and answer yes or no. W
 35. **People in line are only ever shown blurred and without colour,** from a tiny copy the server sends, never a sharp photo. Only real people, never stand-ins, and no row at all for fewer than three. *(14 Nov 2026)*
 36. **A match is shown with a portrait photo** (4:5, cropped from the top), not a small circle. *(14 Nov 2026)*
 
+37. **Pages are paper, not flat white:** `PaperGrain` is the first thing inside every page's root (it is built into `Screen` and `Stage`). It stays faint, about 2%, and never goes over photos, sheets or the plum match screen. *(15 Nov 2026)*
+
 ## How to check
 
 - Screenshot every screen you touch in the browser at an iPhone 15 Pro viewport (393 × 852) and inspect it against these rules before saying it's done.

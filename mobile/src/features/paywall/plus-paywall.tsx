@@ -38,6 +38,7 @@ import type { PlusPlan } from '@/shared/balloons';
 import { withAlpha } from '@/utils/color';
 import { haptics } from '@/utils/haptics';
 import { buyProduct, purchasesAvailable, restorePurchases } from '@/utils/purchases';
+import { PaperGrain } from '@/components/paper-grain';
 
 /** The same pages as Settings' Terms and Privacy, on the web: they open over the paywall. */
 const TERMS_URL = 'https://lassenothelfer-ims.github.io/popdate/terms/';
@@ -190,6 +191,7 @@ export function PlusPaywall() {
     <View
       style={[styles.fill, { backgroundColor: theme.page }]}
       onLayout={(event) => setScreenHeight(event.nativeEvent.layout.height)}>
+      <PaperGrain />
       <ScrollView
         style={styles.fill}
         contentContainerStyle={[

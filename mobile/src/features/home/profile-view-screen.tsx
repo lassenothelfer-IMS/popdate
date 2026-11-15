@@ -28,6 +28,7 @@ import { useSettings } from '@/state/settings';
 import { ageFromBirthDate } from '@/utils/birth-date';
 import { haptics } from '@/utils/haptics';
 import { formatHeight } from '@/utils/units';
+import { PaperGrain } from '@/components/paper-grain';
 
 /** Every photo is a 4:5 portrait, as wide as the screen. */
 const PHOTO_RATIO = 4 / 5;
@@ -151,6 +152,7 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.page }]}>
+      <PaperGrain />
       <Animated.ScrollView
         contentContainerStyle={{ paddingBottom: asTab ? TAB_BAR_CLEARANCE : insets.bottom + Space.xl }}
         // The web has no pull gesture to answer.

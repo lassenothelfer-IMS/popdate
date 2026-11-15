@@ -19,6 +19,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { KeyboardAvoidingView, keyboardDismissMode } from '@/components/keyboard';
 import { Gutter, MaxContentWidth, Space } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PaperGrain } from '@/components/paper-grain';
 
 /** Room left between a revealed field and the edge of what you can see. */
 const REVEAL_MARGIN = Space.md;
@@ -169,6 +170,7 @@ export function Screen({
 
   return (
     <View style={[styles.root, { backgroundColor: theme.page }]}>
+      <PaperGrain />
       {background}
       <SafeAreaView style={styles.safeArea} edges={headerHeight > 0 ? ['left', 'right'] : ['top', 'left', 'right']}>
         <KeyboardAvoidingView

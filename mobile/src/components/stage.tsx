@@ -15,6 +15,7 @@ import { Ease, Fonts } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { webSafeKeyframe } from '@/utils/web-motion';
+import { PaperGrain } from '@/components/paper-grain';
 
 // The pieces the designed full-screen moments share (design/four-screens): the
 // queue, the two "room is ready" screens and "Not this time". Each is drawn on a
@@ -37,6 +38,7 @@ export function Stage({ children }: StageProps) {
   const scale = Math.min(width / STAGE_WIDTH, height / STAGE_HEIGHT);
   return (
     <View style={[styles.window, { backgroundColor: theme.page }]}>
+      <PaperGrain />
       <View style={[styles.canvas, { transform: [{ scale }] }]}>{children}</View>
     </View>
   );
