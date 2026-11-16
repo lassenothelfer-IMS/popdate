@@ -1,32 +1,22 @@
+import type { Doc } from '../_generated/dataModel';
 import type { MutationCtx } from '../_generated/server';
+import { QUESTION_TEXTS } from '../../src/shared/questions';
 
-/** The starting list. Edit or add questions in the dashboard; `active: false` retires one. */
-const DEFAULT_QUESTIONS = [
-  'What would your friends say is your worst habit?',
-  "What's the most spontaneous thing you've ever done?",
-  'What does your perfect Sunday look like?',
-  "What's a red flag you secretly have?",
-  "What's the last thing that made you laugh really hard?",
-  'Which song plays when you walk into a room?',
-  "What's your most controversial food opinion?",
-  'What would you do with a free week and no money?',
-  "What's something you're weirdly good at?",
-  "What's your go-to karaoke song?",
-  "What's the best date you've ever been on?",
-  'Cats or dogs? Defend your answer.',
-  "What's a dealbreaker for you?",
-  'What would your ex say about you?',
-  "What's your biggest ick?",
-  'What are you irrationally scared of?',
-];
-
-/** The active questions, adding the starting list the first time a room needs it. */
+/**
+ * The active questions. The starting list lives in `src/shared/questions.ts`
+ * with its translations; any of it not in the table yet is added here, so new
+ * questions reach a deployment that already has rooms. Edit or add questions in
+ * the dashboard; `active: false` retires one (deleting a starting question
+ * would only bring it back).
+ */
 export async function questionPool(ctx: MutationCtx) {
   const all = await ctx.db.query('questions').collect();
-  if (all.length > 0) return all.filter((question) => question.active);
-
-  for (const text of DEFAULT_QUESTIONS) {
-    await ctx.db.insert('questions', { text, active: true });
+  const known = new Set(all.map((question) => question.text));
+  const added: Doc<'questions'>[] = [];
+  for (const text of QUESTION_TEXTS) {
+    if (known.has(text)) continue;
+    const id = await ctx.db.insert('questions', { text, active: true });
+    added.push((await ctx.db.get(id))!);
   }
-  return await ctx.db.query('questions').collect();
+  return [...all, ...added].filter((question) => question.active);
 }

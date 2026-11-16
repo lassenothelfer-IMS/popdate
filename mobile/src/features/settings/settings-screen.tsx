@@ -25,6 +25,7 @@ import { deviceRegion, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useSettings } from '@/state/settings';
 import { haptics } from '@/utils/haptics';
+import { setSoundsOn, useSoundsOn } from '@/utils/sounds';
 import { openBalloonShop, openPlus } from '@/features/paywall/shop';
 import { manageSubscription, purchasesAvailable, restorePurchases, usePlus } from '@/utils/purchases';
 import { enablePush, getPushPermission, type PushPermission } from '@/utils/push';
@@ -62,6 +63,7 @@ function formatBirthday(birthDate: string, locale: string, region: string | null
 export function SettingsScreen() {
   const t = useT();
   const { settings, locale, region, update } = useSettings();
+  const soundsOn = useSoundsOn();
   const { profile, signOut, deleteAccount } = useSession();
   const [verification, setVerification] = useState<VerificationStatus | null>(null);
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
@@ -325,6 +327,13 @@ export function SettingsScreen() {
               { value: 'imperial', label: t('settings.unitsImperial') },
             ]}
             onChange={(units) => save('preferences', { units })}
+          />
+          {/* Kept on this phone: the ringer switch mutes them anyway. */}
+          <SwitchRow
+            label={t('settings.sounds')}
+            description={t('settings.soundsHint')}
+            value={soundsOn}
+            onValueChange={(on) => void setSoundsOn(on)}
           />
         </SettingsSection>
 

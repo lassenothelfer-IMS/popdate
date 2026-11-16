@@ -4,8 +4,8 @@ import type { Strings } from '@/i18n/types';
 export const rooms = {
   en: {
     title: 'Your rooms',
-    summary: { one: '1 room played, %{wins}.', other: '%{count} rooms played, %{wins}.' },
-    summaryWins: { one: '1 win', other: '%{count} wins' },
+    summary: { one: '1 room played, %{matches}.', other: '%{count} rooms played, %{matches}.' },
+    summaryMatches: { one: '1 match', other: '%{count} matches' },
     failed: "Couldn't load your rooms.",
     emptyTitle: 'No rooms yet',
     emptyBody: 'Every room you play shows up here, with your answers and how it ended.',
@@ -33,8 +33,8 @@ export const rooms = {
   },
   de: {
     title: 'Deine Räume',
-    summary: { one: '1 Raum gespielt, %{wins}.', other: '%{count} Räume gespielt, %{wins}.' },
-    summaryWins: { one: '1 Sieg', other: '%{count} Siege' },
+    summary: { one: '1 Raum gespielt, %{matches}.', other: '%{count} Räume gespielt, %{matches}.' },
+    summaryMatches: { one: '1 Match', other: '%{count} Matches' },
     failed: 'Deine Räume konnten nicht geladen werden.',
     emptyTitle: 'Noch keine Räume',
     emptyBody: 'Jeder Raum, den du spielst, landet hier, mit deinen Antworten und wie er ausging.',
@@ -62,8 +62,8 @@ export const rooms = {
   },
   fr: {
     title: 'Tes salles',
-    summary: { one: '1 salle jouée, %{wins}.', other: '%{count} salles jouées, %{wins}.' },
-    summaryWins: { one: '1 victoire', other: '%{count} victoires' },
+    summary: { one: '1 salle jouée, %{matches}.', other: '%{count} salles jouées, %{matches}.' },
+    summaryMatches: { one: '1 match', other: '%{count} matchs' },
     failed: 'Impossible de charger tes salles.',
     emptyTitle: 'Pas encore de salles',
     emptyBody: 'Chaque salle que tu joues apparaît ici, avec tes réponses et la fin de la partie.',
@@ -91,8 +91,8 @@ export const rooms = {
   },
   it: {
     title: 'Le tue stanze',
-    summary: { one: '1 stanza giocata, %{wins}.', other: '%{count} stanze giocate, %{wins}.' },
-    summaryWins: { one: '1 vittoria', other: '%{count} vittorie' },
+    summary: { one: '1 stanza giocata, %{matches}.', other: '%{count} stanze giocate, %{matches}.' },
+    summaryMatches: { one: '1 match', other: '%{count} match' },
     failed: 'Impossibile caricare le tue stanze.',
     emptyTitle: 'Ancora nessuna stanza',
     emptyBody: 'Ogni stanza che giochi appare qui, con le tue risposte e com’è finita.',
@@ -124,7 +124,7 @@ export const rooms = {
 export const you = {
   en: {
     statRooms: { one: 'room', other: 'rooms' },
-    statLastBalloon: { one: 'win', other: 'wins' },
+    statMatches: { one: 'match', other: 'matches' },
     statChooser: { one: 'time choosing', other: 'times choosing' },
     statStreak: { one: 'day streak', other: 'day streak' },
     pinnedTitle: 'Your answers',
@@ -132,7 +132,7 @@ export const you = {
   },
   de: {
     statRooms: { one: 'Raum', other: 'Räume' },
-    statLastBalloon: { one: 'Sieg', other: 'Siege' },
+    statMatches: { one: 'Match', other: 'Matches' },
     statChooser: { one: 'Mal gewählt', other: 'Mal gewählt' },
     statStreak: { one: 'Tag in Folge', other: 'Tage in Folge' },
     pinnedTitle: 'Deine Antworten',
@@ -140,7 +140,7 @@ export const you = {
   },
   fr: {
     statRooms: { one: 'salle', other: 'salles' },
-    statLastBalloon: { one: 'victoire', other: 'victoires' },
+    statMatches: { one: 'match', other: 'matchs' },
     statChooser: { one: 'fois au choix', other: 'fois au choix' },
     statStreak: { one: 'jour d’affilée', other: 'jours d’affilée' },
     pinnedTitle: 'Tes réponses',
@@ -148,7 +148,7 @@ export const you = {
   },
   it: {
     statRooms: { one: 'stanza', other: 'stanze' },
-    statLastBalloon: { one: 'vittoria', other: 'vittorie' },
+    statMatches: { one: 'match', other: 'match' },
     statChooser: { one: 'volta a scegliere', other: 'volte a scegliere' },
     statStreak: { one: 'giorno di fila', other: 'giorni di fila' },
     pinnedTitle: 'Le tue risposte',

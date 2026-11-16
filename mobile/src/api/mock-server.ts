@@ -66,6 +66,7 @@ import {
   REVEAL_BEAT_MS,
   SECOND_CHANCE_MS,
 } from '@/shared/limits';
+import { QUESTION_TEXTS } from '@/shared/questions';
 import {
   type Reveal,
   REVEAL_POP_TOLERANCE_MS,
@@ -96,24 +97,8 @@ const MESSAGES_LIMIT = 200;
 function sideFor(interest: Interest): Gender {
   return interest === 'everyone' ? pickRandom<Gender>(['woman', 'man']) : interest;
 }
-const QUESTIONS: Question[] = [
-  'What would your friends say is your worst habit?',
-  "What's the most spontaneous thing you've ever done?",
-  'What does your perfect Sunday look like?',
-  "What's a red flag you secretly have?",
-  "What's the last thing that made you laugh really hard?",
-  'Which song plays when you walk into a room?',
-  "What's your most controversial food opinion?",
-  'What would you do with a free week and no money?',
-  "What's something you're weirdly good at?",
-  "What's your go-to karaoke song?",
-  "What's the best date you've ever been on?",
-  'Cats or dogs? Defend your answer.',
-  "What's a dealbreaker for you?",
-  'What would your ex say about you?',
-  "What's your biggest ick?",
-  'What are you irrationally scared of?',
-].map((text, index) => ({ id: `q${index + 1}`, text }));
+/** The shared list, in English as the server sends it. The first 16 keep their ids for the bots' answers below. */
+const QUESTIONS: Question[] = QUESTION_TEXTS.map((text, index) => ({ id: `q${index + 1}`, text }));
 
 /** What bots say to each question, so their answers fit what was asked. */
 const BOT_ANSWERS_BY_QUESTION: Record<string, string[]> = {
@@ -875,7 +860,8 @@ class MockServer implements PopdateApi {
   async getQueueStats(): Promise<QueueStats> {
     // The mock's line is made of bots: it drifts a little each time you look,
     // and stays short of a full room so joining still has a seat to fill.
-    this.lineWaiting = Math.min(LOBBY_SIZE - 2, Math.max(1, this.lineWaiting + randomInt(-1, 1)));
+    // It can run empty, so Home's quiet state shows up in a dev run too.
+    this.lineWaiting = Math.min(LOBBY_SIZE - 2, Math.max(0, this.lineWaiting + randomInt(-1, 1)));
     // The same bots keep their place: the row doesn't reshuffle on every look.
     if (!this.lineFaces) {
       const demo = demoPhotos();
@@ -883,7 +869,9 @@ class MockServer implements PopdateApi {
     }
     return {
       waiting: this.lineWaiting,
-      roomsLastHour: randomInt(2, 9),
+      roomsLastHour: this.lineWaiting === 0 ? 0 : randomInt(2, 9),
+      // The bots play most at eight in the evening, the phone's time.
+      busyHourUtc: new Date(new Date().setHours(20, 0, 0, 0)).getUTCHours(),
       faces: this.lineFaces.filter(Boolean).slice(0, this.lineWaiting),
     };
   }

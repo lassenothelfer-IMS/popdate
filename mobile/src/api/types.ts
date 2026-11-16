@@ -90,6 +90,11 @@ export type QueueStats = {
   /** Rooms that started in the last hour. */
   roomsLastHour: number;
   /**
+   * The UTC hour (0 to 23) most rooms started in over the last two weeks, or
+   * null while there are too few rooms to say. Home tells it in the phone's time.
+   */
+  busyHourUtc: number | null;
+  /**
    * Up to six of the people waiting, each as a tiny picture that is already
    * blurred beyond recognition. Never a sharp photo: nobody is shown before a room.
    */

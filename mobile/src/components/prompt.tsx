@@ -2,6 +2,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
+import { useQuestionText } from '@/i18n';
 
 type PromptProps = {
   question: string;
@@ -24,9 +25,11 @@ const ANSWER = {
  * is small and in the system font; the answer is large and in the serif.
  */
 export function Prompt({ question, answer, size = 'regular', style }: PromptProps) {
+  // Pinned answers keep the question as the server sent it: shown in your language.
+  const questionText = useQuestionText();
   return (
     <View style={[styles.prompt, style]}>
-      <ThemedText style={styles.question}>{question}</ThemedText>
+      <ThemedText style={styles.question}>{questionText(question)}</ThemedText>
       {answer ? <ThemedText style={[styles.answer, ANSWER[size]]}>{answer}</ThemedText> : null}
     </View>
   );

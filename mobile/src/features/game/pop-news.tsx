@@ -17,6 +17,7 @@ import { announce as say, sentence } from '@/features/game/announce';
 import { PopBurstStage } from '@/features/game/pop-burst';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { haptics } from '@/utils/haptics';
+import { sounds } from '@/utils/sounds';
 import { nativeOnly } from '@/utils/web-motion';
 
 /** The pop's stage: the balloon floats in the middle, the burst plays around it. */
@@ -150,8 +151,11 @@ function PopSequence({ text, detail, color, fromBurst, announce }: SequenceProps
 
   useEffect(() => {
     clock.set(withTiming(TIMELINE_MS, { duration: TIMELINE_MS - start, easing: Easing.linear }));
-    // The custom pop haptic, at the burst.
-    const id = setTimeout(() => haptics.pop(), BURST_AT - start);
+    // The custom pop haptic and the pop sound, at the burst.
+    const id = setTimeout(() => {
+      haptics.pop();
+      sounds.pop();
+    }, BURST_AT - start);
     return () => clearTimeout(id);
   }, [clock, start]);
 

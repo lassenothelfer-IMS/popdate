@@ -26,7 +26,7 @@ import { useRoomHistory } from '@/features/rooms/use-room-history';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useRoom } from '@/hooks/use-server';
 import { seatAt } from '@/hooks/use-theme';
-import { useT, useLocale } from '@/i18n';
+import { useLocale, useQuestionText, useT } from '@/i18n';
 import { useSession } from '@/state/session';
 import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
@@ -90,6 +90,7 @@ type Round = { number: number; question: string | null; popped: string[]; gotMe:
 
 function Recap({ room }: { room: Room }) {
   const t = useT();
+  const questionText = useQuestionText();
   const locale = useLocale();
   const { profile } = useSession();
   const reduced = useReduceMotion();
@@ -257,7 +258,7 @@ function Recap({ room }: { room: Room }) {
                   <View style={styles.roundBody}>
                     {round.question ? (
                       <Text style={[styles.roundQuestion, { color: paper.text }]} numberOfLines={3}>
-                        {`“${round.question}”`}
+                        {`“${questionText(round.question)}”`}
                       </Text>
                     ) : null}
                     {round.popped.length > 0 ? (

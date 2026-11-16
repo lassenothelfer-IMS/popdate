@@ -11,6 +11,7 @@ import { fail } from './lib/errors';
 import { lobbySize, QUEUE_AWAY_MS, QUEUE_PING_MS, QUEUE_STALE_MS } from './lib/game';
 import { activeRoomOf, getProfile, isBlockedEitherWay } from './lib/people';
 import { rateLimit } from './lib/rateLimit';
+import { busiestHour } from './lib/busy-hour';
 import { createRoom } from './lib/room';
 
 /** How many waiting players matchmaking looks at. Plenty for the test phase. */
@@ -70,6 +71,7 @@ export const stats = query({
       faces,
       waiting: waiting.length,
       roomsLastHour: recent.filter((room) => room.createdAt > hourAgo).length,
+      busyHourUtc: busiestHour(recent.map((room) => room.createdAt)),
     };
   },
 });

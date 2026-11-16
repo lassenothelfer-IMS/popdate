@@ -26,7 +26,7 @@ import { useJoinQueue } from '@/features/home/use-join-queue';
 import { roomStats, useRoomHistory } from '@/features/rooms/use-room-history';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useSeats, useTheme } from '@/hooks/use-theme';
-import { useLocale, useT, type Translate } from '@/i18n';
+import { useLocale, useQuestionText, useT, type Translate } from '@/i18n';
 import { useSession } from '@/state/session';
 import { haptics } from '@/utils/haptics';
 import { nativeOnly } from '@/utils/web-motion';
@@ -127,7 +127,8 @@ export function RoomsScreen() {
               <ThemedText type="body" style={styles.summary}>
                 {t('rooms.summary', {
                   count: stats.played,
-                  wins: t('rooms.summaryWins', { count: stats.lastBalloon }),
+                  // Matches, not wins: a chooser's match counts too, and a room you didn't win isn't a loss.
+                  matches: t('rooms.summaryMatches', { count: stats.matches }),
                 })}
               </ThemedText>
             ) : null}
@@ -215,6 +216,7 @@ type RoomCardProps = {
  */
 function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCardProps) {
   const t = useT();
+  const questionText = useQuestionText();
   const theme = useTheme();
   const seats = useSeats();
   const locale = useLocale();
@@ -283,7 +285,7 @@ function RoomCard({ room, open, fadeIn, onToggle, pins, pinning, onPin }: RoomCa
             const pinned = pin ? pins.some((p) => samePin(p, pin)) : false;
             return (
               <View key={`${room.roomId}-${i}`} style={[styles.round, { borderTopColor: theme.border }]}>
-                <ThemedText style={styles.asked}>{round.question}</ThemedText>
+                <ThemedText style={styles.asked}>{questionText(round.question)}</ThemedText>
                 {pin ? (
                   <View style={styles.answerRow}>
                     <ThemedText style={[styles.answer, styles.said]}>{pin.answer}</ThemedText>

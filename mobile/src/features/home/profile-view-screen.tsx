@@ -244,8 +244,8 @@ export function ProfileViewScreen({ asTab = false }: { asTab?: boolean }) {
               <Stat half={statGrid} value={stats.played} label={t('you.statRooms', { count: stats.played })} />
               <Stat
                 half={statGrid}
-                value={stats.lastBalloon}
-                label={t('you.statLastBalloon', { count: stats.lastBalloon })}
+                value={stats.matches}
+                label={t('you.statMatches', { count: stats.matches })}
               />
               <Stat half={statGrid} value={stats.chooser} label={t('you.statChooser', { count: stats.chooser })} />
               <Stat half={statGrid} value={stats.streak} label={t('you.statStreak', { count: stats.streak })} />

@@ -36,10 +36,10 @@ export function useRoomHistory() {
 
 export type RoomStats = {
   played: number;
-  /** Rooms where you were the last balloon. */
-  lastBalloon: number;
   /** Rooms where you were choosing. */
   chooser: number;
+  /** Rooms that ended in a match for you: as the last balloon or as the one choosing. */
+  matches: number;
   /** Days in a row, up to today or yesterday, with at least one room. */
   streak: number;
 };
@@ -61,8 +61,8 @@ export function roomStats(history: readonly RoomSummary[]): RoomStats {
   }
   return {
     played: history.length,
-    lastBalloon: history.filter((room) => room.outcome === 'won').length,
     chooser: history.filter((room) => room.role === 'popper').length,
+    matches: history.filter((room) => room.matchId !== null).length,
     streak,
   };
 }

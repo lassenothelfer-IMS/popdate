@@ -16,6 +16,7 @@ import { queue } from '@/i18n/locales/queue';
 import { almost, checkin, rooms, you } from '@/i18n/locales/rooms';
 import { settings } from '@/i18n/locales/settings';
 import { LOCALES, type Locale, type Strings } from '@/i18n/types';
+import { localizeQuestion } from '@/shared/questions';
 
 /**
  * Every area registers under its own namespace, so a key reads like
@@ -105,6 +106,16 @@ export function useLocale(): Locale {
 export function useT(): Translate {
   const locale = use(LocaleContext);
   return (key, ...[options]) => i18n.t(key, { locale, ...options });
+}
+
+/**
+ * A room question in the current language. The server sends questions in
+ * English; the ones from `src/shared/questions.ts` come back translated, any
+ * other shows as written.
+ */
+export function useQuestionText(): (text: string) => string {
+  const locale = use(LocaleContext);
+  return (text) => localizeQuestion(text, locale);
 }
 
 /** Outside React (announcements in callbacks, the mock): translate in a given language. */

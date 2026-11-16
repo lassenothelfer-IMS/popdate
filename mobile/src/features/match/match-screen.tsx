@@ -32,6 +32,7 @@ import { seatAt, seatFor, useSeats, useTheme } from '@/hooks/use-theme';
 import { useT, type Translate } from '@/i18n';
 import { track } from '@/utils/analytics';
 import { haptics } from '@/utils/haptics';
+import { sounds } from '@/utils/sounds';
 import { goHome } from '@/utils/navigation';
 import { webSafeKeyframe } from '@/utils/web-motion';
 import { Tap } from '@/components/tap';
@@ -158,6 +159,7 @@ function MatchMoment({ match, role }: { match: Match; role: Role }) {
     if (!fresh || celebrated.current) return;
     celebrated.current = true;
     haptics.success();
+    sounds.match();
   }, [fresh]);
 
   useEffect(() => {

@@ -1,12 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { api, type QueueStatus, type Room } from '@/api';
+import { useLocale } from '@/i18n';
+import { localizeQuestion } from '@/shared/questions';
 
-/** The live room, `null` if it doesn't exist, `undefined` while loading. */
+/**
+ * The live room, `null` if it doesn't exist, `undefined` while loading. Its
+ * question and the chooser's options are in the app's language.
+ */
 export function useRoom(roomId: string) {
   const [room, setRoom] = useState<Room | null | undefined>(undefined);
   useEffect(() => api.watchRoom(roomId, setRoom), [roomId]);
-  return room;
+  const locale = useLocale();
+  return useMemo(() => {
+    if (!room) return room;
+    const local = (question: Room['questionOptions'][number]) => ({
+      ...question,
+      text: localizeQuestion(question.text, locale),
+    });
+    return {
+      ...room,
+      question: room.question ? local(room.question) : null,
+      questionOptions: room.questionOptions.map(local),
+    };
+  }, [room, locale]);
 }
 
 export function useQueueStatus() {

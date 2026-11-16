@@ -43,7 +43,7 @@ import { useJoinQueue } from '@/features/home/use-join-queue';
 import { previewLine, withLastMessages, type Thread } from '@/features/matches/threads';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { seatFor, useSeats, useTheme } from '@/hooks/use-theme';
-import { useT, type TranslationKey } from '@/i18n';
+import { useLocale, useT, type TranslationKey } from '@/i18n';
 import { useSession } from '@/state/session';
 import { useFilterText } from '@/state/settings';
 
@@ -63,6 +63,17 @@ const BOB_MS = 2800;
 /** The balloon's flight off the top of the screen, once you are in the line. */
 const FLIGHT_MS = 620;
 
+/** A UTC hour as a time of day on this phone: "20:00", or "8:00 PM" in English. */
+function localHour(hourUtc: number, locale: string) {
+  const at = new Date();
+  at.setUTCHours(hourUtc, 0, 0, 0);
+  try {
+    return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(at);
+  } catch {
+    return `${at.getHours()}:00`;
+  }
+}
+
 /**
  * Play is one page that doesn't scroll, and mostly air: the headline, then the
  * brand balloon, which is the button. "Get in line" hangs on its string. Press
@@ -74,6 +85,7 @@ export function HomeScreen() {
   const seats = useSeats();
   const theme = useTheme();
   const t = useT();
+  const locale = useLocale();
   const filter = useFilterText();
   const myId = profile?.id ?? null;
   /** The newest chat where they wrote last. Null while there is none. */
@@ -82,6 +94,8 @@ export function HomeScreen() {
   const { join, joining, error, balloons } = useJoinQueue();
   /** Null until it loads, or while it can't: the line then falls back to the city. */
   const [live, setLive] = useState<QueueStats | null>(null);
+  /** Nobody in line who could share a room with you. */
+  const quiet = live !== null && live.waiting === 0;
   const { history, failed: historyFailed } = useRoomHistory();
   const stats = history ? roomStats(history) : null;
   // Waits for your rooms, so it doesn't flash and go for someone who has played
@@ -191,17 +205,30 @@ export function HomeScreen() {
               <ThemedText type="hero" accessibilityRole="header" maxFontSizeMultiplier={1.2}>
                 {t('home.cardTitle')}
               </ThemedText>
-              {live ? <QueueFaces faces={live.faces} /> : null}
+              {live && !quiet ? <QueueFaces faces={live.faces} /> : null}
               <ThemedText type="body">
                 {/* A city is optional now: without one, the line just says how many are waiting. */}
-                {profile.city
-                  ? live
-                    ? t('home.liveQueue', { count: live.waiting, city: profile.city })
-                    : t('home.cardLabel', { city: profile.city })
-                  : live
-                    ? t('home.liveQueueAnywhere', { count: live.waiting })
-                    : t('home.cardLabelAnywhere')}
+                {quiet
+                  ? profile.city
+                    ? t('home.quietQueue', { city: profile.city })
+                    : t('home.quietQueueAnywhere')
+                  : profile.city
+                    ? live
+                      ? t('home.liveQueue', { count: live.waiting, city: profile.city })
+                      : t('home.cardLabel', { city: profile.city })
+                    : live
+                      ? t('home.liveQueueAnywhere', { count: live.waiting })
+                      : t('home.cardLabelAnywhere')}
               </ThemedText>
+              {/* Nobody in line is no reason to leave: when rooms usually open, and that a place in line still counts. */}
+              {quiet ? (
+                <ThemedText type="callout" themeColor="textSecondary">
+                  {/* A number check, not a null check: a server not yet redeployed sends no hour at all. */}
+                  {typeof live.busyHourUtc === 'number'
+                    ? t('home.quietBusyHour', { time: localHour(live.busyHourUtc, locale) })
+                    : t('home.quietNote')}
+                </ThemedText>
+              ) : null}
             </Rise>
           </Animated.View>
 
