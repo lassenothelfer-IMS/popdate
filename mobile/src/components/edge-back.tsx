@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { haptics } from '@/utils/haptics';
@@ -37,7 +37,13 @@ export function EdgeBack({ onBack, children }: EdgeBackProps) {
     });
   return (
     <GestureHandlerRootView style={styles.fill}>
-      <GestureDetector gesture={swipe}>{children}</GestureDetector>
+      <GestureDetector gesture={swipe}>
+        {/* The detector needs a real native view to attach to: one React Native
+            can't flatten away, or the swipe misbehaves and logs an error. */}
+        <View collapsable={false} style={styles.fill}>
+          {children}
+        </View>
+      </GestureDetector>
     </GestureHandlerRootView>
   );
 }

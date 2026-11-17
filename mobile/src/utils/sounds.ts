@@ -105,8 +105,11 @@ function play(sound: Sound) {
   const found = player(sound);
   if (!found) return;
   try {
-    // From the start each time: a pop right after the last one plays in full.
-    void found.seekTo(0).catch(() => {});
+    // Back to the start, so a pop right after the last one plays in full. Only
+    // once the file is loaded: iOS throws on a seek before that, and the throw
+    // takes the whole app down (it did, at the first pop of a room). Not loaded
+    // yet, it hasn't played either, so it starts at the beginning anyway.
+    if (found.isLoaded) void found.seekTo(0).catch(() => {});
     found.play();
   } catch {
     // A sound that can't play is never worth an error.
@@ -114,6 +117,12 @@ function play(sound: Sound) {
 }
 
 export const sounds = {
+  /** Loads both sounds ahead, so the first pop of a room is ready when it bursts. */
+  prepare: () => {
+    if (on === false) return;
+    player('pop');
+    player('match');
+  },
   /** The burst of a balloon, with `haptics.pop()`. */
   pop: () => play('pop'),
   /** The match opening, with `haptics.success()`. */

@@ -279,6 +279,13 @@ function ReadyStep({ profile }: { profile: Profile }) {
             loading={joining}
             onPress={() => void join(() => router.replace('/home'))}
           />
+          {/* Or look around first: finish the profile, see the app, and only show up in a room when ready. */}
+          <Button
+            title={t('onboarding.lookAround')}
+            variant="plain"
+            disabled={joining}
+            onPress={() => router.replace('/home')}
+          />
         </View>
       }>
       <Rise index={0}>

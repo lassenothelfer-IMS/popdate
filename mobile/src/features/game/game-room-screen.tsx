@@ -51,6 +51,7 @@ import { haptics } from '@/utils/haptics';
 import { goHome } from '@/utils/navigation';
 import { numberWord } from '@/utils/number-word';
 import { countRoomPlayed, useShowHints } from '@/utils/rooms-played';
+import { sounds } from '@/utils/sounds';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useT } from '@/i18n';
 
@@ -166,6 +167,11 @@ export function GameRoomScreen({ roomId }: { roomId: string }) {
   useMatchHandoff(room, matchInBeat, holdMs);
   // A beat before each new round and before the reveal. A pop holds the room itself.
   const curtain = usePhaseCurtain(room, !!phase?.holding);
+
+  // The pop and match sounds load while the room opens, so the first burst has its sound ready.
+  useEffect(() => {
+    sounds.prepare();
+  }, []);
 
   // Every new phase starts at the top: the balloons, the pop and the next question.
   // Nobody asked for this scroll, so under Reduce Motion it jumps. An effect event

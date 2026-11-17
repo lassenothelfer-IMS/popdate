@@ -36,7 +36,10 @@ export function SideSwipe({ onLeft, onRight, children, style, fill = true }: Sid
   return (
     <GestureHandlerRootView style={fill ? styles.fill : undefined}>
       <GestureDetector gesture={swipe}>
-        <View style={[fill && styles.fill, style]}>{children}</View>
+        {/* Never flattened away: the detector needs a native view to attach to. */}
+        <View collapsable={false} style={[fill && styles.fill, style]}>
+          {children}
+        </View>
       </GestureDetector>
     </GestureHandlerRootView>
   );

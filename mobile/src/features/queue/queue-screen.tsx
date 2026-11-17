@@ -30,6 +30,8 @@ const TICK_GAP_MS = 1000;
  * first), so it doesn't tick.
  */
 const CATCH_UP_MS = 5000;
+/** How long you wait in line before the app asks about notifications. */
+const QUEUE_PRIMER_DELAY_MS = 10_000;
 /** How long the "room is ready" countdown runs before the room opens by itself. */
 const ROLE_BEAT_MS = 5000;
 /**
@@ -357,8 +359,10 @@ function FillingRoom({ found, needed, roomId }: FillingRoomProps) {
           onLeave={() => void handleCancel()}
         />
       )}
-      {/* While you wait is when a nudge makes sense: "tell me when the room fills". */}
-      <PushPrimer moment="queue" active={!matched} />
+      {/* While you wait is when a nudge makes sense: "tell me when the room fills".
+          Only after a real wait: a room that fills in a few seconds closed the sheet
+          right after it opened, before anyone could read it, and it came back every time. */}
+      <PushPrimer moment="queue" active={!matched} delayMs={QUEUE_PRIMER_DELAY_MS} />
     </>
   );
 }
