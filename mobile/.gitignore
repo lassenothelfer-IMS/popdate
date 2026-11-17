@@ -44,3 +44,6 @@ example
 
 # designlang reference extractions
 design-ref/
+
+# Waitlist exports hold personal data
+waitlist*.csv
