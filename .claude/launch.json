@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "popdate-web",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd mobile && npx expo start --web --port 8081"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "popdate-web-demo",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd mobile && set EXPO_PUBLIC_DEMO_PHOTOS=1&& npx expo start --web --port 8083 --clear"
+      ],
+      "port": 8083
+    },
+    {
+      "name": "popdate-web-dist",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd mobile && npx expo serve --port 8082"
+      ],
+      "port": 8082
+    }
+  ]
+}

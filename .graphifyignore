@@ -1,0 +1,6 @@
+# Generated or scratch folders that aren't part of the app.
+brag-output/
+brag-output-*/
+marketing/
+design/screenshots/
+_site/
